@@ -1,0 +1,151 @@
+// Prisma Schema for DifaMap WebGIS Backend
+// Integrates with Supabase Auth, PostgreSQL, and PostGIS Geospatial Extension
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [postgis]
+}
+
+enum Role {
+  USER
+  SURVEYOR
+  ADMIN
+}
+
+enum LocationCategory {
+  BUS_STOP
+  TRANSIT_HUB
+  TRAIN_STATION
+  PEDESTRIAN_CROSSING
+  SIDEWALK_SEGMENT
+}
+
+enum FacilityType {
+  RAMP
+  GUIDING_BLOCK
+  SIDEWALK
+  ELEVATOR
+  TACTILE_SIGNAGE
+  CROSSING
+  OTHER
+}
+
+enum DamageSeverity {
+  NONE       // Tidak ada kerusakan / sangat layak
+  LOW        // Kerusakan ringan (masih dapat dilalui)
+  MODERATE   // Kerusakan sedang (membutuhkan bantuan)
+  SEVERE     // Kerusakan berat / terputus / tidak dapat diakses
+}
+
+enum ReportStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  RESOLVED
+}
+
+enum EconomicType {
+  MENU_GO       // Data kuliner & UMKM
+  PROPERTI_GO   // Data properti & kepadatan bangunan
+  COMMERCIAL    // Kawasan perdagangan / jasa
+}
+
+// Model User: Terhubung 1-to-1 dengan Supabase Auth (auth.users)
+model User {
+  id        String   @id @db.Uuid
+  email     String   @unique
+  name      String?
+  avatarUrl String?  @map("avatar_url")
+  role      Role     @default(USER)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  reports   Report[]
+
+  @@map("users")
+}
+
+// Model Location: Titik transportasi massal / segmen jalan utama
+model Location {
+  id                    String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                  String
+  category              LocationCategory @default(BUS_STOP)
+  description           String?
+
+  // Koordinat numerik untuk query cepat / fallback
+  latitude              Float
+  longitude             Float
+
+  // Kolom Geometri PostGIS WGS84 (Point, SRID 4326)
+  geom                  Unsupported("geometry(Point, 4326)")?
+
+  // Skor agregasi yang di-update otomatis oleh Database Trigger
+  avgAccessibilityScore Float            @default(0.0) @map("avg_accessibility_score") // 1.0 (Buruk) - 5.0 (Baik)
+  economicScore         Float            @default(0.0) @map("economic_score")          // 0.0 - 100.0 (Kerapatan Menu/Properti Go)
+  priorityIndex         Float            @default(0.0) @map("priority_index")          // (0.6 * Skor Kerusakan) + (0.4 * Skor Ekonomi)
+  totalReports          Int              @default(0) @map("total_reports")
+
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
+
+  reports               Report[]
+
+  @@index([category])
+  @@map("locations")
+}
+
+// Model Report: Laporan crowdsourced kondisi aksesibilitas disabilitas
+model Report {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String         @map("user_id") @db.Uuid
+  locationId     String         @map("location_id") @db.Uuid
+
+  facilityType   FacilityType   @map("facility_type")
+  damageSeverity DamageSeverity @default(NONE) @map("damage_severity")
+
+  description    String         @db.Text
+  photoUrl       String?        @map("photo_url")
+
+  // Skor penilaian user (1.0 = Sangat Buruk/Tidak Aksesibel, 5.0 = Sangat Baik)
+  userScore      Float          @map("user_score")
+
+  // Hasil Ekstraksi AI (OpenAI Orchestrator)
+  aiScore        Float?         @map("ai_score")
+  aiAnalysis     Json?          @map("ai_analysis") // Tag isu, rekomendasi aksi, deteksi rintangan
+
+  status         ReportStatus   @default(PENDING)
+
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location       Location       @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([locationId])
+  @@index([userId])
+  @@index([facilityType])
+  @@map("reports")
+}
+
+// Model EconomicPoint: Menyimpan data spasial sekunder (Menu Go & Properti Go)
+model EconomicPoint {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  type        EconomicType
+  weight      Float        @default(1.0) // Bobot aktivitas (misal: foot traffic / kapasitas)
+  latitude    Float
+  longitude   Float
+  geom        Unsupported("geometry(Point, 4326)")?
+  metadata    Json?
+
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  @@map("economic_points")
+}
