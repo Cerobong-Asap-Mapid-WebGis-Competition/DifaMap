@@ -19,36 +19,98 @@ enum Role {
   ADMIN
 }
 
-enum LocationCategory {
-  BUS_STOP
-  TRANSIT_HUB
-  TRAIN_STATION
-  PEDESTRIAN_CROSSING
-  SIDEWALK_SEGMENT
+// 2 Jenis Entitas Spasial Utama: Tempat vs Jalan/Trotoar vs Titik Transit
+enum EntityType {
+  PLACE            // Mall, Tempat Wisata, Restoran, Fasilitas Publik, dll
+  SIDEWALK         // Segmen Jalan / Jalur Trotoar Pedestrian
+  TRANSIT_HUB      // Halte Bus, Stasiun Kereta, Titik Transit
 }
 
-enum FacilityType {
-  RAMP
-  GUIDING_BLOCK
-  SIDEWALK
-  ELEVATOR
-  TACTILE_SIGNAGE
-  CROSSING
+enum PlaceCategory {
+  MALL
+  RESTAURANT
+  TOURISM
+  HEALTHCARE
+  EDUCATION
+  GOVERNMENT
+  TRANSIT_STATION
+  BUS_STOP
+  PEDESTRIAN_PATH
   OTHER
 }
 
-enum DamageSeverity {
-  NONE       // Tidak ada kerusakan / sangat layak
-  LOW        // Kerusakan ringan (masih dapat dilalui)
-  MODERATE   // Kerusakan sedang (membutuhkan bantuan)
-  SEVERE     // Kerusakan berat / terputus / tidak dapat diakses
+// ==========================================
+// PARAMETER KONDISI FISIK & AKSESIBILITAS
+// ==========================================
+
+enum RampStatus {
+  GOOD             // Ada & kondisi baik / ramah kursi roda (< 8% kelandaian)
+  DAMAGED          // Ada tapi rusak / terlalu curam / terhalang / tanpa pegangan
+  NONE             // Tidak ada ramp
 }
 
-enum ReportStatus {
-  PENDING
-  VERIFIED
-  REJECTED
-  RESOLVED
+enum GuidingBlockStatus {
+  GOOD             // Ada & tersambung dengan baik
+  DAMAGED          // Ada tapi rusak / terputus / terhalang
+  NONE             // Tidak ada ubin pemandu sama sekali
+}
+
+enum SidewalkCondition {
+  GOOD             // Trotoar lebar, rata, dan nyaman
+  NARROW           // Trotoar sempit (< 1.2 meter)
+  DAMAGED          // Trotoar berlubang / paving terlepas
+  BLOCKED          // Terhalang PKL, tiang, kabel, parkir liar
+  NOT_APPLICABLE   // Bukan jalan trotoar (misal: bangunan mall/indoor)
+}
+
+enum SurfaceCondition {
+  SMOOTH           // Halus / rata / paving rapi
+  SLIPPERY         // Licin (terutama saat basah/keramik)
+  POTHOLE          // Berlubang / pecah-pecah
+  UNEVEN           // Bergelombang / berbatu
+}
+
+enum SeatingAvailability {
+  AVAILABLE        // Tersedia tempat duduk / istirahat
+  NOT_AVAILABLE    // Tidak ada tempat istirahat
+}
+
+enum ToiletAccessibility {
+  AVAILABLE_GOOD   // Tersedia toilet ramah disabilitas layak pakai
+  AVAILABLE_DAMAGED // Tersedia tapi rusak / sempit / tidak terawat
+  NOT_AVAILABLE    // Tidak tersedia toilet disabilitas
+}
+
+// ==========================================
+// PARAMETER KEAMANAN & KENYAMANAN
+// ==========================================
+
+enum LightingLevel {
+  BRIGHT           // Sangat terang / lampu jalan aktif & merata
+  DIM              // Redup / pencahayaan minim
+  DARK             // Gelap / tidak ada lampu jalan
+}
+
+enum CrowdLevel {
+  QUIET            // Sepi
+  MODERATE         // Sedang / normal
+  CROWDED          // Ramai / sangat padat
+}
+
+// ==========================================
+// PARAMETER TEMPORAL (WAKTU)
+// ==========================================
+
+enum WeeklyPattern {
+  WEEKDAY_BUSY     // Lebih ramai saat hari kerja (Senin-Jumat)
+  WEEKEND_BUSY     // Lebih ramai saat akhir pekan (Sabtu-Minggu)
+  BALANCED         // Relatif seimbang setiap hari
+}
+
+enum ActivityStatus {
+  DRAFT
+  PUBLIC
+  ARCHIVED
 }
 
 enum EconomicType {
@@ -57,95 +119,157 @@ enum EconomicType {
   COMMERCIAL    // Kawasan perdagangan / jasa
 }
 
-// Model User: Terhubung 1-to-1 dengan Supabase Auth (auth.users)
-model User {
-  id        String   @id @db.Uuid
-  email     String   @unique
-  name      String?
-  avatarUrl String?  @map("avatar_url")
-  role      Role     @default(USER)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+// ==========================================
+// MODELS / TABLES
+// ==========================================
 
-  reports   Report[]
+// Model User: Terhubung dengan Supabase Auth (auth.users)
+model User {
+  id         String     @id @db.Uuid
+  email      String     @unique
+  name       String?
+  avatarUrl  String?    @map("avatar_url")
+  role       Role       @default(USER)
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  activities Activity[]
+  comments   Comment[]
 
   @@map("users")
 }
 
-// Model Location: Titik transportasi massal / segmen jalan utama
+// Model Location: Tempat (Mall, Wisata, Resto, Halte) dan Ruas Jalan/Trotoar
 model Location {
-  id                    String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                    String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name                  String
-  category              LocationCategory @default(BUS_STOP)
-  description           String?
+  entityType            EntityType          @default(PLACE) @map("entity_type")
+  category              PlaceCategory       @default(OTHER)
+  specificLocation      String?             @map("specific_location") // Alamat detail / patokan
+  description           String?             @db.Text
+  coverImageUrl         String?             @map("cover_image_url")
 
-  // Koordinat numerik untuk query cepat / fallback
+  // Koordinat spasial
   latitude              Float
   longitude             Float
-
-  // Kolom Geometri PostGIS WGS84 (Point, SRID 4326)
   geom                  Unsupported("geometry(Point, 4326)")?
 
-  // Skor agregasi yang di-update otomatis oleh Database Trigger
-  avgAccessibilityScore Float            @default(0.0) @map("avg_accessibility_score") // 1.0 (Buruk) - 5.0 (Baik)
-  economicScore         Float            @default(0.0) @map("economic_score")          // 0.0 - 100.0 (Kerapatan Menu/Properti Go)
-  priorityIndex         Float            @default(0.0) @map("priority_index")          // (0.6 * Skor Kerusakan) + (0.4 * Skor Ekonomi)
-  totalReports          Int              @default(0) @map("total_reports")
+  // Parameter Fisik & Aksesibilitas Terkini (Disintesis dari AI & Input Laporan)
+  rampStatus            RampStatus          @default(NONE) @map("ramp_status")
+  guidingBlockStatus    GuidingBlockStatus  @default(NONE) @map("guiding_block_status")
+  sidewalkCondition     SidewalkCondition   @default(NOT_APPLICABLE) @map("sidewalk_condition")
+  surfaceCondition      SurfaceCondition    @default(SMOOTH) @map("surface_condition")
+  seatingAvailability   SeatingAvailability @default(NOT_AVAILABLE) @map("seating_availability")
+  toiletAccessibility   ToiletAccessibility @default(NOT_AVAILABLE) @map("toilet_accessibility")
 
-  createdAt             DateTime         @default(now()) @map("created_at")
-  updatedAt             DateTime         @updatedAt @map("updated_at")
+  // Parameter Keamanan & Kenyamanan
+  lightingLevel         LightingLevel       @default(BRIGHT) @map("lighting_level")
+  crowdLevel            CrowdLevel          @default(MODERATE) @map("crowd_level")
 
-  reports               Report[]
+  // Parameter Temporal (Waktu)
+  peakHours             String?             @map("peak_hours") // Contoh: "07:00-09:00, 17:00-19:30"
+  safeVisitTime         String?             @map("safe_visit_time") // Contoh: "08:00 - 17:00"
+  weeklyPattern         WeeklyPattern       @default(BALANCED) @map("weekly_pattern")
 
+  // Scoring & AI Insights (Murni Dihitung & Di-update oleh AI Orchestrator)
+  overallScore          Float               @default(0.0) @map("overall_score") // 1.0 - 5.0 (Rating Bintang)
+  physicalScore         Float               @default(0.0) @map("physical_score") // 1.0 - 5.0
+  safetyScore           Float               @default(0.0) @map("safety_score") // 1.0 - 5.0
+  aiSummary             String?             @db.Text @map("ai_summary") // Ringkasan poin-poin aksesibilitas
+  aiInsights            Json?               @map("ai_insights") // Rekomendasi perbaikan & detail parameter
+
+  // Analisis Spasial Ekonomi MAPID
+  economicScore         Float               @default(0.0) @map("economic_score") // 0.0 - 100.0 (Kerapatan Menu/Properti Go)
+  priorityIndex         Float               @default(0.0) @map("priority_index") // Indeks prioritas intervensi
+
+  totalActivities       Int                 @default(0) @map("total_activities")
+  totalComments         Int                 @default(0) @map("total_comments")
+
+  createdAt             DateTime            @default(now()) @map("created_at")
+  updatedAt             DateTime            @updatedAt @map("updated_at")
+
+  activities            Activity[]
+  comments              Comment[]
+
+  @@index([entityType])
   @@index([category])
+  @@index([overallScore])
   @@map("locations")
 }
 
-// Model Report: Laporan crowdsourced kondisi aksesibilitas disabilitas
-model Report {
-  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId         String         @map("user_id") @db.Uuid
-  locationId     String         @map("location_id") @db.Uuid
+// Model Activity: Crowdsourced Postingan Komunitas / Story / Laporan Foto
+model Activity {
+  id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String             @map("user_id") @db.Uuid
+  locationId         String?            @map("location_id") @db.Uuid // Opsional: jika ditag ke Location tertentu
 
-  facilityType   FacilityType   @map("facility_type")
-  damageSeverity DamageSeverity @default(NONE) @map("damage_severity")
+  title              String             // Activity Name (misal: "Mampir lihat Danau UNHAS")
+  description        String             @db.Text // Activity Description
+  mediaUrls          String[]           @default([]) @map("media_urls") // Foto-foto yang diunggah
+  specificLocation   String?            @map("specific_location") // Nama tempat / jalan spesifik dari user
 
-  description    String         @db.Text
-  photoUrl       String?        @map("photo_url")
+  // Koordinat Pick Location pada Map
+  latitude           Float
+  longitude          Float
+  geom               Unsupported("geometry(Point, 4326)")?
 
-  // Skor penilaian user (1.0 = Sangat Buruk/Tidak Aksesibel, 5.0 = Sangat Baik)
-  userScore      Float          @map("user_score")
+  status             ActivityStatus     @default(PUBLIC)
+  accessibilityTags  String[]           @default([]) @map("accessibility_tags") // e.g. ["Kursi Roda", "Ramp Bagus", "Trotoar Sempit"]
 
-  // Hasil Ekstraksi AI (OpenAI Orchestrator)
-  aiScore        Float?         @map("ai_score")
-  aiAnalysis     Json?          @map("ai_analysis") // Tag isu, rekomendasi aksi, deteksi rintangan
+  // Hasil Ekstraksi & Scoring Otomatis oleh AI Orchestrator
+  aiScore            Float?             @map("ai_score") // Skor 1.0 - 5.0 dari AI
+  aiAnalysis         Json?              @map("ai_analysis") // Ekstraksi rintangan, isu, rekomendasi
+  observedParameters Json?              @map("observed_parameters") // Parameter fisik yang terdeteksi
 
-  status         ReportStatus   @default(PENDING)
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
 
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location           Location?          @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  comments           Comment[]
 
-  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  location       Location       @relation(fields: [locationId], references: [id], onDelete: Cascade)
-
-  @@index([locationId])
   @@index([userId])
-  @@index([facilityType])
-  @@map("reports")
+  @@index([locationId])
+  @@index([status])
+  @@map("activities")
+}
+
+// Model Comment: Komentar / Ulasan dari User Terautentikasi untuk Location atau Activity
+model Comment {
+  id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String             @map("user_id") @db.Uuid
+  locationId         String?            @map("location_id") @db.Uuid
+  activityId         String?            @map("activity_id") @db.Uuid
+
+  content            String             @db.Text
+  photoUrls          String[]           @default([]) @map("photo_urls")
+
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location           Location?          @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  activity           Activity?          @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([locationId])
+  @@index([activityId])
+  @@map("comments")
 }
 
 // Model EconomicPoint: Menyimpan data spasial sekunder (Menu Go & Properti Go)
 model EconomicPoint {
-  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name        String
-  type        EconomicType
-  weight      Float        @default(1.0) // Bobot aktivitas (misal: foot traffic / kapasitas)
-  latitude    Float
-  longitude   Float
-  geom        Unsupported("geometry(Point, 4326)")?
-  metadata    Json?
+  id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name               String
+  type               EconomicType
+  weight             Float              @default(1.0) // Bobot aktivitas (misal: foot traffic / kapasitas)
+  latitude           Float
+  longitude          Float
+  geom               Unsupported("geometry(Point, 4326)")?
+  metadata           Json?
 
-  createdAt   DateTime     @default(now()) @map("created_at")
+  createdAt          DateTime           @default(now()) @map("created_at")
 
   @@map("economic_points")
 }
+

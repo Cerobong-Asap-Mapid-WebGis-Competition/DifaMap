@@ -1,6 +1,6 @@
 # Entity Relationship Diagram (ERD) & Penjelasan Database Schema - DifaMap
 
-Dokumen ini berisi dokumentasi skema database Prisma untuk backend **DifaMap WebGIS** (`apps/api/prisma/schema.prisma`), relasi antar tabel, dan Entity Relationship Diagram (ERD).
+Dokumen ini berisi dokumentasi resmi skema database Prisma untuk backend **DifaMap WebGIS** (`apps/api/prisma/schema.prisma`), relasi antar entitas, tipe enum parameter aksesibilitas fisik, keamanan, temporal, serta Entity Relationship Diagram (ERD).
 
 ---
 
@@ -8,10 +8,6 @@ Dokumen ini berisi dokumentasi skema database Prisma untuk backend **DifaMap Web
 
 ```mermaid
 erDiagram
-    %% ==========================================
-    %% ENUMS (Sebagai Tipe Data Referensi)
-    %% ==========================================
-
     %% ==========================================
     %% ENTITIES / TABLES
     %% ==========================================
@@ -28,34 +24,68 @@ erDiagram
 
     locations {
         uuid id PK "gen_random_uuid()"
-        string name "Nama titik fasilitas/halte/stasiun"
-        LocationCategory category "BUS_STOP | TRANSIT_HUB | dll"
-        string description "Deskripsi lokasi (nullable)"
+        string name "Nama Tempat / Nama Ruas Trotoar"
+        EntityType entity_type "PLACE | SIDEWALK | TRANSIT_HUB"
+        PlaceCategory category "MALL | RESTAURANT | TOURISM | BUS_STOP | dll"
+        string specific_location "Detail alamat / patokan lokasi (nullable)"
+        string description "Deskripsi umum (nullable)"
+        string cover_image_url "Foto utama tempat / trotoar (nullable)"
         float latitude "Koordinat lintang (WGS84)"
         float longitude "Koordinat bujur (WGS84)"
         geometry geom "PostGIS Point SRID 4326 (nullable)"
-        float avg_accessibility_score "Skor rata-rata aksesibilitas (1.0-5.0)"
-        float economic_score "Skor kerapatan ekonomi (0.0-100.0)"
-        float priority_index "Indeks prioritas perbaikan fasilitas"
-        int total_reports "Jumlah total laporan masuk"
+        RampStatus ramp_status "GOOD | DAMAGED | NONE"
+        GuidingBlockStatus guiding_block_status "GOOD | DAMAGED | NONE"
+        SidewalkCondition sidewalk_condition "GOOD | NARROW | DAMAGED | BLOCKED | NOT_APPLICABLE"
+        SurfaceCondition surface_condition "SMOOTH | SLIPPERY | POTHOLE | UNEVEN"
+        SeatingAvailability seating_availability "AVAILABLE | NOT_AVAILABLE"
+        ToiletAccessibility toilet_accessibility "AVAILABLE_GOOD | AVAILABLE_DAMAGED | NOT_AVAILABLE"
+        LightingLevel lighting_level "BRIGHT | DIM | DARK"
+        CrowdLevel crowd_level "QUIET | MODERATE | CROWDED"
+        string peak_hours "Contoh: 07:00-09:00, 17:00-19:30"
+        string safe_visit_time "Contoh: 08:00 - 17:00"
+        WeeklyPattern weekly_pattern "WEEKDAY_BUSY | WEEKEND_BUSY | BALANCED"
+        float overall_score "Rating 1.0 - 5.0 (Dihitung Murni oleh AI)"
+        float physical_score "Skor fisik 1.0 - 5.0"
+        float safety_score "Skor keamanan 1.0 - 5.0"
+        string ai_summary "Ringkasan poin-poin aksesibilitas hasil AI"
+        json ai_insights "Detail poin kekuatan, rintangan & rekomendasi"
+        float economic_score "Skor kerapatan ekonomi MAPID (0.0 - 100.0)"
+        float priority_index "Indeks prioritas intervensi perbaikan"
+        int total_activities "Jumlah total postingan aktivitas ter-tag"
+        int total_comments "Jumlah komentar ulasan"
         datetime created_at "Timestamp pembuatan"
         datetime updated_at "Timestamp update"
     }
 
-    reports {
+    activities {
         uuid id PK "gen_random_uuid()"
         uuid user_id FK "Relasi ke users.id"
-        uuid location_id FK "Relasi ke locations.id"
-        FacilityType facility_type "RAMP | GUIDING_BLOCK | SIDEWALK | dll"
-        DamageSeverity damage_severity "NONE | LOW | MODERATE | SEVERE"
-        string description "Keterangan detail kondisi fasilitas"
-        string photo_url "Bukti foto fasilitas (nullable)"
-        float user_score "Skor penilaian pengguna (1.0 - 5.0)"
-        float ai_score "Skor hasil validasi AI (nullable)"
+        uuid location_id FK "Relasi opsional ke locations.id (nullable)"
+        string title "Activity Name (misal: Mampir lihat Danau UNHAS)"
+        string description "Activity Description (caption detail)"
+        string[] media_urls "Array URL foto-foto aktivitas"
+        string specific_location "Nama tempat / jalan yang diinput user"
+        float latitude "Koordinat lintang dari Pick Location"
+        float longitude "Koordinat bujur dari Pick Location"
+        geometry geom "PostGIS Point SRID 4326 (nullable)"
+        ActivityStatus status "DRAFT | PUBLIC | ARCHIVED"
+        string[] accessibility_tags "Tag aksesibilitas (Kursi Roda, Ramp, dll)"
+        float ai_score "Skor evaluasi AI (1.0 - 5.0)"
         json ai_analysis "Hasil ekstraksi AI (isu, rintangan, rekomendasi)"
-        ReportStatus status "PENDING | VERIFIED | REJECTED | RESOLVED"
-        datetime created_at "Timestamp pembuatan laporan"
-        datetime updated_at "Timestamp update laporan"
+        json observed_parameters "Parameter fisik terdeteksi AI"
+        datetime created_at "Timestamp pembuatan"
+        datetime updated_at "Timestamp update"
+    }
+
+    comments {
+        uuid id PK "gen_random_uuid()"
+        uuid user_id FK "Relasi ke users.id"
+        uuid location_id FK "Relasi opsional ke locations.id (nullable)"
+        uuid activity_id FK "Relasi opsional ke activities.id (nullable)"
+        string content "Teks komentar / ulasan pengguna"
+        string[] photo_urls "Array URL foto lampiran ulasan"
+        datetime created_at "Timestamp ulasan"
+        datetime updated_at "Timestamp update"
     }
 
     economic_points {
@@ -66,7 +96,7 @@ erDiagram
         float latitude "Koordinat lintang (WGS84)"
         float longitude "Koordinat bujur (WGS84)"
         geometry geom "PostGIS Point SRID 4326 (nullable)"
-        json metadata "Data atribut tambahan"
+        json metadata "Data atribut tambahan MAPID"
         datetime created_at "Timestamp pembuatan data"
     }
 
@@ -74,9 +104,12 @@ erDiagram
     %% RELATIONSHIPS
     %% ==========================================
 
-    users ||--o{ reports : "membuat (1:N, onDelete: Cascade)"
-    locations ||--o{ reports : "memiliki (1:N, onDelete: Cascade)"
-    locations ..o{ economic_points : "dianalisis spasial via PostGIS (ST_DWithin/ST_Distance)"
+    users ||--o{ activities : "membuat aktivitas (1:N, onDelete: Cascade)"
+    users ||--o{ comments : "menulis ulasan/komentar (1:N, onDelete: Cascade)"
+    locations ||--o{ activities : "memiliki aktivitas berlabel (0:N, onDelete: SetNull)"
+    locations ||--o{ comments : "menerima ulasan (0:N, onDelete: Cascade)"
+    activities ||--o{ comments : "menerima komentar diskusi (0:N, onDelete: Cascade)"
+    locations ..o{ economic_points : "analisis buffer spasial PostGIS (ST_DWithin)"
 ```
 
 ---
@@ -87,62 +120,67 @@ Database DifaMap dirancang di atas **PostgreSQL** dengan ekstensi **PostGIS** da
 
 ### A. Tabel `users` (`User`)
 Tabel penyimpan data pengguna aplikasi.
-* **Tujuan**: Menghubungkan identitas autentikasi Supabase (`auth.users`) dengan data laporan di DifaMap.
+* **Tujuan**: Menghubungkan identitas autentikasi Supabase (`auth.users`) dengan data aktivitas dan komentar di DifaMap.
 * **Kolom Kunci**:
   * `id` (`UUID`): Primary Key yang mereferensikan UUID pengguna dari Supabase Auth.
   * `role` (`Role` enum): Peran pengguna (`USER`, `SURVEYOR`, `ADMIN`) untuk kontrol akses (RBAC).
   * `email`, `name`, `avatar_url`: Profil pengguna.
-* **Relasi**:
-  * Memiliki relasi **1-ke-Banyak (One-to-Many)** dengan tabel `reports`.
 
 ---
 
 ### B. Tabel `locations` (`Location`)
-Tabel penyimpan titik infrastruktur publik, transportasi massal, maupun segmen trotoar.
-* **Tujuan**: Menjadi entitas sentral pemetaan spasial fasilitas aksesibilitas ramah disabilitas.
-* **Kolom Kunci**:
-  * `id` (`UUID`): Primary Key (auto-generated UUID).
-  * `category` (`LocationCategory` enum): Klasifikasi titik (`BUS_STOP`, `TRANSIT_HUB`, `TRAIN_STATION`, `PEDESTRIAN_CROSSING`, `SIDEWALK_SEGMENT`).
-  * `latitude`, `longitude`, `geom`: Koordinat numerik serta kolom geometri PostGIS (`Point, 4326`) untuk operasi spasial.
-  * **Metrik & Skor Agregasi**:
-    * `avg_accessibility_score`: Rata-rata skor aksesibilitas (rentang 1.0 = buruk s.d. 5.0 = sangat aksesibel) yang dihitung dari agregasi laporan.
-    * `economic_score`: Skor kerapatan ekonomi (0.0 - 100.0) di sekitar titik lokasi.
-    * `priority_index`: Indeks prioritas intervensi perbaikan yang dihitung dari formula gabungan: `(0.6 × Skor Kerusakan) + (0.4 × Skor Ekonomi)`.
-    * `total_reports`: Jumlah laporan yang masuk pada lokasi ini.
-* **Relasi**:
-  * Memiliki relasi **1-ke-Banyak (One-to-Many)** dengan tabel `reports`.
+Tabel penyimpan titik infrastruktur publik (Mall, Wisata, Restoran, Halte) dan segmen jalan/trotoar publik.
+* **Tujuan**: Menjadi entitas sentral pemetaan spasial dan visualisasi pin/kartu tempat & trotoar.
+* **Kategori Entitas**:
+  * `entity_type`: `PLACE` (mall, restoran, wisata), `SIDEWALK` (jalan/trotoar), `TRANSIT_HUB` (halte, stasiun).
+* **Parameter Fisik & Aksesibilitas**:
+  * `ramp_status`: `GOOD` | `DAMAGED` | `NONE`
+  * `guiding_block_status`: `GOOD` | `DAMAGED` | `NONE`
+  * `sidewalk_condition`: `GOOD` | `NARROW` | `DAMAGED` | `BLOCKED` | `NOT_APPLICABLE` (Khusus jalan trotoar)
+  * `surface_condition`: `SMOOTH` | `SLIPPERY` | `POTHOLE` | `UNEVEN`
+  * `seating_availability`: `AVAILABLE` | `NOT_AVAILABLE`
+  * `toilet_accessibility`: `AVAILABLE_GOOD` | `AVAILABLE_DAMAGED` | `NOT_AVAILABLE`
+* **Parameter Keamanan & Kenyamanan**:
+  * `lighting_level`: `BRIGHT` | `DIM` | `DARK`
+  * `crowd_level`: `QUIET` | `MODERATE` | `CROWDED`
+* **Parameter Temporal**:
+  * `peak_hours`: Rentang jam ramai (misal: "07:00-09:00, 17:00-19:30").
+  * `safe_visit_time`: Waktu terbaik & paling aman dikunjungi (misal: "08:00 - 17:00").
+  * `weekly_pattern`: `WEEKDAY_BUSY` | `WEEKEND_BUSY` | `BALANCED`.
+* **Scoring & AI Insights (Scoring Murni AI)**:
+  * `overall_score`: Nilai rating bintang 1.0 - 5.0 yang dihitung murni oleh AI.
+  * `ai_summary`: Deskripsi poin-poin ringkas hasil sintesis AI dari laporan aktivitas.
+  * `ai_insights`: JSON terstruktur berisi kekuatan (*strengths*), rintangan (*barriers*), dan saran perbaikan.
 
 ---
 
-### C. Tabel `reports` (`Report`)
-Tabel crowdsourcing laporan kondisi fasilitas aksesibilitas disabilitas dari masyarakat / surveyor.
-* **Tujuan**: Mencatat riwayat aduan, bukti foto, tingkat kerusakan, dan validasi AI.
+### C. Tabel `activities` (`Activity`)
+Tabel crowdsourcing aktivitas/cerita/laporan komunitas berbasis multi-foto (sesuai UI tab Activity & Create Activity).
+* **Tujuan**: Pengguna terautentikasi dapat membagikan postingan foto kondisi fasilitas/aktivitas di lokasi tertentu.
 * **Kolom Kunci**:
   * `id` (`UUID`): Primary Key.
-  * `user_id` (`UUID`): Foreign Key yang merujuk ke `users.id`.
-  * `location_id` (`UUID`): Foreign Key yang merujuk ke `locations.id`.
-  * `facility_type` (`FacilityType` enum): Jenis fasilitas yang dilaporkan (`RAMP`, `GUIDING_BLOCK`, `SIDEWALK`, `ELEVATOR`, `TACTILE_SIGNAGE`, `CROSSING`, `OTHER`).
-  * `damage_severity` (`DamageSeverity` enum): Tingkat kerusakan (`NONE`, `LOW`, `MODERATE`, `SEVERE`).
-  * `user_score`: Skor penilaian dari pelapor (1.0 s.d. 5.0).
-  * `ai_score` & `ai_analysis`: Hasil orkestrasi AI (OpenAI/Vision) yang mengekstrak ringkasan rintangan, rekomendasi perbaikan, dan validasi foto.
-  * `status` (`ReportStatus` enum): Status alur laporan (`PENDING`, `VERIFIED`, `REJECTED`, `RESOLVED`).
-* **Relasi**:
-  * **Many-to-One** ke `users` (`onDelete: Cascade`).
-  * **Many-to-One** ke `locations` (`onDelete: Cascade`).
+  * `user_id` (`UUID`): Foreign Key merujuk ke `users.id`.
+  * `location_id` (`UUID`, nullable): Foreign Key merujuk ke `locations.id` jika aktivitas dilabelkan pada tempat terdaftar.
+  * `title`: Nama aktivitas (Activity Name).
+  * `description`: Deskripsi cerita/laporan (Activity Description).
+  * `media_urls`: Array string URL foto-foto yang diunggah.
+  * `specific_location`: Nama tempat / jalan spesifik yang diketik pengguna.
+  * `latitude`, `longitude`, `geom`: Koordinat hasil pin lokasi (*Pick Location*).
+  * `status`: `DRAFT` | `PUBLIC` | `ARCHIVED`.
+  * `ai_score` & `ai_analysis`: Hasil evaluasi AI terhadap postingan, foto, dan isu aksesibilitas yang terdeteksi.
 
 ---
 
-### D. Tabel `economic_points` (`EconomicPoint`)
-Tabel penyimpan data spasial sekunder pendukung analisis prioritas (Point of Interest ekonomi).
-* **Tujuan**: Menyimpan data titik kuliner/UMKM (*Menu Go*), properti & kepadatan bangunan (*Properti Go*), dan kawasan komersial.
+### D. Tabel `comments` (`Comment`)
+Tabel ulasan dan komentar pengguna untuk Tempat maupun Aktivitas.
+* **Tujuan**: Memungkinkan pengguna terautentikasi menulis ulasan, tips aksesibilitas, dan diskusi.
 * **Kolom Kunci**:
   * `id` (`UUID`): Primary Key.
-  * `type` (`EconomicType` enum): Tipe data (`MENU_GO`, `PROPERTI_GO`, `COMMERCIAL`).
-  * `weight`: Bobot aktivitas/keramaian (*foot traffic*).
-  * `geom`: Kolom PostGIS Point SRID 4326.
-  * `metadata`: Data atribut JSON tambahan dari sumber data eksternal.
-* **Relasi Spasial**:
-  * Tabel ini berdiri sendiri (*standalone spatial table*), tetapi dihubungkan dengan tabel `locations` melalui **query kalkulasi spasial PostGIS** (seperti `ST_DWithin` / `ST_Distance` dalam radius tertentu) untuk menghitung nilai `economic_score` dan `priority_index` pada lokasi.
+  * `user_id` (`UUID`): Penulis komentar.
+  * `location_id` (`UUID`, nullable): Relasi ke Tempat/Trotoar yang diulas.
+  * `activity_id` (`UUID`, nullable): Relasi ke Aktivitas yang dikomentari.
+  * `content`: Teks ulasan.
+  * `photo_urls`: Lampiran foto ulasan jika ada.
 
 ---
 
@@ -150,6 +188,9 @@ Tabel penyimpan data spasial sekunder pendukung analisis prioritas (Point of Int
 
 | Hubungan | Tipe Relasi | Foreign Key & Constraint | Deskripsi & Dampak Aksi |
 | :--- | :--- | :--- | :--- |
-| **`User` ➜ `Report`** | One-to-Many (`1 : N`) | `reports.user_id` ➜ `users.id`<br>`onDelete: Cascade` | Satu pengguna dapat membuat banyak laporan. Jika akun pengguna dihapus, seluruh laporannya ikut terhapus (*Cascade*). |
-| **`Location` ➜ `Report`** | One-to-Many (`1 : N`) | `reports.location_id` ➜ `locations.id`<br>`onDelete: Cascade` | Satu lokasi fasilitas publik dapat memiliki banyak laporan dari berbagai pengguna. Jika lokasi dihapus, seluruh laporannya ikut terhapus. |
-| **`Location` ⬌ `EconomicPoint`** | Spasial GIS (Proximity) | *Tidak menggunakan FK relasional, melainkan PostGIS functions (`ST_DWithin`)* | Digunakan oleh backend/DB trigger untuk mengagregasi bobot ekonomi di sekitar titik lokasi guna menentukan `priority_index`. |
+| **`User` ➜ `Activity`** | One-to-Many (`1 : N`) | `activities.user_id` ➜ `users.id`<br>`onDelete: Cascade` | Pengguna dapat membuat banyak postingan aktivitas. Jika akun dihapus, aktivitasnya ikut terhapus. |
+| **`Location` ➜ `Activity`** | One-to-Many (`0 : N`) | `activities.location_id` ➜ `locations.id`<br>`onDelete: SetNull` | Tempat dapat memiliki banyak aktivitas berlabel. Jika tempat dihapus, `location_id` di activity di-set null. |
+| **`User` ➜ `Comment`** | One-to-Many (`1 : N`) | `comments.user_id` ➜ `users.id`<br>`onDelete: Cascade` | Pengguna dapat menulis ulasan di banyak tempat atau aktivitas. |
+| **`Location` ➜ `Comment`** | One-to-Many (`0 : N`) | `comments.location_id` ➜ `locations.id`<br>`onDelete: Cascade` | Tempat dapat memiliki banyak ulasan dari berbagai pengguna. |
+| **`Activity` ➜ `Comment`** | One-to-Many (`0 : N`) | `comments.activity_id` ➜ `activities.id`<br>`onDelete: Cascade` | Postingan aktivitas dapat memiliki utas diskusi komentar. |
+| **`Location` ⬌ `EconomicPoint`** | Spasial GIS (Buffer Proximity) | *Tidak menggunakan FK relasional, melainkan PostGIS functions (`ST_DWithin`)* | Digunakan untuk mengagregasi bobot ekonomi di sekitar titik lokasi guna menentukan `priority_index`. |

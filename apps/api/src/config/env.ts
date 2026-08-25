@@ -15,6 +15,8 @@ const envSchema = z.object({
   MAPID_API_KEY: z.string().min(1, 'MAPID_API_KEY is required'),
   MAPID_BASE_URL: z.string().url().default('https://api.mapid.io'),
   MAPID_BASEMAP_URL: z.string().url().default('https://basemap.mapid.io'),
+  MAPID_GEOSERVER_URL: z.string().url().default('https://geoserver.mapid.io'),
+  MAPID_PROJECT_ID: z.string().default('6a8bb9c9880d11c7bade0a62'),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -25,3 +27,4 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
