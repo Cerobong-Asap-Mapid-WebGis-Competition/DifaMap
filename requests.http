@@ -1,0 +1,76 @@
+### =========================================================================
+### DIFAMAP WEBGIS BACKEND API TEST COLLECTION (VSCode REST Client)
+### =========================================================================
+@baseUrl = http://localhost:4000/api
+
+### 1. Health Check Service
+GET {{baseUrl}}/health
+
+### 2. Mengambil Semua Lokasi (Places & Sidewalks) dengan Skor AI
+GET {{baseUrl}}/locations
+
+### 3. Filter Lokasi Khusus Kursi Roda (Tunadaksa) dengan Skor Minimal 4.0
+GET {{baseUrl}}/locations?wheelchairOnly=true&minScore=4.0
+
+### 4. Filter Lokasi Khusus Tunanetra (Guiding Block Baik)
+GET {{baseUrl}}/locations?visuallyImpairedOnly=true
+
+### 5. Filter Khusus Ruas Trotoar / Jalan Pedestrian
+GET {{baseUrl}}/locations?entityType=SIDEWALK
+
+### 6. Detail Satu Lokasi (Misal: MaRI)
+GET {{baseUrl}}/locations/11111111-1111-1111-1111-111111111111
+
+### 7. Mengambil Feed Aktivitas Komunitas
+GET {{baseUrl}}/activities
+
+### 8. Membuat Postingan Aktivitas Baru (Demo Payload)
+POST {{baseUrl}}/activities
+Content-Type: application/json
+
+{
+  "userId": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+  "title": "Mampir lihat Danau UNHAS",
+  "description": "Jalur lingkar danau sangat tenang dan datar, permukaan paving rata untuk kursi roda manual.",
+  "mediaUrls": [
+    "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800"
+  ],
+  "specificLocation": "Danau UNHAS Tamalanrea",
+  "latitude": -5.13842,
+  "longitude": 119.49214,
+  "status": "PUBLIC",
+  "accessibilityTags": ["Danau", "Kursi Roda", "Asri"]
+}
+
+### 9. Chatbot Asisten Aksesibilitas DifaMap (Spatial RAG Makassar)
+POST {{baseUrl}}/chatbot/message
+Content-Type: application/json
+
+{
+  "message": "Apakah Pantai Losari ramah untuk pengguna kursi roda di sore hari?",
+  "userLocation": {
+    "latitude": -5.14766,
+    "longitude": 119.40632
+  }
+}
+
+### 10. MAPID Geoserver Open API - Ambil Daftar Layer Proyek
+GET {{baseUrl}}/mapid/project/layers
+
+### 11. MAP Analysis Tool - Isokron Catchment (5, 10, 15 Menit Kursi Roda dari Halte Karebosi)
+GET {{baseUrl}}/mapid/analysis/isochrone?lat=-5.13421&lng=119.40932&intervals=5,10,15&mode=wheelchair
+
+### 12. MAP Analysis Tool - Slope & Elevation Profile (Uji Tanjakan Trotoar)
+POST {{baseUrl}}/mapid/analysis/elevation-slope
+Content-Type: application/json
+
+{
+  "coordinates": [
+    [119.4058, -5.1412],
+    [119.4063, -5.1476],
+    [119.4165, -5.1583]
+  ]
+}
+
+### 13. MAPID SINI AI - Multi-Criteria Priority Grid Heatmap Makassar
+GET {{baseUrl}}/mapid/analysis/sini-grid?gridSize=1000
