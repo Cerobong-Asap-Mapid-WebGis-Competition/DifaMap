@@ -128,10 +128,17 @@ flowchart TD
 }
 ```
 
-#### 2. Mengambil Detail Satu Lokasi / Trotoar
+#### 2. Pencarian Lokasi Terdekat (PostGIS Proximity Search)
+* **Method**: `GET`
+* **URL**: `/api/locations/nearby?lat=-5.1476&lng=119.4063&radius=2500`
+* **Hak Akses**: Publik
+* **Fitur**: Menggunakan fungsi geospasial `ST_DWithin` dan `ST_Distance` PostGIS untuk mengembalikan daftar fasilitas terurut dari yang paling dekat (termasuk nilai `distanceMeters`).
+
+#### 3. Mengambil Detail Satu Lokasi / Trotoar
 * **Method**: `GET`
 * **URL**: `/api/locations/:id`
 * **Respon**: Mengembalikan seluruh data lokasi, 6 aktivitas terbaru, ulasan komentar, serta insight rekomendasi AI.
+
 
 ---
 

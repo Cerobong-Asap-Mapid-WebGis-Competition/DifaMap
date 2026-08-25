@@ -48,6 +48,7 @@ class MapIdService {
   private apiClient: AxiosInstance;
   private basemapClient: AxiosInstance;
   private geoserverClient: AxiosInstance;
+  private memoryCache: Map<string, { data: any; expiresAt: number }> = new Map();
 
   constructor() {
     // Client untuk MAPID Data API (Layers, Activity Maps, Projects)
@@ -74,17 +75,38 @@ class MapIdService {
     });
   }
 
+  private getCached(key: string): any | null {
+    const cached = this.memoryCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
+    this.memoryCache.delete(key);
+    return null;
+  }
+
+  private setCached(key: string, data: any, ttlSeconds: number = 900): void {
+    this.memoryCache.set(key, {
+      data,
+      expiresAt: Date.now() + ttlSeconds * 1000,
+    });
+  }
+
   /**
-   * Mengambil Mapbox/MapLibre Style JSON dari MAPID Basemap
+   * Mengambil Mapbox/MapLibre Style JSON dari MAPID Basemap (dengan in-memory caching)
    * Endpoint: https://basemap.mapid.io/styles/{styleId}/style.json?key={API_KEY}
    */
   async getMapStyle(styleId: string) {
+    const cacheKey = `style_${styleId}`;
+    const cached = this.getCached(cacheKey);
+    if (cached) return cached;
+
     try {
       const response = await this.basemapClient.get(`/styles/${styleId}/style.json`, {
         params: {
           key: env.MAPID_API_KEY,
         },
       });
+      this.setCached(cacheKey, response.data, 1800); // Cache 30 menit
       return response.data;
     } catch (error: any) {
       console.error(`[MAPID Proxy] Error fetching style ${styleId}:`, error.message);
@@ -93,10 +115,14 @@ class MapIdService {
   }
 
   /**
-   * Mengambil daftar layer dari Geoserver MAPID untuk proyek DifaMap
+   * Mengambil daftar layer dari Geoserver MAPID untuk proyek DifaMap (dengan in-memory caching)
    * Endpoint: https://geoserver.mapid.io/layers_new/get_layer_list?api_key=...&project_id=...
    */
   async getProjectLayers(projectId: string = env.MAPID_PROJECT_ID) {
+    const cacheKey = `project_layers_${projectId}`;
+    const cached = this.getCached(cacheKey);
+    if (cached) return cached;
+
     try {
       const response = await this.geoserverClient.get('/layers_new/get_layer_list', {
         params: {
@@ -104,6 +130,7 @@ class MapIdService {
           project_id: projectId,
         },
       });
+      this.setCached(cacheKey, response.data, 600); // Cache 10 menit
       return response.data;
     } catch (error: any) {
       console.error('[MAPID Geoserver] Error fetching project layer list:', error.message);

@@ -312,3 +312,54 @@ export async function reSynthesizeLocationController(req: Request, res: Response
   }
 }
 
+/**
+ * Mengambil lokasi terdekat berdasarkan koordinat pengguna (PostGIS Proximity Search)
+ */
+export async function getNearbyLocationsController(req: Request, res: Response): Promise<void> {
+  try {
+    const { lat, lng, radius = '2000', limit = '20' } = req.query;
+    const latitude = parseFloat(lat as string);
+    const longitude = parseFloat(lng as string);
+    const radiusMeters = parseFloat(radius as string) || 2000;
+    const maxLimit = Math.min(100, parseInt(limit as string, 10) || 20);
+
+    if (isNaN(latitude) || isNaN(longitude)) {
+      res.status(400).json({ error: 'Valid lat and lng query parameters are required' });
+      return;
+    }
+
+    const locations: any[] = await prisma.$queryRaw`
+      SELECT 
+        id, name, entity_type as "entityType", category, specific_location as "specificLocation",
+        latitude, longitude, overall_score as "overallScore", physical_score as "physicalScore",
+        safety_score as "safetyScore", ramp_status as "rampStatus", guiding_block_status as "guidingBlockStatus",
+        sidewalk_condition as "sidewalkCondition", surface_condition as "surfaceCondition",
+        lighting_level as "lightingLevel", crowd_level as "crowdLevel", ai_summary as "aiSummary",
+        ROUND(ST_Distance(
+          ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography,
+          ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography
+        )) as "distanceMeters"
+      FROM public.locations
+      WHERE ST_DWithin(
+        ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography,
+        ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography,
+        ${radiusMeters}
+      )
+      ORDER BY "distanceMeters" ASC
+      LIMIT ${maxLimit}
+    `;
+
+    res.json({
+      success: true,
+      count: locations.length,
+      userCenter: { latitude, longitude },
+      radiusMeters,
+      data: locations,
+    });
+  } catch (error: any) {
+    console.error('Error fetching nearby locations:', error);
+    res.status(500).json({ error: 'Failed to fetch nearby locations', message: error.message });
+  }
+}
+
+

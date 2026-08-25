@@ -9,8 +9,12 @@ GET {{baseUrl}}/health
 ### 2. Mengambil Semua Lokasi (Places & Sidewalks) dengan Skor AI
 GET {{baseUrl}}/locations
 
-### 3. Filter Lokasi Khusus Kursi Roda (Tunadaksa) dengan Skor Minimal 4.0
+### 3. PostGIS Proximity Search (Titik Terdekat dari Pengguna)
+GET {{baseUrl}}/locations/nearby?lat=-5.1476&lng=119.4063&radius=2500
+
+### 4. Filter Lokasi Khusus Kursi Roda (Tunadaksa) dengan Skor Minimal 4.0
 GET {{baseUrl}}/locations?wheelchairOnly=true&minScore=4.0
+
 
 ### 4. Filter Lokasi Khusus Tunanetra (Guiding Block Baik)
 GET {{baseUrl}}/locations?visuallyImpairedOnly=true

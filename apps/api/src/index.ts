@@ -1,11 +1,13 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import { env } from './config/env.js';
 import apiRouter from './routes/index.js';
 
 const app = express();
 
 // Middleware
+app.use(compression()); // Gzip/Brotli compression untuk data cepat & ringan
 app.use(cors({
   origin: '*', // Pada tahap produksi sesuaikan dengan domain Next.js
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
