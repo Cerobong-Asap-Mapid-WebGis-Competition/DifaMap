@@ -40,8 +40,8 @@ export default function MapCanvas({
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: styleUrl,
-      center: [119.4327, -5.1476], // Koordinat Kota Makassar
-      zoom: 13,
+      center: [119.4500, -5.1700], // Pusat Geografis Survei Makassar & Gowa
+      zoom: 12,
       pitch: 35, // Kemiringan 3D
       bearing: -10,
     });

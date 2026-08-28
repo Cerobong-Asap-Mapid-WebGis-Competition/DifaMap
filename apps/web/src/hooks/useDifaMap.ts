@@ -91,7 +91,7 @@ export function useAccessibilityChatbot() {
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; referencedLocations?: any[] }>>([
     {
       role: 'assistant',
-      content: 'Halo! Saya DifaMap AI Assistant. Ada yang bisa saya bantu terkait rute, fasilitas ramah kursi roda, ubin pemandu (guiding block), atau waktu aman kunjungan di Kota Makassar?',
+      content: 'Halo! Saya DifaMap AI Assistant. Ada yang bisa saya bantu terkait rute, fasilitas ramah kursi roda, ubin pemandu (guiding block), atau waktu aman kunjungan di Kota Makassar dan Kabupaten Gowa?',
     },
   ]);
   const [isSending, setIsSending] = useState(false);

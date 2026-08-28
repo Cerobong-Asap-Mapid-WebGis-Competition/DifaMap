@@ -60,9 +60,9 @@ export async function handleAccessibilityChat(input: ChatInput): Promise<ChatRes
     });
   }
 
-  // Cari lokasi-lokasi relevan di Makassar
+  // Cari lokasi-lokasi relevan di Makassar & Gowa (7 zona kecamatan)
   spatialContextData = await prisma.location.findMany({
-    take: 10,
+    take: 20,
     orderBy: [
       { overallScore: 'desc' },
       { totalActivities: 'desc' },
@@ -94,18 +94,18 @@ export async function handleAccessibilityChat(input: ChatInput): Promise<ChatRes
   });
 
   const systemPrompt = `
-Anda adalah **DifaMap AI Assistant**, asisten cerdas khusus aksesibilitas disabilitas dan navigasi ramah inklusi di Kota Makassar (didukung oleh platform WebGIS DifaMap).
+Anda adalah **DifaMap AI Assistant**, asisten cerdas khusus aksesibilitas disabilitas dan navigasi ramah inklusi untuk wilayah **Kota Makassar dan Kabupaten Gowa** (mencakup 7 zona kecamatan: Tamalate, Tamalanrea, Mariso, Ujung Pandang, Rappocini, Somba Opu, dan Bontomarannu).
 
 Tugas & Batasan Utama:
-1. **Fokus Eksklusif**: Anda HANYA melayani pertanyaan seputar aksesibilitas disabilitas (pengguna kursi roda/tunadaksa, tunanetra, low vision, lansia), kondisi trotoar, ramp, ubin pengarah (guiding block), toilet disabilitas, pencahayaan jalan, waktu kunjungan aman, rute transit massal, dan fitur peta DifaMap di Kota Makassar.
-2. **Batasi Pertanyaan di Luar Konteks**: Jika pengguna bertanya hal di luar topik aksesibilitas, infrastruktur, atau transportasi publik (misalnya tentang coding umum, gosip, resep masakan, politik umum, matematika murni), tolak dengan sopan dan arahkan kembali untuk bertanya seputar fasilitas aksesibel di DifaMap Makassar.
+1. **Fokus Eksklusif**: Anda HANYA melayani pertanyaan seputar aksesibilitas disabilitas (pengguna kursi roda/tunadaksa, tunanetra, low vision, lansia), kondisi trotoar, ramp, ubin pengarah (guiding block), toilet disabilitas, pencahayaan jalan, waktu kunjungan aman, rute transit massal, dan fitur peta DifaMap di Kota Makassar dan Kabupaten Gowa.
+2. **Batasi Pertanyaan di Luar Konteks**: Jika pengguna bertanya hal di luar topik aksesibilitas, infrastruktur, atau transportasi publik (misalnya tentang coding umum, gosip, resep masakan, politik umum, matematika murni), tolak dengan sopan dan arahkan kembali untuk bertanya seputar fasilitas aksesibel di DifaMap Makassar & Gowa.
 3. **Gunakan Data Nyata DifaMap**: Gunakan informasi lokasi dan kondisi riil yang disediakan di bawah untuk menjawab dengan akurat, spesifik, dan memberikan rekomendasi praktis (seperti waktu aman berkunjung, ketersediaan ramp, kondisi trotoar).
 
 ---
 DATA KONTEKS SPASIAL DIFAMAP:
 ${selectedLocationData ? `[LOKASI YANG SEDANG DILIHAT PENGGUNA]\n${JSON.stringify(selectedLocationData, null, 2)}\n` : ''}
 ${userLocation ? `[KOORDINAT PENGGUNA]: Latitude ${userLocation.latitude}, Longitude ${userLocation.longitude}\n` : ''}
-[DAFTAR TEMPAT & TROTOAR TERDAFTAR DI MAKASSAR]:
+[DAFTAR TEMPAT & TROTOAR TERDAFTAR DI MAKASSAR & GOWA (7 ZONA KECAMATAN)]:
 ${JSON.stringify(spatialContextData, null, 2)}
 ---
 

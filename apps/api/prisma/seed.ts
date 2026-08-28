@@ -1,9 +1,9 @@
-import { PrismaClient, EntityType, PlaceCategory, RampStatus, GuidingBlockStatus, SidewalkCondition, SurfaceCondition, SeatingAvailability, ToiletAccessibility, LightingLevel, CrowdLevel, WeeklyPattern, ActivityStatus, Role } from '@prisma/client';
+import { PrismaClient, EntityType, PlaceCategory, RampStatus, GuidingBlockStatus, SidewalkCondition, SurfaceCondition, SeatingAvailability, ToiletAccessibility, LightingLevel, CrowdLevel, WeeklyPattern, ActivityStatus, Role, EconomicType } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Starting DifaMap Makassar database seeding...');
+  console.log('🌱 Starting DifaMap Makassar & Gowa (7 Zona Kecamatan) database seeding...');
 
   // 1. Seed Contributor / Surveyor User
   const demoUser = await prisma.user.upsert({
@@ -20,81 +20,20 @@ async function main() {
 
   console.log(`👤 Seeded User: ${demoUser.name} (${demoUser.email})`);
 
-  // 2. Seed Makassar Locations (Places, Sidewalks, Transit Hubs)
+  // 2. Seed Locations for all 7 Target Zones:
+  // Kota Makassar: Ujung Pandang, Mariso, Tamalate, Rappocini, Tamalanrea
+  // Kabupaten Gowa: Somba Opu, Bontomarannu
   const locationsData = [
-    {
-      id: '11111111-1111-1111-1111-111111111111',
-      name: 'Mal Ratu Indah (MaRI)',
-      entityType: EntityType.PLACE,
-      category: PlaceCategory.MALL,
-      specificLocation: 'Jl. Dr. Sam Ratulangi No.35, Mamajang, Makassar',
-      description: 'Pusat perbelanjaan ramah disabilitas dan lansia dengan fasilitas ramp standar internasional di pintu masuk utama dan utara.',
-      coverImageUrl: 'https://images.unsplash.com/photo-1567449303078-57ad995bd301?w=800',
-      latitude: -5.15832,
-      longitude: 119.41654,
-      rampStatus: RampStatus.GOOD,
-      guidingBlockStatus: GuidingBlockStatus.GOOD,
-      sidewalkCondition: SidewalkCondition.NOT_APPLICABLE,
-      surfaceCondition: SurfaceCondition.SMOOTH,
-      seatingAvailability: SeatingAvailability.AVAILABLE,
-      toiletAccessibility: ToiletAccessibility.AVAILABLE_GOOD,
-      lightingLevel: LightingLevel.BRIGHT,
-      crowdLevel: CrowdLevel.CROWDED,
-      peakHours: '16:00 - 20:30',
-      safeVisitTime: '10:00 - 15:30',
-      weeklyPattern: WeeklyPattern.WEEKEND_BUSY,
-      overallScore: 4.8,
-      physicalScore: 4.9,
-      safetyScore: 4.7,
-      aiSummary: 'Mall dengan aksesibilitas ramah kursi roda yang sangat baik. Dilengkapi ramp di seluruh pintu masuk, lift dengan tombol braille bersuara, dan toilet khusus disabilitas yang bersih.',
-      aiInsights: {
-        strengths: ['Ramp landai < 8% dengan pegangan tangan', 'Toilet disabilitas di setiap lantai', 'Jalur drop-off kursi roda langsung'],
-        barriers: ['Keramaian tinggi di akhir pekan membutuhkan kehati-hatian pengguna kursi roda'],
-        keyPoints: ['Aksesibel Kursi Roda', 'Guiding Block Tersambung', 'Lift Braille'],
-      },
-      economicScore: 88.5,
-      priorityIndex: 32.0,
-    },
-    {
-      id: '22222222-2222-2222-2222-222222222222',
-      name: 'Nipah Park Makassar',
-      entityType: EntityType.PLACE,
-      category: PlaceCategory.MALL,
-      specificLocation: 'Jl. Urip Sumoharjo No.23, Panaikang, Panakkukang, Makassar',
-      description: 'Green lifestyle mall dengan koridor semi-outdoor lebar, lantai datar, dan jalur pedestrian yang ramah pengguna kursi roda.',
-      coverImageUrl: 'https://images.unsplash.com/photo-1519567241046-7f570eee3ce6?w=800',
-      latitude: -5.13781,
-      longitude: 119.44892,
-      rampStatus: RampStatus.GOOD,
-      guidingBlockStatus: GuidingBlockStatus.GOOD,
-      sidewalkCondition: SidewalkCondition.NOT_APPLICABLE,
-      surfaceCondition: SurfaceCondition.SMOOTH,
-      seatingAvailability: SeatingAvailability.AVAILABLE,
-      toiletAccessibility: ToiletAccessibility.AVAILABLE_GOOD,
-      lightingLevel: LightingLevel.BRIGHT,
-      crowdLevel: CrowdLevel.MODERATE,
-      peakHours: '17:00 - 21:00',
-      safeVisitTime: '10:00 - 16:00',
-      weeklyPattern: WeeklyPattern.BALANCED,
-      overallScore: 4.9,
-      physicalScore: 5.0,
-      safetyScore: 4.8,
-      aiSummary: 'Konsep mall hijau dengan sirkulasi udara alami dan lantai tanpa undakan. Seluruh tenant dan lantai dapat diakses mandiri oleh pengguna kursi roda.',
-      aiInsights: {
-        strengths: ['Koridor sangat luas (>3m)', 'Ramp kelandaian sangat landai', 'Tersedia kursi roda peminjaman gratis'],
-        barriers: ['Area outdoor perlu kehati-hatian saat hujan karena lantai basah'],
-        keyPoints: ['Ramah Kursi Roda Penuh', 'Taman Terbuka Aksesibel', 'Toilet Standar Nasional'],
-      },
-      economicScore: 92.0,
-      priorityIndex: 28.5,
-    },
+    // ========================================================
+    // ZONA 1: UJUNG PANDANG (KOTA MAKASSAR)
+    // ========================================================
     {
       id: '33333333-3333-3333-3333-333333333333',
       name: 'Halte Karebosi (Teman Bus Makassar)',
       entityType: EntityType.TRANSIT_HUB,
       category: PlaceCategory.BUS_STOP,
-      specificLocation: 'Jl. Ahmad Yani, Depan Lapangan Karebosi, Makassar',
-      description: 'Halte transit utama armada Teman Bus Trans Mamminasata Koridor 1 dan 2 dengan jalur integrasi ke pusat kota.',
+      specificLocation: 'Jl. Ahmad Yani, Depan Lapangan Karebosi, Ujung Pandang, Makassar',
+      description: 'Halte transit utama armada Teman Bus Trans Mamminasata Koridor 1 dan 2 dengan integrasi jalur pedestrian ke pusat kota.',
       coverImageUrl: 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?w=800',
       latitude: -5.13421,
       longitude: 119.40932,
@@ -114,8 +53,8 @@ async function main() {
       safetyScore: 4.1,
       aiSummary: 'Halte sentral transportasi massal dengan ramp naik bus yang landai. Guiding block ubin taktil di sekitar trotoar luar sempat terputus dan butuh perbaikan sambungan rute.',
       aiInsights: {
-        strengths: ['Ramp masuk halte berpegangan tangan', 'Penerangan halte terang', 'Dekat dengan penyeberangan zebra cross'],
-        barriers: ['Ubin pemandu tunanetra terputus di dekat tiang rambu', 'Tidak ada toilet umum di dalam halte'],
+        strengths: ['Ramp masuk halte berpegangan tangan', 'Penerangan halte terang', 'Dekat penyeberangan zebra cross'],
+        barriers: ['Ubin pemandu tunanetra terputus di dekat tiang rambu', 'Tidak ada toilet umum di halte'],
         keyPoints: ['Transit Utama Teman Bus', 'Ramp Halte Baik', 'Prioritas Perbaikan Taktil'],
       },
       economicScore: 95.0,
@@ -147,7 +86,7 @@ async function main() {
       safetyScore: 4.6,
       aiSummary: 'Destinasi wisata terbuka yang sangat nyaman untuk pengguna kursi roda dan lansia. Memiliki banyak tempat istirahat dengan pemandangan laut dan jalur tanpa undakan.',
       aiInsights: {
-        strengths: ['Trotoar anjungan sangat luas dan rata', 'Ramp landai di setiap zona masuk', 'Banyak bangku istirahat'],
+        strengths: ['Trotoar anjungan luas dan rata', 'Ramp landai di setiap zona masuk', 'Banyak bangku istirahat'],
         barriers: ['Pusat jajanan kuliner di malam hari terkadang mempersempit jalur pedestrian'],
         keyPoints: ['Pemandangan Laut Losari', 'Ramp Ramah Kursi Roda', 'Banyak Tempat Duduk'],
       },
@@ -156,7 +95,7 @@ async function main() {
     },
     {
       id: '55555555-5555-5555-5555-555555555555',
-      name: 'Trotoar Jl. Penghibur (Benteng Rotterdam - Losari)',
+      name: 'Trotoar Heritage Jl. Penghibur (Benteng Rotterdam - Losari)',
       entityType: EntityType.SIDEWALK,
       category: PlaceCategory.PEDESTRIAN_PATH,
       specificLocation: 'Sepanjang Jl. Penghibur, Ujung Pandang, Makassar',
@@ -186,6 +125,253 @@ async function main() {
       },
       economicScore: 84.0,
       priorityIndex: 38.0,
+    },
+
+    // ========================================================
+    // ZONA 2: MARISO (KOTA MAKASSAR)
+    // ========================================================
+    {
+      id: '10101010-1010-1010-1010-101010101010',
+      name: 'Phinisi Point Mall (PIPO) & Kawasan CPI',
+      entityType: EntityType.PLACE,
+      category: PlaceCategory.MALL,
+      specificLocation: 'Jl. Metro Tanjung Bunga No.2, Panambungan, Mariso, Makassar',
+      description: 'Mall gaya hidup pesisir dengan jalur akses ramah kursi roda menghubungkan pedestrian tepi pantai dan jembatan CPI.',
+      coverImageUrl: 'https://images.unsplash.com/photo-1519567241046-7f570eee3ce6?w=800',
+      latitude: -5.15240,
+      longitude: 119.40810,
+      rampStatus: RampStatus.GOOD,
+      guidingBlockStatus: GuidingBlockStatus.GOOD,
+      sidewalkCondition: SidewalkCondition.NOT_APPLICABLE,
+      surfaceCondition: SurfaceCondition.SMOOTH,
+      seatingAvailability: SeatingAvailability.AVAILABLE,
+      toiletAccessibility: ToiletAccessibility.AVAILABLE_GOOD,
+      lightingLevel: LightingLevel.BRIGHT,
+      crowdLevel: CrowdLevel.MODERATE,
+      peakHours: '17:00 - 21:30',
+      safeVisitTime: '10:00 - 16:30',
+      weeklyPattern: WeeklyPattern.WEEKEND_BUSY,
+      overallScore: 4.8,
+      physicalScore: 4.9,
+      safetyScore: 4.7,
+      aiSummary: 'Aksesibilitas ramah disabilitas sangat prima dengan jalur trotoar lebar penghubung koridor Metro Tanjung Bunga ke area mall.',
+      aiInsights: {
+        strengths: ['Lantai mulus tanpa undakan', 'Toilet khusus disabilitas bersih di setiap lobby', 'Ramp masuk landai < 7%'],
+        barriers: ['Penyeberangan jalan utama Metro Tanjung Bunga cukup padat saat jam pulang kerja'],
+        keyPoints: ['Aksesibel Kursi Roda', 'Kawasan CPI Mariso', 'Ramp Standar Nasional'],
+      },
+      economicScore: 92.0,
+      priorityIndex: 30.0,
+    },
+    {
+      id: '10201020-1020-1020-1020-102010201020',
+      name: 'Pelataran Masjid 99 Kubah CPI Makassar',
+      entityType: EntityType.PLACE,
+      category: PlaceCategory.TOURISM,
+      specificLocation: 'Kawasan Reklamasi Centre Point of Indonesia (CPI), Mariso, Makassar',
+      description: 'Landmark ikonik ruang terbuka publik dan tempat ibadah dengan pelataran marmer luas datar yang terhubung jalur ramp.',
+      coverImageUrl: 'https://images.unsplash.com/photo-1564769625905-50e93615e769?w=800',
+      latitude: -5.15010,
+      longitude: 119.40350,
+      rampStatus: RampStatus.GOOD,
+      guidingBlockStatus: GuidingBlockStatus.NONE,
+      sidewalkCondition: SidewalkCondition.GOOD,
+      surfaceCondition: SurfaceCondition.SMOOTH,
+      seatingAvailability: SeatingAvailability.AVAILABLE,
+      toiletAccessibility: ToiletAccessibility.AVAILABLE_GOOD,
+      lightingLevel: LightingLevel.BRIGHT,
+      crowdLevel: CrowdLevel.CROWDED,
+      peakHours: '16:00 - 19:00',
+      safeVisitTime: '07:00 - 15:30',
+      weeklyPattern: WeeklyPattern.WEEKEND_BUSY,
+      overallScore: 4.3,
+      physicalScore: 4.4,
+      safetyScore: 4.2,
+      aiSummary: 'Pelataran megah tanpa undakan tangga utama, sangat ramah pengguna kursi roda dan stroller lansia. Belum dipasangi ubin taktil pemandu tunanetra.',
+      aiInsights: {
+        strengths: ['Pelataran marmer super rata', 'Lift khusus disabilitas menuju ruang shalat utama', 'Parkir khusus disabilitas dekat lift'],
+        barriers: ['Belum tersedia guiding block tactile ubin di pelataran luar', 'Cuaca terik di siang hari tanpa kanopi'],
+        keyPoints: ['Landmark 99 Kubah', 'Ramah Kursi Roda Penuh', 'Perlu Tambahan Guiding Block'],
+      },
+      economicScore: 86.0,
+      priorityIndex: 40.0,
+    },
+
+    // ========================================================
+    // ZONA 3: TAMALATE (KOTA MAKASSAR)
+    // ========================================================
+    {
+      id: '11111111-1111-1111-1111-111111111111',
+      name: 'Mal Ratu Indah (MaRI)',
+      entityType: EntityType.PLACE,
+      category: PlaceCategory.MALL,
+      specificLocation: 'Jl. Dr. Sam Ratulangi No.35, Mamajang / Tamalate, Makassar',
+      description: 'Pusat perbelanjaan ramah disabilitas dan lansia dengan fasilitas ramp standar internasional di pintu masuk utama dan utara.',
+      coverImageUrl: 'https://images.unsplash.com/photo-1567449303078-57ad995bd301?w=800',
+      latitude: -5.15832,
+      longitude: 119.41654,
+      rampStatus: RampStatus.GOOD,
+      guidingBlockStatus: GuidingBlockStatus.GOOD,
+      sidewalkCondition: SidewalkCondition.NOT_APPLICABLE,
+      surfaceCondition: SurfaceCondition.SMOOTH,
+      seatingAvailability: SeatingAvailability.AVAILABLE,
+      toiletAccessibility: ToiletAccessibility.AVAILABLE_GOOD,
+      lightingLevel: LightingLevel.BRIGHT,
+      crowdLevel: CrowdLevel.CROWDED,
+      peakHours: '16:00 - 20:30',
+      safeVisitTime: '10:00 - 15:30',
+      weeklyPattern: WeeklyPattern.WEEKEND_BUSY,
+      overallScore: 4.8,
+      physicalScore: 4.9,
+      safetyScore: 4.7,
+      aiSummary: 'Mall dengan aksesibilitas ramah kursi roda yang sangat baik. Dilengkapi ramp di seluruh pintu masuk, lift dengan tombol braille bersuara, dan toilet khusus disabilitas.',
+      aiInsights: {
+        strengths: ['Ramp landai < 8% dengan pegangan tangan', 'Toilet disabilitas di setiap lantai', 'Jalur drop-off kursi roda langsung'],
+        barriers: ['Keramaian tinggi di akhir pekan membutuhkan kehati-hatian pengguna kursi roda'],
+        keyPoints: ['Aksesibel Kursi Roda', 'Guiding Block Tersambung', 'Lift Braille'],
+      },
+      economicScore: 88.5,
+      priorityIndex: 32.0,
+    },
+    {
+      id: '10401040-1040-1040-1040-104010401040',
+      name: 'Trotoar Koridor Jl. Sultan Alauddin (Depan Unismuh, Tamalate)',
+      entityType: EntityType.SIDEWALK,
+      category: PlaceCategory.PEDESTRIAN_PATH,
+      specificLocation: 'Jl. Sultan Alauddin KM 7, Gunung Sari, Tamalate, Makassar',
+      description: 'Segmen trotoar koridor arteri penghubung Makassar dan Gowa dengan aktivitas mahasiswa dan pengguna angkutan umum yang padat.',
+      coverImageUrl: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=800',
+      latitude: -5.17820,
+      longitude: 119.42980,
+      rampStatus: RampStatus.DAMAGED,
+      guidingBlockStatus: GuidingBlockStatus.DAMAGED,
+      sidewalkCondition: SidewalkCondition.DAMAGED,
+      surfaceCondition: SurfaceCondition.POTHOLE,
+      seatingAvailability: SeatingAvailability.NOT_AVAILABLE,
+      toiletAccessibility: ToiletAccessibility.NOT_AVAILABLE,
+      lightingLevel: LightingLevel.DIM,
+      crowdLevel: CrowdLevel.CROWDED,
+      peakHours: '07:00 - 09:00, 16:30 - 19:30',
+      safeVisitTime: '08:30 - 15:30',
+      weeklyPattern: WeeklyPattern.WEEKDAY_BUSY,
+      overallScore: 2.3,
+      physicalScore: 2.1,
+      safetyScore: 2.5,
+      aiSummary: 'Kondisi jalur pedestrian memerlukan intervensi revitalisasi segera. Terdapat undakan tinggi tanpa ramp kelandaian dan ubin pemandu terhalang lapak pedagang.',
+      aiInsights: {
+        strengths: ['Koridor strategis transit perbatasan Makassar - Gowa'],
+        barriers: ['Trotoar berlubang dan paving pecah', 'Guiding block terputus', 'Banyak parkir motor liar menghalangi kursi roda'],
+        keyPoints: ['Prioritas Revitalisasi Tinggi', 'Trotoar Rusak', 'Koridor Makassar-Gowa'],
+      },
+      economicScore: 93.0,
+      priorityIndex: 85.0,
+    },
+
+    // ========================================================
+    // ZONA 4: RAPPOCINI (KOTA MAKASSAR)
+    // ========================================================
+    {
+      id: '10601060-1060-1060-1060-106010601060',
+      name: 'Halte Menara Phinisi UNM (Jl. A.P. Pettarani, Rappocini)',
+      entityType: EntityType.TRANSIT_HUB,
+      category: PlaceCategory.BUS_STOP,
+      specificLocation: 'Jl. A.P. Pettarani, Tidung, Rappocini, Makassar',
+      description: 'Halte transit koridor utama Pettarani di depan kampus UNM dengan fasilitas jembatan penyeberangan dan jalur integrasi.',
+      coverImageUrl: 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?w=800',
+      latitude: -5.16540,
+      longitude: 119.43820,
+      rampStatus: RampStatus.GOOD,
+      guidingBlockStatus: GuidingBlockStatus.GOOD,
+      sidewalkCondition: SidewalkCondition.GOOD,
+      surfaceCondition: SurfaceCondition.SMOOTH,
+      seatingAvailability: SeatingAvailability.AVAILABLE,
+      toiletAccessibility: ToiletAccessibility.NOT_AVAILABLE,
+      lightingLevel: LightingLevel.BRIGHT,
+      crowdLevel: CrowdLevel.CROWDED,
+      peakHours: '07:00 - 08:30, 16:30 - 18:30',
+      safeVisitTime: '09:00 - 16:00',
+      weeklyPattern: WeeklyPattern.WEEKDAY_BUSY,
+      overallScore: 4.4,
+      physicalScore: 4.5,
+      safetyScore: 4.3,
+      aiSummary: 'Halte ramah disabilitas yang tersambung dengan trotoar pedestrian modern Pettarani. Dilengkapi guiding block kuning kontras dan ramp akses bus.',
+      aiInsights: {
+        strengths: ['Trotoar lebar > 2 meter', 'Guiding block tersambung rapi', 'Penerangan lampu jalan LED sangat terang'],
+        barriers: ['Tangga JPO agak curam bagi tunadaksa tanpa lift operasional'],
+        keyPoints: ['Transit Kampus UNM', 'Trotoar Modern Pettarani', 'Guiding Block Rapi'],
+      },
+      economicScore: 96.0,
+      priorityIndex: 45.0,
+    },
+    {
+      id: '10701070-1070-1070-1070-107010701070',
+      name: 'Trotoar Koridor Pettarani - Living Plaza (Rappocini)',
+      entityType: EntityType.SIDEWALK,
+      category: PlaceCategory.PEDESTRIAN_PATH,
+      specificLocation: 'Jl. A.P. Pettarani No.18, Rappocini, Makassar',
+      description: 'Jalur trotoar ramah pedestrian modern di bawah koridor jalan tol layang Pettarani.',
+      coverImageUrl: 'https://images.unsplash.com/photo-1477959858617-67f30bc75b82?w=800',
+      latitude: -5.15980,
+      longitude: 119.43910,
+      rampStatus: RampStatus.GOOD,
+      guidingBlockStatus: GuidingBlockStatus.GOOD,
+      sidewalkCondition: SidewalkCondition.GOOD,
+      surfaceCondition: SurfaceCondition.SMOOTH,
+      seatingAvailability: SeatingAvailability.AVAILABLE,
+      toiletAccessibility: ToiletAccessibility.NOT_AVAILABLE,
+      lightingLevel: LightingLevel.BRIGHT,
+      crowdLevel: CrowdLevel.MODERATE,
+      peakHours: '16:00 - 19:30',
+      safeVisitTime: '06:00 - 18:00',
+      weeklyPattern: WeeklyPattern.BALANCED,
+      overallScore: 4.6,
+      physicalScore: 4.7,
+      safetyScore: 4.5,
+      aiSummary: 'Trotoar berstandar perkotaan baru dengan jalur ubin pemandu kontinu, bangku taman di beberapa titik, dan ramp landai di setiap penyeberangan jalan masuk gedung.',
+      aiInsights: {
+        strengths: ['Jalur taktil ubin kuning terpasang rapi', 'Ramp masuk gedung landai', 'Bollard pelindung kokoh'],
+        barriers: ['Perlu penambahan kanopi peneduh pohon di beberapa segmen terbuka'],
+        keyPoints: ['Trotoar Modern Rappocini', 'Guiding Block Lengkap', 'Ramp Masuk Rata'],
+      },
+      economicScore: 92.0,
+      priorityIndex: 34.0,
+    },
+
+    // ========================================================
+    // ZONA 5: TAMALANREA (KOTA MAKASSAR)
+    // ========================================================
+    {
+      id: '22222222-2222-2222-2222-222222222222',
+      name: 'Nipah Park Makassar',
+      entityType: EntityType.PLACE,
+      category: PlaceCategory.MALL,
+      specificLocation: 'Jl. Urip Sumoharjo No.23, Panaikang, Panakkukang / Tamalanrea Koridor',
+      description: 'Green lifestyle mall dengan koridor semi-outdoor lebar, lantai datar, dan jalur pedestrian yang ramah pengguna kursi roda.',
+      coverImageUrl: 'https://images.unsplash.com/photo-1519567241046-7f570eee3ce6?w=800',
+      latitude: -5.13781,
+      longitude: 119.44892,
+      rampStatus: RampStatus.GOOD,
+      guidingBlockStatus: GuidingBlockStatus.GOOD,
+      sidewalkCondition: SidewalkCondition.NOT_APPLICABLE,
+      surfaceCondition: SurfaceCondition.SMOOTH,
+      seatingAvailability: SeatingAvailability.AVAILABLE,
+      toiletAccessibility: ToiletAccessibility.AVAILABLE_GOOD,
+      lightingLevel: LightingLevel.BRIGHT,
+      crowdLevel: CrowdLevel.MODERATE,
+      peakHours: '17:00 - 21:00',
+      safeVisitTime: '10:00 - 16:00',
+      weeklyPattern: WeeklyPattern.BALANCED,
+      overallScore: 4.9,
+      physicalScore: 5.0,
+      safetyScore: 4.8,
+      aiSummary: 'Konsep mall hijau dengan sirkulasi udara alami dan lantai tanpa undakan. Seluruh tenant dan lantai dapat diakses mandiri oleh pengguna kursi roda.',
+      aiInsights: {
+        strengths: ['Koridor sangat luas (>3m)', 'Ramp kelandaian sangat landai', 'Tersedia kursi roda peminjaman gratis'],
+        barriers: ['Area outdoor perlu kehati-hatian saat hujan karena lantai basah'],
+        keyPoints: ['Ramah Kursi Roda Penuh', 'Taman Terbuka Aksesibel', 'Toilet Standar Nasional'],
+      },
+      economicScore: 92.0,
+      priorityIndex: 28.5,
     },
     {
       id: '66666666-6666-6666-6666-666666666666',
@@ -286,6 +472,212 @@ async function main() {
       economicScore: 94.0,
       priorityIndex: 86.5,
     },
+
+    // ========================================================
+    // ZONA 6: SOMBA OPU (KABUPATEN GOWA)
+    // ========================================================
+    {
+      id: '20102010-2010-2010-2010-201020102010',
+      name: 'RSUD Syekh Yusuf Kabupaten Gowa',
+      entityType: EntityType.PLACE,
+      category: PlaceCategory.HEALTHCARE,
+      specificLocation: 'Jl. Dr. Wahidin Sudirohusodo No.48, Batangkaluku, Somba Opu, Gowa',
+      description: 'Rumah sakit umum daerah pusat rujukan Kabupaten Gowa dengan fasilitas ramp gedung utama dan jalur akses ramah kursi roda.',
+      coverImageUrl: 'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=800',
+      latitude: -5.20210,
+      longitude: 119.45230,
+      rampStatus: RampStatus.GOOD,
+      guidingBlockStatus: GuidingBlockStatus.GOOD,
+      sidewalkCondition: SidewalkCondition.GOOD,
+      surfaceCondition: SurfaceCondition.SMOOTH,
+      seatingAvailability: SeatingAvailability.AVAILABLE,
+      toiletAccessibility: ToiletAccessibility.AVAILABLE_GOOD,
+      lightingLevel: LightingLevel.BRIGHT,
+      crowdLevel: CrowdLevel.MODERATE,
+      peakHours: '08:00 - 12:30',
+      safeVisitTime: '07:30 - 17:00',
+      weeklyPattern: WeeklyPattern.WEEKDAY_BUSY,
+      overallScore: 4.7,
+      physicalScore: 4.8,
+      safetyScore: 4.6,
+      aiSummary: 'Fasilitas kesehatan di pusat Somba Opu dengan jalur pedestrian masuk yang ramah kursi roda, handrail di setiap ramp selasar, dan toilet disabilitas bersih.',
+      aiInsights: {
+        strengths: ['Ramp selasar poliklinik landai dan berpegangan tangan', 'Jalur ubin pemandu kuning di lobby utama', 'Area drop-off ambulans & kursi roda luas'],
+        barriers: ['Area parkir luar saat pagi hari cukup padat'],
+        keyPoints: ['Faskes Rujukan Utama Gowa', 'Ramp Selasar Baik', 'Ramah Kursi Roda'],
+      },
+      economicScore: 88.0,
+      priorityIndex: 30.0,
+    },
+    {
+      id: '20202020-2020-2020-2020-202020202020',
+      name: 'Kawasan RTH & Masjid Agung Syekh Yusuf Gowa',
+      entityType: EntityType.PLACE,
+      category: PlaceCategory.TOURISM,
+      specificLocation: 'Jl. Masjid Raya, Sungguminasa, Somba Opu, Kabupaten Gowa',
+      description: 'Pusat kegiatan masyarakat dan ruang terbuka hijau Syekh Yusuf Discovery Park dengan pelataran datar dan jalur jogging ramah disabilitas.',
+      coverImageUrl: 'https://images.unsplash.com/photo-1564769625905-50e93615e769?w=800',
+      latitude: -5.20050,
+      longitude: 119.45010,
+      rampStatus: RampStatus.GOOD,
+      guidingBlockStatus: GuidingBlockStatus.GOOD,
+      sidewalkCondition: SidewalkCondition.GOOD,
+      surfaceCondition: SurfaceCondition.SMOOTH,
+      seatingAvailability: SeatingAvailability.AVAILABLE,
+      toiletAccessibility: ToiletAccessibility.AVAILABLE_GOOD,
+      lightingLevel: LightingLevel.BRIGHT,
+      crowdLevel: CrowdLevel.CROWDED,
+      peakHours: '16:00 - 19:30',
+      safeVisitTime: '06:00 - 17:00',
+      weeklyPattern: WeeklyPattern.WEEKEND_BUSY,
+      overallScore: 4.6,
+      physicalScore: 4.7,
+      safetyScore: 4.5,
+      aiSummary: 'Ruang publik terbuka ikonik Sungguminasa Gowa. Memiliki jalur pedestrian mengelilingi taman yang mulus, ramp penghubung ke pelataran masjid, serta bangku istirahat memadai.',
+      aiInsights: {
+        strengths: ['Jalur pedestrian taman lebar dan mulus', 'Ramp masuk pelataran masjid memadai', 'Banyak bangku taman rindang'],
+        barriers: ['Kepadatan pengunjung di akhir pekan sore'],
+        keyPoints: ['Pusat Wisata & RTH Gowa', 'Jalur Datar Kursi Roda', 'Banyak Tempat Istirahat'],
+      },
+      economicScore: 90.0,
+      priorityIndex: 33.0,
+    },
+    {
+      id: '20302030-2030-2030-2030-203020302030',
+      name: 'Trotoar Jl. Masjid Raya Somba Opu (Depan Balla Lompoa)',
+      entityType: EntityType.SIDEWALK,
+      category: PlaceCategory.PEDESTRIAN_PATH,
+      specificLocation: 'Jl. Masjid Raya No.1, Sungguminasa, Somba Opu, Gowa',
+      description: 'Jalur trotoar kawasan cagar budaya Istana Balla Lompoa dan pusat kota Sungguminasa.',
+      coverImageUrl: 'https://images.unsplash.com/photo-1477959858617-67f30bc75b82?w=800',
+      latitude: -5.19820,
+      longitude: 119.45450,
+      rampStatus: RampStatus.DAMAGED,
+      guidingBlockStatus: GuidingBlockStatus.NONE,
+      sidewalkCondition: SidewalkCondition.DAMAGED,
+      surfaceCondition: SurfaceCondition.UNEVEN,
+      seatingAvailability: SeatingAvailability.NOT_AVAILABLE,
+      toiletAccessibility: ToiletAccessibility.NOT_AVAILABLE,
+      lightingLevel: LightingLevel.DIM,
+      crowdLevel: CrowdLevel.MODERATE,
+      peakHours: '16:30 - 19:00',
+      safeVisitTime: '08:00 - 16:00',
+      weeklyPattern: WeeklyPattern.BALANCED,
+      overallScore: 2.8,
+      physicalScore: 2.6,
+      safetyScore: 3.0,
+      aiSummary: 'Jalur trotoar bersejarah namun membutuhkan perbaikan ubin dan pembuatan ramp akses kursi roda. Belum ada guiding block tunanetra di sepanjang segmen depan museum.',
+      aiInsights: {
+        strengths: ['Kawasan wisata budaya strategis'],
+        barriers: ['Paving bergelombang dan belum ada guiding block', 'Undakan tanpa ramp sambungan'],
+        keyPoints: ['Kawasan Heritage Somba Opu', 'Perlu Pemasangan Ubin Taktil', 'Perlu Perbaikan Paving'],
+      },
+      economicScore: 82.0,
+      priorityIndex: 72.0,
+    },
+
+    // ========================================================
+    // ZONA 7: BONTOMARANNU (KABUPATEN GOWA)
+    // ========================================================
+    {
+      id: '20402040-2040-2040-2040-204020402040',
+      name: 'Kampus Fakultas Teknik UNHAS Gowa (FT UNHAS)',
+      entityType: EntityType.PLACE,
+      category: PlaceCategory.EDUCATION,
+      specificLocation: 'Jl. Poros Malino KM 6, Borongloe, Bontomarannu, Kabupaten Gowa',
+      description: 'Kampus teknik modern ramah disabilitas dengan jembatan penghubung gedung berlantai datar, lift berfitur braille, dan jalur pedestrian terpadu.',
+      coverImageUrl: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800',
+      latitude: -5.23050,
+      longitude: 119.50120,
+      rampStatus: RampStatus.GOOD,
+      guidingBlockStatus: GuidingBlockStatus.GOOD,
+      sidewalkCondition: SidewalkCondition.GOOD,
+      surfaceCondition: SurfaceCondition.SMOOTH,
+      seatingAvailability: SeatingAvailability.AVAILABLE,
+      toiletAccessibility: ToiletAccessibility.AVAILABLE_GOOD,
+      lightingLevel: LightingLevel.BRIGHT,
+      crowdLevel: CrowdLevel.MODERATE,
+      peakHours: '08:00 - 16:30',
+      safeVisitTime: '07:30 - 18:00',
+      weeklyPattern: WeeklyPattern.WEEKDAY_BUSY,
+      overallScore: 4.9,
+      physicalScore: 5.0,
+      safetyScore: 4.8,
+      aiSummary: 'Fasilitas pendidikan berstandar aksesibilitas tinggi di Bontomarannu Gowa. Seluruh gedung perkuliahan (COTE, CSA) terhubung selasar landai tanpa undakan dengan lift bersuara.',
+      aiInsights: {
+        strengths: ['Selasar antar gedung 100% ramah kursi roda', 'Lift dengan petunjuk braille & suara', 'Toilet disabilitas luas di setiap lantai gedung'],
+        barriers: ['Jarak antargedung cukup jauh sehingga membutuhkan kanopi tambahan saat hujan deras'],
+        keyPoints: ['Kampus Teknik Modern', 'Aksesibilitas Paripurna', 'Selasar Datar Antargedung'],
+      },
+      economicScore: 78.0,
+      priorityIndex: 22.0,
+    },
+    {
+      id: '20502050-2050-2050-2050-205020502050',
+      name: 'Puskesmas Bontomarannu Gowa',
+      entityType: EntityType.PLACE,
+      category: PlaceCategory.HEALTHCARE,
+      specificLocation: 'Jl. Poros Malino, Bontomanai, Bontomarannu, Kabupaten Gowa',
+      description: 'Fasilitas pelayanan kesehatan tingkat pertama di Kecamatan Bontomarannu dengan ramp masuk dan pelayanan inklusif.',
+      coverImageUrl: 'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=800',
+      latitude: -5.23410,
+      longitude: 119.50980,
+      rampStatus: RampStatus.GOOD,
+      guidingBlockStatus: GuidingBlockStatus.DAMAGED,
+      sidewalkCondition: SidewalkCondition.GOOD,
+      surfaceCondition: SurfaceCondition.SMOOTH,
+      seatingAvailability: SeatingAvailability.AVAILABLE,
+      toiletAccessibility: ToiletAccessibility.AVAILABLE_GOOD,
+      lightingLevel: LightingLevel.BRIGHT,
+      crowdLevel: CrowdLevel.MODERATE,
+      peakHours: '08:00 - 12:00',
+      safeVisitTime: '08:00 - 15:00',
+      weeklyPattern: WeeklyPattern.WEEKDAY_BUSY,
+      overallScore: 4.1,
+      physicalScore: 4.2,
+      safetyScore: 4.0,
+      aiSummary: 'Puskesmas dengan ramp masuk utama yang memenuhi standar kelandaian. Terdapat pegangan tangan handrail stainless dan toilet ramah lansia.',
+      aiInsights: {
+        strengths: ['Ramp lobby depan landai dengan handrail', 'Ruang tunggu berlantai keramik rata', 'Pelayanan petugas ramah disabilitas'],
+        barriers: ['Guiding block ubin pemandu di halaman luar belum lengkap'],
+        keyPoints: ['Faskes Inklusif Bontomarannu', 'Ramp Berpegangan Tangan', 'Toilet Ramah Lansia'],
+      },
+      economicScore: 72.0,
+      priorityIndex: 42.0,
+    },
+    {
+      id: '20602060-2060-2060-2060-206020602060',
+      name: 'Segmen Jalur Pedestrian Poros Malino Borongloe (Bontomarannu)',
+      entityType: EntityType.SIDEWALK,
+      category: PlaceCategory.PEDESTRIAN_PATH,
+      specificLocation: 'Jl. Poros Malino KM 5 - KM 7, Borongloe, Bontomarannu, Gowa',
+      description: 'Jalur pedestrian penghubung kawasan permukiman, kawasan industri, dan kampus teknik UNHAS Gowa.',
+      coverImageUrl: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=800',
+      latitude: -5.22890,
+      longitude: 119.49850,
+      rampStatus: RampStatus.NONE,
+      guidingBlockStatus: GuidingBlockStatus.NONE,
+      sidewalkCondition: SidewalkCondition.NARROW,
+      surfaceCondition: SurfaceCondition.UNEVEN,
+      seatingAvailability: SeatingAvailability.NOT_AVAILABLE,
+      toiletAccessibility: ToiletAccessibility.NOT_AVAILABLE,
+      lightingLevel: LightingLevel.DIM,
+      crowdLevel: CrowdLevel.MODERATE,
+      peakHours: '06:30 - 08:30, 16:30 - 18:30',
+      safeVisitTime: '08:00 - 16:00',
+      weeklyPattern: WeeklyPattern.WEEKDAY_BUSY,
+      overallScore: 2.1,
+      physicalScore: 1.9,
+      safetyScore: 2.3,
+      aiSummary: 'Jalur bahu jalan belum memiliki trotoar permanen dan belum ramah kursi roda maupun tunanetra. Membutuhkan intervensi pembangunan trotoar baru bagi pejalan kaki dan disabilitas.',
+      aiInsights: {
+        strengths: ['Jalur arteri penting menuju destinasi wisata Malino'],
+        barriers: ['Bahu jalan berbatu tanpa trotoar permanen', 'Lalu lintas kendaraan antar-kota cukup kencang', 'Penerangan malam minim'],
+        keyPoints: ['Prioritas Bangun Trotoar Baru', 'Poros Malino Gowa', 'Bahu Jalan Berbatu'],
+      },
+      economicScore: 76.0,
+      priorityIndex: 88.0,
+    },
   ];
 
   for (const loc of locationsData) {
@@ -297,7 +689,41 @@ async function main() {
     console.log(`📍 Seeded Location: ${loc.name} (${loc.entityType} - Score: ${loc.overallScore})`);
   }
 
-  // 3. Seed Sample Activities (Community Postings with Photos)
+  // 3. Seed Economic Points (Menu Go, Properti Go, Commercial) across all 7 Zones
+  const economicPointsData = [
+    // Ujung Pandang & Mariso
+    { id: 'ec010000-0000-0000-0000-000000000001', name: 'Sentra Kuliner Pantai Losari', type: EconomicType.MENU_GO, weight: 1.5, latitude: -5.14650, longitude: 119.40680 },
+    { id: 'ec010000-0000-0000-0000-000000000002', name: 'Kompleks Ruko Penghibur Heritage', type: EconomicType.COMMERCIAL, weight: 1.2, latitude: -5.14200, longitude: 119.40550 },
+    { id: 'ec010000-0000-0000-0000-000000000003', name: 'Area Bisnis & Kuliner CPI Mariso', type: EconomicType.MENU_GO, weight: 1.4, latitude: -5.15180, longitude: 119.40750 },
+    { id: 'ec010000-0000-0000-0000-000000000004', name: 'Kawasan Residensial Tanjung Bunga', type: EconomicType.PROPERTI_GO, weight: 1.3, latitude: -5.15700, longitude: 119.40900 },
+
+    // Tamalate & Rappocini
+    { id: 'ec010000-0000-0000-0000-000000000005', name: 'Sentra Kuliner Sultan Alauddin', type: EconomicType.MENU_GO, weight: 1.6, latitude: -5.17750, longitude: 119.42920 },
+    { id: 'ec010000-0000-0000-0000-000000000006', name: 'Kompleks Ruko & Percetakan Alauddin', type: EconomicType.COMMERCIAL, weight: 1.1, latitude: -5.17900, longitude: 119.43100 },
+    { id: 'ec010000-0000-0000-0000-000000000007', name: 'Pusat Perkantoran & Bisnis Pettarani', type: EconomicType.COMMERCIAL, weight: 1.8, latitude: -5.16300, longitude: 119.43800 },
+    { id: 'ec010000-0000-0000-0000-000000000008', name: 'Pujasera & Kafe Tidung Rappocini', type: EconomicType.MENU_GO, weight: 1.3, latitude: -5.16600, longitude: 119.43950 },
+
+    // Tamalanrea
+    { id: 'ec010000-0000-0000-0000-000000000009', name: 'Pusat Kuliner Pintu 1 & 2 UNHAS', type: EconomicType.MENU_GO, weight: 1.7, latitude: -5.13680, longitude: 119.48850 },
+    { id: 'ec010000-0000-0000-0000-000000000010', name: 'Kawasan Properti & Kos Mahasiswa Tamalanrea', type: EconomicType.PROPERTI_GO, weight: 1.5, latitude: -5.13900, longitude: 119.49100 },
+
+    // Somba Opu & Bontomarannu (Gowa)
+    { id: 'ec010000-0000-0000-0000-000000000011', name: 'Pusat Pertokoan Sungguminasa Somba Opu', type: EconomicType.COMMERCIAL, weight: 1.5, latitude: -5.20100, longitude: 119.45300 },
+    { id: 'ec010000-0000-0000-0000-000000000012', name: 'Sentra Kuliner Tradisional Gowa', type: EconomicType.MENU_GO, weight: 1.4, latitude: -5.19950, longitude: 119.45100 },
+    { id: 'ec010000-0000-0000-0000-000000000013', name: 'Pusat Kuliner & Layanan Mahasiswa Borongloe', type: EconomicType.MENU_GO, weight: 1.3, latitude: -5.22950, longitude: 119.50050 },
+    { id: 'ec010000-0000-0000-0000-000000000014', name: 'Kawasan Pengembangan Residensial Bontomarannu', type: EconomicType.PROPERTI_GO, weight: 1.2, latitude: -5.23300, longitude: 119.50800 },
+  ];
+
+  for (const ep of economicPointsData) {
+    await prisma.economicPoint.upsert({
+      where: { id: ep.id },
+      update: ep,
+      create: ep,
+    });
+  }
+  console.log(`📊 Seeded ${economicPointsData.length} Economic Points (Menu Go / Properti Go)`);
+
+  // 4. Seed Sample Activities (Community Postings with Photos)
   const activitiesData = [
     {
       id: 'aaaa1111-1111-1111-1111-111111111111',
@@ -309,7 +735,7 @@ async function main() {
         'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800',
         'https://images.unsplash.com/photo-1439853941329-a99ce0457e8a?w=800',
       ],
-      specificLocation: 'Danau UNHAS Tamalanrea',
+      specificLocation: 'Danau UNHAS Tamalanrea, Makassar',
       latitude: -5.13842,
       longitude: 119.49214,
       status: ActivityStatus.PUBLIC,
@@ -339,7 +765,7 @@ async function main() {
       mediaUrls: [
         'https://images.unsplash.com/photo-1567449303078-57ad995bd301?w=800',
       ],
-      specificLocation: 'Mal Ratu Indah',
+      specificLocation: 'Mal Ratu Indah, Makassar',
       latitude: -5.15832,
       longitude: 119.41654,
       status: ActivityStatus.PUBLIC,
@@ -369,7 +795,7 @@ async function main() {
       mediaUrls: [
         'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=800',
       ],
-      specificLocation: 'Trotoar Jl. Perintis Kemerdekaan KM 10',
+      specificLocation: 'Trotoar Jl. Perintis Kemerdekaan KM 10, Tamalanrea',
       latitude: -5.13612,
       longitude: 119.48931,
       status: ActivityStatus.PUBLIC,
@@ -391,6 +817,66 @@ async function main() {
         crowdLevel: CrowdLevel.CROWDED,
       },
     },
+    {
+      id: 'dddd4444-4444-4444-4444-444444444444',
+      userId: demoUser.id,
+      locationId: '20102010-2010-2010-2010-201020102010', // RSUD Syekh Yusuf Gowa
+      title: 'Audit Ramp Selasar Poliklinik RSUD Syekh Yusuf Gowa',
+      description: 'Pemeriksaan akses kursi roda di poliklinik terpadu RSUD Syekh Yusuf. Ramp landai berpegangan tangan ganda memudahkan mobilitas pasien disabilitas.',
+      mediaUrls: [
+        'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=800',
+      ],
+      specificLocation: 'RSUD Syekh Yusuf, Somba Opu, Gowa',
+      latitude: -5.20210,
+      longitude: 119.45230,
+      status: ActivityStatus.PUBLIC,
+      accessibilityTags: ['Fasilitas Medis', 'Ramah Kursi Roda', 'Gowa Inklusif'],
+      aiScore: 4.8,
+      aiAnalysis: {
+        summary: 'Fasilitas poliklinik memenuhi standar Permen PUPR No 14/2017 mengenai aksesibilitas bangunan publik.',
+        barrierType: 'Tidak ada hambatan signifikan',
+        actionRecommendation: 'Pertahankan kebersihan ubin pemandu dan ramp.',
+        physicalScore: 4.9,
+        safetyScore: 4.7,
+      },
+      observedParameters: {
+        rampStatus: RampStatus.GOOD,
+        guidingBlockStatus: GuidingBlockStatus.GOOD,
+        surfaceCondition: SurfaceCondition.SMOOTH,
+        lightingLevel: LightingLevel.BRIGHT,
+        crowdLevel: CrowdLevel.MODERATE,
+      },
+    },
+    {
+      id: 'eeee5555-5555-5555-5555-555555555555',
+      userId: demoUser.id,
+      locationId: '20402040-2040-2040-2040-204020402040', // FT UNHAS Gowa
+      title: 'Konektivitas Selasar COTE - CSA Kampus Teknik Gowa',
+      description: 'Selasar jembatan penghubung antargedung di Fakultas Teknik UNHAS Gowa memiliki jalur datar tanpa tangga undakan dengan lift berfitur audio.',
+      mediaUrls: [
+        'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800',
+      ],
+      specificLocation: 'Kampus Teknik UNHAS Gowa, Bontomarannu',
+      latitude: -5.23050,
+      longitude: 119.50120,
+      status: ActivityStatus.PUBLIC,
+      accessibilityTags: ['Kampus Inklusif', 'Lift Audio Braille', 'Bontomarannu'],
+      aiScore: 4.9,
+      aiAnalysis: {
+        summary: 'Sirkulasi horizontal dan vertikal di kampus teknik Gowa sangat mendukung mobilitas mahasiswa disabilitas.',
+        barrierType: 'Perlu kanopi pelindung hujan tambahan di selasar terbuka',
+        actionRecommendation: 'Pemasangan kanopi pada selasar luar antargedung.',
+        physicalScore: 5.0,
+        safetyScore: 4.8,
+      },
+      observedParameters: {
+        rampStatus: RampStatus.GOOD,
+        guidingBlockStatus: GuidingBlockStatus.GOOD,
+        surfaceCondition: SurfaceCondition.SMOOTH,
+        lightingLevel: LightingLevel.BRIGHT,
+        crowdLevel: CrowdLevel.MODERATE,
+      },
+    },
   ];
 
   for (const act of activitiesData) {
@@ -402,21 +888,24 @@ async function main() {
     console.log(`📸 Seeded Activity: ${act.title}`);
   }
 
-  // 4. Update Activity Counter di Location
-  await prisma.location.update({
-    where: { id: '66666666-6666-6666-6666-666666666666' },
-    data: { totalActivities: 1 },
-  });
-  await prisma.location.update({
-    where: { id: '11111111-1111-1111-1111-111111111111' },
-    data: { totalActivities: 1 },
-  });
-  await prisma.location.update({
-    where: { id: '88888888-8888-8888-8888-888888888888' },
-    data: { totalActivities: 1 },
-  });
+  // 5. Update Activity Counter di Location
+  const activeLocationIds = [
+    '66666666-6666-6666-6666-666666666666',
+    '11111111-1111-1111-1111-111111111111',
+    '88888888-8888-8888-8888-888888888888',
+    '20102010-2010-2010-2010-201020102010',
+    '20402040-2040-2040-2040-204020402040',
+  ];
 
-  console.log('✅ Seeding completed successfully!');
+  for (const locId of activeLocationIds) {
+    const count = await prisma.activity.count({ where: { locationId: locId, status: ActivityStatus.PUBLIC } });
+    await prisma.location.update({
+      where: { id: locId },
+      data: { totalActivities: count },
+    });
+  }
+
+  console.log('✅ Seeding for Makassar & Gowa (7 Target Zones) completed successfully!');
 }
 
 main()

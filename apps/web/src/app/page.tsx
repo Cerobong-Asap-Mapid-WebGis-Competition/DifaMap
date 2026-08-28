@@ -60,7 +60,7 @@ export default function HomePage() {
             <span className="gradient-text">DifaMap</span> Architecture
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem', marginTop: '6px' }}>
-            Peta Cerdas Aksesibilitas Disabilitas di Sekitar Rute Transportasi Massal (Makassar Pilot)
+            Peta Cerdas Aksesibilitas Disabilitas di Sekitar Rute Transportasi Massal (Makassar & Gowa — 7 Zona Kecamatan)
           </p>
         </div>
 

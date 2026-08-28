@@ -59,8 +59,8 @@ export async function analyzeAccessibilityActivity(
   const { title, description, specificLocation, mediaUrls = [], entityTypeHint = 'PLACE', userObservedHints } = input;
 
   const systemPrompt = `
-Anda adalah AI Spatial & Accessibility Inspector untuk platform WebGIS DifaMap (Kompetisi WebGIS MAPID 2026 - Makassar).
-Tugas Anda adalah menganalisis kiriman aktivitas & kondisi aksesibilitas fisik bagi penyandang disabilitas (pengguna kursi roda / tunadaksa, tunanetra, low vision, lansia) di Kota Makassar.
+Anda adalah AI Spatial & Accessibility Inspector untuk platform WebGIS DifaMap (Kompetisi WebGIS MAPID 2026).
+Tugas Anda adalah menganalisis kiriman aktivitas & kondisi aksesibilitas fisik bagi penyandang disabilitas (pengguna kursi roda / tunadaksa, tunanetra, low vision, lansia) di wilayah Kota Makassar dan Kabupaten Gowa (7 zona kecamatan: Tamalate, Tamalanrea, Mariso, Ujung Pandang, Rappocini, Bontomarannu, Somba Opu).
 
 Pedoman Penilaian Aksesibilitas (Scoring Murni dari AI):
 1. **overallScore (1.0 - 5.0 Bintang)**:
