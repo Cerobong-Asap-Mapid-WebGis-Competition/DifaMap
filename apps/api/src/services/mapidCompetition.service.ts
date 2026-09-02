@@ -89,6 +89,33 @@ export const STUDY_AREA_POLYGON = bboxToPolygon(
 );
 
 // ==========================================================================
+// PARAMETER KAMPANYE SURVEI DIFAMAP
+// ==========================================================================
+
+/**
+ * Tagar tim, dipakai memfilter Activities milik survei DifaMap.
+ * Dikirim tanpa tanda pagar: server mencocokkannya sebagai substring.
+ *
+ * PERINGATAN: MAPID mencocokkan hashtag ke kolom `description`, BUKAN `title`.
+ * Kalau surveyor hanya menaruh tagar di judul, filter ini mengembalikan kosong.
+ * Uji tanpa filter tagar dulu sebelum mempercayainya.
+ */
+export const SURVEY_HASHTAG = 'cerobongasap';
+
+/**
+ * Rentang tarikan data survei lapangan (13-30 Agustus 2026).
+ *
+ * `endDate` sengaja dilebihkan sampai akhir September: MAPID memfilter
+ * berdasarkan `created_at` (kapan postingan dibuat), bukan kapan lokasinya
+ * dikunjungi. Titik yang disurvei 30 Agustus tapi baru diunggah awal September
+ * akan hilang kalau batasnya dipatok tepat di 2026-08-30.
+ */
+export const SURVEY_PERIOD = {
+  startDate: '2026-08-13',
+  endDate: '2026-09-30',
+};
+
+// ==========================================================================
 // TIPE RESPONS
 // ==========================================================================
 
@@ -296,6 +323,23 @@ class MapIdCompetitionService {
     }
 
     return { features: collected, total, complete };
+  }
+
+  /**
+   * Menarik data survei DifaMap: rentang tanggal kampanye + area studi.
+   *
+   * Tagar TIDAK diterapkan secara default. Karena MAPID mencocokkannya ke
+   * `description` saja, memfilter di sini berisiko membuang titik yang tagar-nya
+   * hanya ada di judul. Lebih aman menarik semua lalu menyaring saat cleaning.
+   */
+  fetchSurveyActivities(options: { polygon?: SearchPolygon; withHashtag?: boolean } = {}) {
+    const { polygon = STUDY_AREA_POLYGON, withHashtag = false } = options;
+    return this.fetchActivities({
+      polygon,
+      startDate: SURVEY_PERIOD.startDate,
+      endDate: SURVEY_PERIOD.endDate,
+      hashtag: withHashtag ? [SURVEY_HASHTAG] : undefined,
+    });
   }
 
   /** Menu Go - kuliner & UMKM, membawa juga `kondisi_tempat` dan `mobilitas`. */

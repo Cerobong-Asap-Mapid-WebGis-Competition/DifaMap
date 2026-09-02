@@ -61,14 +61,29 @@ Content-Type: application/json
 ### 10. MAPID Geoserver Open API - Ambil Daftar Layer Proyek
 GET {{baseUrl}}/mapid/project/layers
 
-### 11. MAPID Competition API - Community Maps (survei aksesibilitas 13-30 Agustus 2026)
+### 11. MAPID Competition API - Community Maps (survei aksesibilitas DifaMap)
 # Rentang tanggal WAJIB dikirim; tanpa itu MAPID memotong hasil di 60 record.
+# endDate dilebihkan sampai akhir September karena filter memakai created_at
+# (kapan diunggah), bukan tanggal kunjungan lapangan.
 POST {{baseUrl}}/mapid/competition/activities
 Content-Type: application/json
 
 {
   "startDate": "2026-08-13",
-  "endDate": "2026-08-30"
+  "endDate": "2026-09-30"
+}
+
+### 11b. Uji apakah filter tagar benar-benar cocok
+# MAPID mencocokkan hashtag ke kolom description saja, BUKAN title.
+# Bandingkan jumlah hasilnya dengan no. 11 - kalau jauh lebih sedikit atau 0,
+# berarti tagar hanya ditulis di judul dan filter ini tidak boleh dipakai.
+POST {{baseUrl}}/mapid/competition/activities
+Content-Type: application/json
+
+{
+  "startDate": "2026-08-13",
+  "endDate": "2026-09-30",
+  "hashtag": ["cerobongasap"]
 }
 
 ### 12. MAPID Competition API - Menu Go (kepadatan kuliner & UMKM)
