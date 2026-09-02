@@ -331,6 +331,10 @@ export async function getNearbyLocationsController(req: Request, res: Response):
       return;
     }
 
+    // Query memakai kolom `geom` yang sudah terindeks GIST, bukan membangun
+    // ulang ST_MakePoint per baris. Versi sebelumnya membuat index
+    // idx_locations_geom tidak terpakai sama sekali sehingga setiap permintaan
+    // memindai seluruh tabel.
     const locations: any[] = await prisma.$queryRaw`
       SELECT 
         id, name, entity_type as "entityType", category, specific_location as "specificLocation",
@@ -339,15 +343,16 @@ export async function getNearbyLocationsController(req: Request, res: Response):
         sidewalk_condition as "sidewalkCondition", surface_condition as "surfaceCondition",
         lighting_level as "lightingLevel", crowd_level as "crowdLevel", ai_summary as "aiSummary",
         ROUND(ST_Distance(
-          ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography,
+          geom::geography,
           ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography
         )) as "distanceMeters"
       FROM public.locations
-      WHERE ST_DWithin(
-        ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography,
-        ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography,
-        ${radiusMeters}
-      )
+      WHERE geom IS NOT NULL
+        AND ST_DWithin(
+          geom::geography,
+          ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography,
+          ${radiusMeters}
+        )
       ORDER BY "distanceMeters" ASC
       LIMIT ${maxLimit}
     `;

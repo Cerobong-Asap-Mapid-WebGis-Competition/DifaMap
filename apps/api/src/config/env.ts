@@ -6,6 +6,9 @@ dotenv.config();
 const envSchema = z.object({
   PORT: z.string().default('4000').transform((val) => parseInt(val, 10)),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  // Daftar origin frontend yang diizinkan, dipisah koma.
+  // Contoh produksi: "https://difamap.vercel.app,https://www.difamap.id"
+  CORS_ORIGINS: z.string().default('http://localhost:3000'),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   DIRECT_URL: z.string().optional(),
   SUPABASE_URL: z.string().url('SUPABASE_URL must be a valid URL'),
