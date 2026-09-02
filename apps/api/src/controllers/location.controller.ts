@@ -271,7 +271,10 @@ export async function createLocationController(req: Request, res: Response): Pro
 export async function recalculateEconomicScoreController(req: Request, res: Response): Promise<void> {
   try {
     const id = String(req.params.id);
-    const radius = Number(req.query.radius) || 500.0;
+    // Default 200m mengikuti buffer spatial join di DEVELOPMENT.md Bab 7,
+    // dan harus sama dengan lingkaran radius yang digambar Mode Urban Planner
+    // agar skor yang ditampilkan konsisten dengan area yang terlihat.
+    const radius = Number(req.query.radius) || 200.0;
 
     const { data, error } = await supabase.rpc('calculate_buffer_economic_score', {
       loc_id: id,
