@@ -194,8 +194,26 @@ Foto Lampiran: ${mediaUrls.length > 0 ? mediaUrls.join(', ') : 'Tidak ada foto.'
 }
 
 /**
- * Mensintesis dan memperbarui agregat rating dan deskripsi AI pada entitas Location
- * ketika ada Activity baru yang di-tag pada tempat tersebut.
+ * Menyegarkan ringkasan naratif sebuah Location berdasarkan laporan komunitas
+ * terbaru yang ditandai ke tempat tersebut.
+ *
+ * BATAS TEGAS: fungsi ini TIDAK BOLEH menulis overall_score, physical_score,
+ * safety_score, maupun kolom status fasilitas (rampStatus, guidingBlockStatus,
+ * sidewalkCondition, lightingLevel, toiletAccessibility). Semua itu skor dan
+ * status RESMI yang berasal dari penilaian AI atas data survei.
+ *
+ * Versi sebelumnya menimpa semuanya dengan hasil pembacaan AI atas teks yang
+ * ditulis pengguna. Akibatnya siapa pun yang login bisa mengubah status ramp
+ * dan guiding block resmi sebuah lokasi hanya dengan menulis deskripsi —
+ * untuk produk yang dipakai memutuskan apakah aman berangkat dengan kursi
+ * roda, itu bukan sekadar cacat data.
+ *
+ * Yang boleh ditulis fungsi ini: aiSummary dan aiInsights (naratif). Observasi
+ * komunitas atas kondisi fasilitas tetap disimpan, tapi di dalam
+ * aiInsights.communityObserved sebagai catatan — bukan sebagai status resmi.
+ *
+ * community_score dan community_report_count dihitung trigger database, bukan
+ * di sini, supaya angkanya konsisten walau activity masuk lewat jalur lain.
  */
 export async function synthesizeLocationInsightsWithAI(locationId: string): Promise<void> {
   try {
@@ -216,15 +234,6 @@ export async function synthesizeLocationInsightsWithAI(locationId: string): Prom
       return;
     }
 
-    // Hitung rata-rata skor AI dari seluruh activity publik
-    const validScores = location.activities
-      .map((a) => a.aiScore)
-      .filter((s): s is number => typeof s === 'number' && s > 0);
-
-    const avgScore = validScores.length > 0
-      ? validScores.reduce((acc, curr) => acc + curr, 0) / validScores.length
-      : location.overallScore || 3.5;
-
     // Ambil sampel aktivitas terbaru untuk disintesis oleh AI menjadi ringkasan poin tempat
     const recentActivitiesContext = location.activities.map((a) => ({
       title: a.title,
@@ -243,17 +252,21 @@ ${JSON.stringify(recentActivitiesContext, null, 2)}
 
 Buatkan deskripsi ringkas poin-poin aksesibilitas terkini (maksimal 3-4 kalimat padat dalam bahasa Indonesia) serta daftar poin kekuatan dan rintangan untuk disabilitas fisik/sensorik.
 
+PENTING: field "communityObserved" di bawah adalah CATATAN LAPORAN KOMUNITAS, bukan status resmi lokasi. Isi apa adanya sesuai yang dilaporkan pengguna, dan gunakan "TIDAK_DISEBUT" bila laporan tidak menyinggung parameter tersebut. Jangan menebak.
+
 Keluarkan JSON format:
 {
   "summary": string,
   "keyPoints": string[],
   "strengths": string[],
   "barriers": string[],
-  "latestRampStatus": "GOOD" | "DAMAGED" | "NONE",
-  "latestGuidingBlockStatus": "GOOD" | "DAMAGED" | "NONE",
-  "latestSidewalkCondition": "GOOD" | "NARROW" | "DAMAGED" | "BLOCKED" | "NOT_APPLICABLE",
-  "latestLightingLevel": "BRIGHT" | "DIM" | "DARK",
-  "latestToiletAccessibility": "AVAILABLE_GOOD" | "AVAILABLE_DAMAGED" | "NOT_AVAILABLE"
+  "communityObserved": {
+    "rampStatus": "GOOD" | "DAMAGED" | "NONE" | "TIDAK_DISEBUT",
+    "guidingBlockStatus": "GOOD" | "DAMAGED" | "NONE" | "TIDAK_DISEBUT",
+    "sidewalkCondition": "GOOD" | "NARROW" | "DAMAGED" | "BLOCKED" | "TIDAK_DISEBUT",
+    "lightingLevel": "BRIGHT" | "DIM" | "DARK" | "TIDAK_DISEBUT",
+    "toiletAccessibility": "AVAILABLE_GOOD" | "AVAILABLE_DAMAGED" | "NOT_AVAILABLE" | "TIDAK_DISEBUT"
+  }
 }
 `;
 
@@ -271,23 +284,21 @@ Keluarkan JSON format:
     if (raw) {
       const parsed = JSON.parse(raw);
 
+      // Hanya kolom naratif. Skor resmi, status fasilitas, dan pencacah
+      // sengaja tidak ada di sini — lihat catatan di atas fungsi ini.
       await prisma.location.update({
         where: { id: locationId },
         data: {
-          overallScore: parseFloat(avgScore.toFixed(1)),
           aiSummary: parsed.summary || location.aiSummary,
           aiInsights: {
             keyPoints: parsed.keyPoints || [],
             strengths: parsed.strengths || [],
             barriers: parsed.barriers || [],
+            // Observasi komunitas disimpan sebagai catatan, BUKAN status resmi.
+            communityObserved: parsed.communityObserved || null,
+            basedOnActivityCount: location.activities.length,
             updatedAt: new Date().toISOString(),
           },
-          rampStatus: parsed.latestRampStatus || location.rampStatus,
-          guidingBlockStatus: parsed.latestGuidingBlockStatus || location.guidingBlockStatus,
-          sidewalkCondition: parsed.latestSidewalkCondition || location.sidewalkCondition,
-          lightingLevel: parsed.latestLightingLevel || location.lightingLevel,
-          toiletAccessibility: parsed.latestToiletAccessibility || location.toiletAccessibility,
-          totalActivities: location.activities.length,
         },
       });
     }

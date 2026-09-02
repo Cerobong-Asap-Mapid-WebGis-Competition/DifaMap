@@ -103,8 +103,8 @@ FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 -- ------------------------------------------------------------------------------
 -- 5. PENGHITUNG KONTRIBUSI KOMUNITAS
 --
--- PENTING: trigger ini HANYA memperbarui pencacah, TIDAK menyentuh
--- overall_score. DEVELOPMENT.md Bab 10 fitur 5 dan Bab 11 menyatakan kontribusi
+-- PENTING: trigger ini memperbarui pencacah dan community_score, tetapi TIDAK
+-- PERNAH menyentuh overall_score. DEVELOPMENT.md Bab 10 fitur 5 dan Bab 11 menyatakan kontribusi
 -- pengguna tidak boleh mengubah skor resmi — skor resmi berasal dari penilaian
 -- AI atas data survei, bukan dari postingan komunitas. Versi lama menghitung
 -- rata-rata skor laporan lalu menimpanya ke kolom skor lokasi; itu membuat
@@ -125,11 +125,26 @@ BEGIN
         RETURN NULL;
     END IF;
 
+    -- Skor komunitas dihitung di sini, ke kolom community_score yang TERPISAH.
+    -- overall_score (skor resmi dari survei) sengaja tidak disentuh sama sekali.
+    -- NULL bila belum ada laporan sama sekali — berbeda maknanya dengan 0.
     UPDATE public.locations
        SET total_activities = (
                SELECT COUNT(*) FROM public.activities
                 WHERE location_id = target_loc_id
                   AND status = 'PUBLIC'::"ActivityStatus"
+           ),
+           community_report_count = (
+               SELECT COUNT(*) FROM public.activities
+                WHERE location_id = target_loc_id
+                  AND status = 'PUBLIC'::"ActivityStatus"
+                  AND ai_score IS NOT NULL
+           ),
+           community_score = (
+               SELECT ROUND(AVG(ai_score)::numeric, 2) FROM public.activities
+                WHERE location_id = target_loc_id
+                  AND status = 'PUBLIC'::"ActivityStatus"
+                  AND ai_score IS NOT NULL
            ),
            updated_at = NOW()
      WHERE id = target_loc_id;

@@ -51,7 +51,7 @@ export default function LocationDetailPanel({ location, onClose }: LocationDetai
         docRef="DEVELOPMENT.md §9 Lapis 3 / §10 Fitur 2"
         description="Desain final: skor keseluruhan, rating bintang, ikon per parameter, galeri foto survei, dan form kontribusi."
         checklist={[
-          'Rating bintang + skor keseluruhan yang terbaca jelas',
+          'Skor resmi dan skor komunitas harus tetap terbedakan secara visual, jangan digabung',
           'Ikon per parameter dengan status warna (baik / rusak / tidak ada)',
           'Galeri foto survei + deskripsi',
           'Form kontribusi (foto, lokasi, komentar) dengan penanda "tidak mengubah skor resmi"',
@@ -62,10 +62,32 @@ export default function LocationDetailPanel({ location, onClose }: LocationDetai
       {/* --- Ringkasan sementara langsung dari data backend --- */}
       <dl className="ph-dl">
         <div>
-          <dt>Skor aksesibilitas</dt>
+          <dt>Skor resmi (survei)</dt>
           <dd>
             {typeof location.overallScore === 'number' ? location.overallScore.toFixed(1) : '—'} / 5.0
             <span className="ph-hint"> (makin tinggi makin baik)</span>
+          </dd>
+        </div>
+        {/*
+          Skor komunitas ditampilkan TERPISAH dan diberi label indikatif.
+          Menggabungkannya dengan skor resmi akan menghapus perbedaan yang
+          justru penting: skor resmi berasal dari survei terverifikasi,
+          skor komunitas dari laporan siapa saja.
+        */}
+        <div>
+          <dt>Laporan komunitas</dt>
+          <dd>
+            {typeof location.communityScore === 'number' ? (
+              <>
+                {location.communityScore.toFixed(1)} / 5.0
+                <span className="ph-hint">
+                  {' '}
+                  dari {location.communityReportCount ?? 0} laporan · indikatif, tidak mengubah skor resmi
+                </span>
+              </>
+            ) : (
+              <span className="ph-hint">Belum ada laporan</span>
+            )}
           </dd>
         </div>
         <div>

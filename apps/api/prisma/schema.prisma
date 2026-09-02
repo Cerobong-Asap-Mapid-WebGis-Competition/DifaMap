@@ -171,12 +171,27 @@ model Location {
   safeVisitTime         String?             @map("safe_visit_time") // Contoh: "08:00 - 17:00"
   weeklyPattern         WeeklyPattern       @default(BALANCED) @map("weekly_pattern")
 
-  // Scoring & AI Insights (Murni Dihitung & Di-update oleh AI Orchestrator)
+  // ==========================================
+  // SKOR RESMI - hasil penilaian AI atas DATA SURVEI.
+  // Tidak pernah diubah oleh kontribusi pengguna (DEVELOPMENT.md Bab 10 fitur 5
+  // & Bab 11). Hanya inilah yang masuk perhitungan priorityIndex dan yang
+  // ditampilkan sebagai skor resmi di peta.
+  // ==========================================
   overallScore          Float               @default(0.0) @map("overall_score") // 1.0 - 5.0 (Rating Bintang)
   physicalScore         Float               @default(0.0) @map("physical_score") // 1.0 - 5.0
   safetyScore           Float               @default(0.0) @map("safety_score") // 1.0 - 5.0
   aiSummary             String?             @db.Text @map("ai_summary") // Ringkasan poin-poin aksesibilitas
   aiInsights            Json?               @map("ai_insights") // Rekomendasi perbaikan & detail parameter
+
+  // ==========================================
+  // SKOR KOMUNITAS - agregat laporan pengguna, bersifat INDIKATIF.
+  // Dihitung otomatis oleh trigger dari rata-rata aiScore activity publik.
+  // Sengaja dipisah supaya penurunan kondisi sejak survei tetap terlihat,
+  // tanpa membuat siapa pun bisa menggeser skor resmi lewat teks yang ia tulis.
+  // Null berarti belum ada laporan komunitas sama sekali.
+  // ==========================================
+  communityScore        Float?              @map("community_score") // 1.0 - 5.0
+  communityReportCount  Int                 @default(0) @map("community_report_count")
 
   // Analisis Spasial Ekonomi MAPID
   economicScore         Float               @default(0.0) @map("economic_score") // 0.0 - 100.0 (Kerapatan Menu/Properti Go)
