@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { AuthProvider } from '../context/AuthContext';
 
 export const metadata: Metadata = {
   title: 'DifaMap — Peta Cerdas Aksesibilitas Transportasi Massal Inklusif',
@@ -14,7 +15,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id">
-      <body>{children}</body>
+      <body>
+        {/* Skip link: wajib ada supaya pengguna keyboard/screen reader bisa
+            melompati sidebar langsung ke konten peta & daftar titik. */}
+        <a href="#konten-utama" className="skip-link">
+          Lompat ke konten utama
+        </a>
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }

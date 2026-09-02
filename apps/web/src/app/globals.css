@@ -86,3 +86,344 @@ body {
   font-size: 0.85rem;
   color: #38bdf8;
 }
+
+/* ==========================================================================
+   KERANGKA APLIKASI + PLACEHOLDER
+   --------------------------------------------------------------------------
+   Semua di bawah ini bersifat SEMENTARA dan sengaja dibuat polos.
+   Saat desain final dari UI/UX designer siap, blok ini yang diganti.
+   Kelas .a11y-* dan .skip-link JANGAN dihapus — itu penopang aksesibilitas.
+   ========================================================================== */
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  padding: 12px 20px;
+  background: var(--accent-blue);
+  color: #fff;
+  font-weight: 600;
+}
+
+.skip-link:focus {
+  left: 0;
+}
+
+/* Cincin fokus wajib terlihat di seluruh aplikasi (WCAG 2.4.7) */
+:focus-visible {
+  outline: 3px solid var(--accent-cyan);
+  outline-offset: 2px;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 380px;
+  gap: 16px;
+  padding: 16px;
+  min-height: 100vh;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sidebar,
+.app-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.app-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.map-area {
+  height: 60vh;
+  min-height: 420px;
+}
+
+.map-loading {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  min-height: 420px;
+  color: var(--text-muted);
+}
+
+.sidebar-brand {
+  display: flex;
+  flex-direction: column;
+  font-size: 1.25rem;
+}
+
+.mode-switch {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mode-btn {
+  min-height: 44px; /* target sentuh minimum */
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-main);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mode-btn[data-active='true'] {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  font-weight: 700;
+}
+
+.panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.panel-title {
+  font-size: 1rem;
+  margin-bottom: 12px;
+}
+
+.panel-state {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  margin-top: 8px;
+}
+
+.panel-state[data-state='error'] {
+  color: #fca5a5;
+}
+
+/* --- Penanda area desain --- */
+.ph-box {
+  border: 2px dashed rgba(148, 163, 184, 0.45);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 16px;
+  background: rgba(148, 163, 184, 0.06);
+}
+
+.ph-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ph-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--accent-amber);
+  color: #1c1917;
+}
+
+.ph-label {
+  font-size: 0.9rem;
+}
+
+.ph-ref,
+.ph-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.ph-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.ph-list {
+  margin: 0 0 0 18px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.ph-controls {
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.ph-controls legend {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  padding: 0 6px;
+}
+
+.ph-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.ph-btn {
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-main);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ph-dl {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+.ph-dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 4px;
+}
+
+.ph-dl dt {
+  color: var(--text-muted);
+}
+
+.ph-summary {
+  margin-top: 12px;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.ph-rank {
+  display: grid;
+  gap: 6px;
+  margin-left: 18px;
+}
+
+.ph-rank-btn {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 2px;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-main);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ph-rank-score {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.ph-chat {
+  display: grid;
+  gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.ph-chat-msg[data-role='user'] {
+  color: var(--text-muted);
+}
+
+.ph-chat-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ph-chat-form input {
+  flex: 1;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--text-main);
+  font: inherit;
+}
+
+.ph-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* --- Padanan peta berbasis teks (jangan dihapus) --- */
+.a11y-list {
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.a11y-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-main);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.a11y-item[aria-current='true'] {
+  border-color: var(--accent-cyan);
+  background: rgba(6, 182, 212, 0.12);
+}
+
+.a11y-item-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
