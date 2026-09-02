@@ -116,3 +116,28 @@ Content-Type: application/json
     ]
   }
 }
+
+# ==========================================================================
+# UJI ENDPOINT LAYER LAMA
+#
+# Tiga permintaan berikut menguji apakah alamat yang ditebak kode lama benar-
+# benar ada. Semuanya menunjuk geoserver.mapid.io dan api.mapid.io, dua host
+# yang TIDAK muncul di dokumentasi MAPID mana pun yang sudah kita baca.
+#
+# Cara membaca hasilnya:
+#   200 + data masuk akal -> alamatnya benar, pertahankan
+#   401 / 403             -> alamat mungkin benar tapi skema auth salah
+#   404 / 502             -> alamatnya karangan, hapus ketiganya
+#
+# Competition API sudah mengambil alih fungsi ketiganya, jadi kalau gagal
+# tidak ada yang perlu diganti — cukup dihapus.
+# ==========================================================================
+
+### 15. Uji: daftar layer proyek (geoserver.mapid.io/layers_new/get_layer_list)
+GET {{baseUrl}}/mapid/project/layers
+
+### 16. Uji: daftar layer activity (api.mapid.io/api/v1/layers)
+GET {{baseUrl}}/mapid/layers
+
+### 17. Uji: GeoJSON satu layer (ganti LAYER_ID dengan id dari no. 15 atau 16)
+GET {{baseUrl}}/mapid/layers/LAYER_ID/geojson

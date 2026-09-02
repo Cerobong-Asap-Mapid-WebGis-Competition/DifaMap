@@ -205,6 +205,39 @@ FOR EACH ROW EXECUTE FUNCTION public.refresh_location_comment_count();
 --   Arah pembacaan: priority_index TINGGI = kondisi buruk & ramai = prioritas
 --   perbaikan tinggi. Berlawanan arah dengan overall_score, jangan tertukar.
 -- ------------------------------------------------------------------------------
+-- ------------------------------------------------------------------------------
+-- 6a. PARAMETER YANG DAPAT DIKALIBRASI
+--
+-- Semua angka yang belum terbukti dikumpulkan di sini sebagai fungsi terpisah,
+-- bukan disebar sebagai konstanta di tengah rumus. Kalibrasi ulang cukup dengan
+-- mengganti nilai di fungsi-fungsi ini, tanpa menyentuh logika perhitungan.
+--
+-- STATUS: BELUM TERKALIBRASI. Semua nilai di bawah adalah asumsi awal dan wajib
+-- diuji ulang setelah data survei serta Menu Go / Properti Go asli masuk.
+-- DEVELOPMENT.md Bab 12 menuntut formula yang transparan dan terdokumentasi.
+-- ------------------------------------------------------------------------------
+
+-- Bobot komponen kerusakan pada Accessibility Priority Index.
+-- Asal angka: ditetapkan di PRD tanpa penurunan empiris.
+-- Cara menguji: jalankan ulang daftar prioritas pada 0.5, 0.6, dan 0.7. Bila
+-- 5 besarnya tidak berubah, bobot ini tidak menentukan hasil — dan itu justru
+-- argumen yang kuat saat mempertanggungjawabkannya.
+CREATE OR REPLACE FUNCTION public.weight_damage()
+RETURNS DOUBLE PRECISION AS $$ SELECT 0.6::DOUBLE PRECISION $$ LANGUAGE sql IMMUTABLE;
+
+-- Bobot komponen ekonomi. Selalu 1 - weight_damage().
+CREATE OR REPLACE FUNCTION public.weight_economy()
+RETURNS DOUBLE PRECISION AS $$ SELECT 1.0 - public.weight_damage() $$ LANGUAGE sql IMMUTABLE;
+
+-- Titik jenuh skor ekonomi: berapa "poin berbobot" yang dianggap kepadatan
+-- maksimum (skor 100). Nilai 50 berarti sekitar 33 titik Menu Go dalam radius.
+-- Angka ini murni tebakan sampai data asli ada. Cara mengganti yang benar:
+-- hitung persentil ke-90 kepadatan Menu Go + Properti Go per radius 200m dari
+-- data sungguhan, lalu pakai angka itu di sini.
+CREATE OR REPLACE FUNCTION public.economic_saturation_points()
+RETURNS DOUBLE PRECISION AS $$ SELECT 50.0::DOUBLE PRECISION $$ LANGUAGE sql IMMUTABLE;
+
+
 CREATE OR REPLACE FUNCTION public.damage_score_from_accessibility(acc_score DOUBLE PRECISION)
 RETURNS DOUBLE PRECISION AS $$
 BEGIN
@@ -229,8 +262,8 @@ CREATE OR REPLACE FUNCTION public.sync_priority_index()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.priority_index := ROUND((
-        (0.6 * public.damage_score_from_accessibility(NEW.overall_score)) +
-        (0.4 * COALESCE(NEW.economic_score, 0.0))
+        (public.weight_damage()  * public.damage_score_from_accessibility(NEW.overall_score)) +
+        (public.weight_economy() * COALESCE(NEW.economic_score, 0.0))
     )::numeric, 2);
     RETURN NEW;
 END;
@@ -248,10 +281,8 @@ FOR EACH ROW EXECUTE FUNCTION public.sync_priority_index();
 -- Menghitung kepadatan titik ekonomi di sekitar sebuah lokasi, lalu memperbarui
 -- economic_score dan priority_index.
 --
--- CATATAN KALIBRASI: pembobotan di bawah masih angka sementara. Titik jenuh
--- (skor 100) tercapai pada sekitar 33 titik Menu Go dalam radius. Bobot dan
--- ambang ini HARUS dikalibrasi ulang setelah data Menu Go / Properti Go asli
--- masuk, lalu didokumentasikan — PRD Bab 12 menuntut formula yang transparan.
+-- Bobot dan titik jenuh diambil dari fungsi di bagian 6a agar bisa dikalibrasi
+-- tanpa menyentuh logika di sini.
 -- ------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.calculate_buffer_economic_score(
     loc_id         UUID,
@@ -285,11 +316,12 @@ BEGIN
       FROM public.economic_points
      WHERE ST_DWithin(geom::geography, loc_geom::geography, radius_meters);
 
+    -- Poin berbobot dinormalisasi terhadap titik jenuh, bukan dikali angka ajaib.
     computed_econ := LEAST(100.0, (
         (menu_go_count     * 1.5) +
         (properti_go_count * 2.0) +
         (commercial_count  * 1.0)
-    ) * 2.0);
+    ) / public.economic_saturation_points() * 100.0);
 
     UPDATE public.locations
        SET economic_score = ROUND(computed_econ::numeric, 2),
