@@ -61,20 +61,3 @@ Content-Type: application/json
 ### 10. MAPID Geoserver Open API - Ambil Daftar Layer Proyek
 GET {{baseUrl}}/mapid/project/layers
 
-### 11. MAP Analysis Tool - Isokron Catchment (5, 10, 15 Menit Kursi Roda dari Halte Karebosi)
-GET {{baseUrl}}/mapid/analysis/isochrone?lat=-5.13421&lng=119.40932&intervals=5,10,15&mode=wheelchair
-
-### 12. MAP Analysis Tool - Slope & Elevation Profile (Uji Tanjakan Trotoar)
-POST {{baseUrl}}/mapid/analysis/elevation-slope
-Content-Type: application/json
-
-{
-  "coordinates": [
-    [119.4058, -5.1412],
-    [119.4063, -5.1476],
-    [119.4165, -5.1583]
-  ]
-}
-
-### 13. MAPID SINI AI - Multi-Criteria Priority Grid Heatmap Makassar
-GET {{baseUrl}}/mapid/analysis/sini-grid?gridSize=1000

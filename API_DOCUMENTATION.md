@@ -39,7 +39,7 @@ flowchart TD
     GuestUser -->|Jelajah Map & Filter| LocationCtrl
     GuestUser -->|Lihat Feed & Foto| ActivityCtrl
     GuestUser -->|Konsultasi Rute| ChatbotCtrl
-    GuestUser -->|Layer & Isokron| MapIdCtrl
+    GuestUser -->|Basemap & Layer| MapIdCtrl
 
     AuthUser -->|Kirim Token JWT| AuthMiddleware
     AuthMiddleware -->|Upload Activity + Foto| ActivityCtrl
@@ -231,16 +231,18 @@ flowchart TD
 
 ---
 
-### E. MAPID Geo & Analisis Spasial (`/api/mapid`)
+### E. MAPID Basemap & Layer Proxy (`/api/mapid`)
 
 | Endpoint | Method | Fungsi & Parameter |
 | :--- | :--- | :--- |
 | `/api/mapid/styles/:styleId` | `GET` | Mengambil Style JSON MAPID Basemap (`basic`, `dark`, `light`, `street-2d-building`, `satellite`). |
 | `/api/mapid/project/layers` | `GET` | Mengambil daftar layer aktif dari **MAPID Geoserver Open API**. |
-| `/api/mapid/analysis/isochrone` | `GET` | **Isokron Catchment**: Menghitung poligon jangkauan 5, 10, 15 menit.<br>Query: `lat=-5.14&lng=119.45&intervals=5,10,15&mode=wheelchair` |
-| `/api/mapid/analysis/elevation-slope` | `POST` | **Slope Profile**: Mengukur profil kelandaian tanjakan jalan dan mendeteksi rintangan $>8\%$. |
-| `/api/mapid/analysis/sini-grid` | `GET` | **MAPID SINI AI Grid**: Menghitung heatmap prioritas intervensi infrastruktur multi-kriteria untuk seluruh wilayah Makassar. |
 | `/api/mapid/layers/:layerId/geojson` | `GET` | Mengambil data GeoJSON mentah dari layer MAPID. |
+
+> **Catatan integrasi MAPID.** Isokron, profil ketinggian, routing, dan SINI **tidak tersedia sebagai REST API** —
+> menurut dokumentasi resmi MAPID semuanya adalah tool GUI di dalam Map Editor (Toolbox & menu SINI).
+> Cara memakainya: jalankan tool tersebut di Map Editor, simpan hasilnya sebagai layer, lalu tarik layer itu
+> lewat endpoint GeoJSON di atas. Jangan menghitung sendiri lalu menamainya MAPID.
 
 ---
 

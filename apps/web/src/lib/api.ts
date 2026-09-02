@@ -145,36 +145,4 @@ export const difaMapApi = {
     if (!res.ok) throw new Error('Failed to fetch MAPID project layers');
     return res.json();
   },
-
-  /**
-   * MAP Analysis: Menghitung Poligon Isokron (5, 10, 15 menit)
-   */
-  async getIsochrone(lat: number, lng: number, intervals = [5, 10, 15], mode: 'walking' | 'wheelchair' = 'wheelchair') {
-    const res = await fetch(`${API_BASE_URL}/api/mapid/analysis/isochrone?lat=${lat}&lng=${lng}&intervals=${intervals.join(',')}&mode=${mode}`);
-    if (!res.ok) throw new Error('Failed to calculate isochrone');
-    return res.json();
-  },
-
-  /**
-   * MAP Analysis: Menghitung Elevasi & Kelandaian Tanjakan (Slope Analysis)
-   */
-  async getElevationSlope(coordinates: Array<[number, number]>) {
-    const res = await fetch(`${API_BASE_URL}/api/mapid/analysis/elevation-slope`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ coordinates }),
-    });
-    if (!res.ok) throw new Error('Failed to calculate slope profile');
-    return res.json();
-  },
-
-  /**
-   * MAPID SINI AI: Mengambil Grid Heatmap Prioritas Wilayah Makassar
-   */
-  async getSiniGridPriority(gridSize = 1000) {
-    const res = await fetch(`${API_BASE_URL}/api/mapid/analysis/sini-grid?gridSize=${gridSize}`);
-    if (!res.ok) throw new Error('Failed to fetch SINI grid');
-    return res.json();
-  },
 };
-
