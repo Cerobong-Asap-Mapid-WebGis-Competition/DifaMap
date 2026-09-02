@@ -9,6 +9,7 @@ out/
 # Production builds
 dist/
 build/
+*.tsbuildinfo
 
 # Environment Variables
 .env

@@ -60,14 +60,16 @@ export async function handleAccessibilityChat(input: ChatInput): Promise<ChatRes
     });
   }
 
-  // Cari lokasi-lokasi relevan di Makassar & Gowa (7 zona kecamatan)
-  spatialContextData = await prisma.location.findMany({
-    take: 20,
-    orderBy: [
-      { overallScore: 'desc' },
-      { totalActivities: 'desc' },
-    ],
-    select: {
+  // Pengambilan konteks (retrieval).
+  //
+  // Sebelumnya konteks selalu diisi 20 lokasi berskor TERTINGGI, apa pun
+  // pertanyaannya. Akibatnya pertanyaan seperti "titik mana yang paling butuh
+  // perbaikan?" justru dijawab dengan daftar tempat terbaik — kebalikan dari
+  // yang ditanyakan. Koordinat pengguna pun diabaikan.
+  //
+  // Sekarang: bila koordinat pengguna ada, ambil yang TERDEKAT lewat PostGIS;
+  // bila tidak, ambil yang paling mendesak menurut priorityIndex.
+  const selectFields = {
       id: true,
       name: true,
       entityType: true,
@@ -90,8 +92,46 @@ export async function handleAccessibilityChat(input: ChatInput): Promise<ChatRes
       safeVisitTime: true,
       weeklyPattern: true,
       aiSummary: true,
-    },
-  });
+  } as const;
+
+  if (userLocation) {
+    // Radius 3km dari posisi pengguna, diurutkan dari yang terdekat.
+    // Memakai kolom geom yang terindeks GIST, bukan menghitung ulang per baris.
+    spatialContextData = await prisma.$queryRaw`
+      SELECT
+        id, name, entity_type as "entityType", category,
+        specific_location as "specificLocation", latitude, longitude,
+        overall_score as "overallScore", physical_score as "physicalScore",
+        safety_score as "safetyScore", priority_index as "priorityIndex",
+        ramp_status as "rampStatus", guiding_block_status as "guidingBlockStatus",
+        sidewalk_condition as "sidewalkCondition", surface_condition as "surfaceCondition",
+        seating_availability as "seatingAvailability", toilet_accessibility as "toiletAccessibility",
+        lighting_level as "lightingLevel", crowd_level as "crowdLevel",
+        peak_hours as "peakHours", safe_visit_time as "safeVisitTime",
+        weekly_pattern as "weeklyPattern", ai_summary as "aiSummary",
+        ROUND(ST_Distance(
+          geom::geography,
+          ST_SetSRID(ST_MakePoint(${userLocation.longitude}, ${userLocation.latitude}), 4326)::geography
+        )) as "distanceMeters"
+      FROM public.locations
+      WHERE geom IS NOT NULL
+        AND ST_DWithin(
+          geom::geography,
+          ST_SetSRID(ST_MakePoint(${userLocation.longitude}, ${userLocation.latitude}), 4326)::geography,
+          3000
+        )
+      ORDER BY "distanceMeters" ASC
+      LIMIT 20
+    `;
+  } else {
+    // Tanpa koordinat: prioritaskan titik yang paling butuh perbaikan,
+    // karena itu pertanyaan yang paling sering diajukan Mode Urban Planner.
+    spatialContextData = await prisma.location.findMany({
+      take: 20,
+      orderBy: [{ priorityIndex: 'desc' }, { totalActivities: 'desc' }],
+      select: { ...selectFields, priorityIndex: true },
+    });
+  }
 
   const systemPrompt = `
 Anda adalah **DifaMap AI Assistant**, asisten cerdas khusus aksesibilitas disabilitas dan navigasi ramah inklusi untuk wilayah **Kota Makassar dan Kabupaten Gowa** (mencakup 7 zona kecamatan: Tamalate, Tamalanrea, Mariso, Ujung Pandang, Rappocini, Somba Opu, dan Bontomarannu).
@@ -112,6 +152,11 @@ ${JSON.stringify(spatialContextData, null, 2)}
 Gaya Jawaban:
 - Gunakan bahasa Indonesia yang ramah, jelas, empati, dan terstruktur (gunakan bullet points jika menjelaskan opsi).
 - Sertakan estimasi kelayakan bagi disabilitas terkait (kursi roda/tunanetra).
+- **Sebut nama lokasi PERSIS seperti tertulis pada data di atas**, jangan disingkat
+  atau diparafrase. Nama itu dipakai sistem untuk menandai sumber data yang Anda
+  rujuk, sehingga pengguna bisa memeriksa sendiri dasar jawaban Anda.
+- Jangan menyebut lokasi yang tidak ada dalam data di atas. Bila data yang
+  tersedia tidak cukup untuk menjawab, katakan terus terang.
 `;
 
   const conversationMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
@@ -142,17 +187,30 @@ Gaya Jawaban:
 
     const reply = response.choices[0]?.message?.content || 'Maaf, saya sedang tidak dapat merespon saat ini. Silakan coba sesaat lagi.';
 
-    // Lokasi yang relevan untuk dikirimkan sebagai metadata rekomendasi kartu ke UI
-    const referencedLocations = spatialContextData.slice(0, 3).map((loc) => ({
-      id: loc.id,
-      name: loc.name,
-      entityType: loc.entityType,
-      category: loc.category,
-      overallScore: loc.overallScore,
-      rampStatus: loc.rampStatus,
-      guidingBlockStatus: loc.guidingBlockStatus,
-      safeVisitTime: loc.safeVisitTime,
-    }));
+    // Sumber data yang BENAR-BENAR dirujuk jawaban, bukan tiga teratas konteks.
+    //
+    // Sebelumnya kolom ini diisi 3 lokasi pertama dari konteks apa pun isi
+    // jawabannya, jadi "sumber" yang ditampilkan ke pengguna belum tentu ada
+    // hubungannya dengan yang dibaca AI. DEVELOPMENT.md Bab 8 mensyaratkan
+    // sumber yang mendasari insight ditampilkan — kalau sumbernya dikarang,
+    // syarat itu justru dilanggar sambil terlihat dipenuhi.
+    //
+    // Sekarang: hanya lokasi yang namanya benar-benar disebut dalam jawaban.
+    // Kalau AI tidak menyebut satu pun, daftarnya kosong — itu jawaban jujur.
+    const replyLower = reply.toLowerCase();
+    const referencedLocations = spatialContextData
+      .filter((loc) => typeof loc.name === 'string' && replyLower.includes(loc.name.toLowerCase()))
+      .slice(0, 5)
+      .map((loc) => ({
+        id: loc.id,
+        name: loc.name,
+        entityType: loc.entityType,
+        category: loc.category,
+        overallScore: loc.overallScore,
+        rampStatus: loc.rampStatus,
+        guidingBlockStatus: loc.guidingBlockStatus,
+        safeVisitTime: loc.safeVisitTime,
+      }));
 
     return {
       reply,
