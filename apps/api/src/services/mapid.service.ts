@@ -67,8 +67,25 @@ class MapIdService {
       this.setCached(cacheKey, response.data, 1800); // Cache 30 menit
       return response.data;
     } catch (error: any) {
-      console.error(`[MAPID Proxy] Error fetching style ${styleId}:`, error.message);
-      throw new Error(error.response?.data?.message || `Failed to fetch MAPID map style for '${styleId}'`);
+      // Status HTTP dari MAPID ikut diteruskan. Tanpa ini pesan errornya selalu
+      // sama apa pun sebabnya, sehingga tidak bisa dibedakan mana "API key salah"
+      // (401/403) dan mana "alamatnya memang tidak ada" (404) — padahal dua hal
+      // itu butuh penanganan yang sama sekali berbeda.
+      const status = error.response?.status;
+      const upstream = error.response?.data?.message || error.response?.data?.error;
+      const detail = [
+        status ? `MAPID membalas HTTP ${status}` : `Tidak dapat menghubungi MAPID (${error.code || error.message})`,
+        upstream ? `pesan: ${upstream}` : null,
+        status === 401 || status === 403
+          ? 'Kemungkinan MAPID_API_KEY salah, kedaluwarsa, atau belum diisi'
+          : null,
+        status === 404 ? `Style '${styleId}' tidak dikenali MAPID` : null,
+      ]
+        .filter(Boolean)
+        .join(' — ');
+
+      console.error(`[MAPID Proxy] Gagal mengambil style '${styleId}': ${detail}`);
+      throw new Error(detail);
     }
   }
 
