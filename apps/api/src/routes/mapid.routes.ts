@@ -6,6 +6,10 @@ import {
   getLayerGeoJSONController,
   genericMapIdProxyController,
 } from '../controllers/mapid.controller.js';
+import {
+  getCompetitionActivitiesController,
+  getCompetitionMissionsController,
+} from '../controllers/mapidCompetition.controller.js';
 
 const router = Router();
 
@@ -21,7 +25,13 @@ router.get('/layers', getActivityLayersController);
 // 4. GeoJSON feature data proxy
 router.get('/layers/:layerId/geojson', getLayerGeoJSONController);
 
-// 5. Wildcard passthrough proxy untuk endpoint MAPID lainnya
+// 5. MAPID Competition API - Community Maps (data survei aksesibilitas)
+router.post('/competition/activities', getCompetitionActivitiesController);
+
+// 6. MAPID Competition API - Mission (menugo | propertigo | struckgo)
+router.post('/competition/missions/:missionType', getCompetitionMissionsController);
+
+// 7. Wildcard passthrough proxy untuk endpoint MAPID lainnya
 router.all('/proxy/*', genericMapIdProxyController);
 
 export default router;

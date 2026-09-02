@@ -238,6 +238,12 @@ flowchart TD
 | `/api/mapid/styles/:styleId` | `GET` | Mengambil Style JSON MAPID Basemap (`basic`, `dark`, `light`, `street-2d-building`, `satellite`). |
 | `/api/mapid/project/layers` | `GET` | Mengambil daftar layer aktif dari **MAPID Geoserver Open API**. |
 | `/api/mapid/layers/:layerId/geojson` | `GET` | Mengambil data GeoJSON mentah dari layer MAPID. |
+| `/api/mapid/competition/activities` | `POST` | **Community Maps**: data survei aksesibilitas dalam sebuah polygon.<br>Body: `feature` (Polygon, opsional - default area studi), `startDate`, `endDate`, `hashtag[]`, `author`. |
+| `/api/mapid/competition/missions/:missionType` | `POST` | **Mission Data**: `menugo`, `propertigo`, atau `struckgo`. Seluruh halaman offset ditelusuri otomatis.<br>Body: `feature` (Polygon, opsional). |
+
+> **Rentang tanggal pada Activities wajib jika ingin data lengkap.** Tanpa `startDate` + `endDate`,
+> MAPID memotong hasil di 60 record tanpa memberi tanda apa pun. Respons kami menyertakan flag
+> `truncated` untuk kasus itu - jangan diabaikan saat menarik data survei 13-30 Agustus 2026.
 
 > **Catatan integrasi MAPID.** Isokron, profil ketinggian, routing, dan SINI **tidak tersedia sebagai REST API** —
 > menurut dokumentasi resmi MAPID semuanya adalah tool GUI di dalam Map Editor (Toolbox & menu SINI).

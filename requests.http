@@ -61,3 +61,43 @@ Content-Type: application/json
 ### 10. MAPID Geoserver Open API - Ambil Daftar Layer Proyek
 GET {{baseUrl}}/mapid/project/layers
 
+### 11. MAPID Competition API - Community Maps (survei aksesibilitas 13-30 Agustus 2026)
+# Rentang tanggal WAJIB dikirim; tanpa itu MAPID memotong hasil di 60 record.
+POST {{baseUrl}}/mapid/competition/activities
+Content-Type: application/json
+
+{
+  "startDate": "2026-08-13",
+  "endDate": "2026-08-30"
+}
+
+### 12. MAPID Competition API - Menu Go (kepadatan kuliner & UMKM)
+POST {{baseUrl}}/mapid/competition/missions/menugo
+Content-Type: application/json
+
+{}
+
+### 13. MAPID Competition API - Properti Go (kepadatan properti komersial)
+POST {{baseUrl}}/mapid/competition/missions/propertigo
+Content-Type: application/json
+
+{}
+
+### 14. Contoh polygon khusus - wajib Polygon tertutup, bukan MultiPolygon
+POST {{baseUrl}}/mapid/competition/missions/menugo
+Content-Type: application/json
+
+{
+  "feature": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [119.40, -5.20],
+        [119.46, -5.20],
+        [119.46, -5.14],
+        [119.40, -5.14],
+        [119.40, -5.20]
+      ]
+    ]
+  }
+}
