@@ -9,6 +9,7 @@ import {
 import {
   getCompetitionActivitiesController,
   getCompetitionMissionsController,
+  getSurveyActivitiesController,
 } from '../controllers/mapidCompetition.controller.js';
 
 const router = Router();
@@ -27,6 +28,9 @@ router.get('/layers/:layerId/geojson', getLayerGeoJSONController);
 
 // 5. MAPID Competition API - Community Maps (data survei aksesibilitas)
 router.post('/competition/activities', getCompetitionActivitiesController);
+
+// 5b. Data survei RESMI: sudah disaring ke anggota tim
+router.post('/competition/survey', getSurveyActivitiesController);
 
 // 6. MAPID Competition API - Mission (menugo | propertigo | struckgo)
 router.post('/competition/missions/:missionType', getCompetitionMissionsController);

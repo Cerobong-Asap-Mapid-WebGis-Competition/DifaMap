@@ -5,6 +5,8 @@ import {
   STUDY_AREA_POLYGON,
   SearchPolygon,
   MissionType,
+  SURVEY_TEAM_USERNAMES,
+  SURVEY_PERIOD,
 } from '../services/mapidCompetition.service.js';
 
 /**
@@ -69,6 +71,40 @@ export async function getCompetitionActivitiesController(req: Request, res: Resp
       return;
     }
     res.status(502).json({ error: 'MAPID Competition API - Activities gagal', message: error.message });
+  }
+}
+
+/**
+ * POST /api/mapid/competition/survey
+ * Data survei RESMI DifaMap: rentang kampanye + area studi, disaring ke
+ * anggota tim saja. Inilah sumber yang akan dipakai importer nanti.
+ */
+export async function getSurveyActivitiesController(req: Request, res: Response): Promise<void> {
+  try {
+    const validated = missionSchema.parse(req.body ?? {});
+    const polygon = validated.feature as SearchPolygon | undefined;
+
+    const result = await mapIdCompetitionService.fetchSurveyActivities(
+      polygon ? { polygon } : {}
+    );
+
+    res.json({
+      success: true,
+      period: SURVEY_PERIOD,
+      teamUsernames: SURVEY_TEAM_USERNAMES,
+      count: result.activities.length,
+      // Jumlah titik yang ikut tertarik tapi bukan tulisan anggota tim.
+      // Ditampilkan supaya penyaringan tidak terjadi diam-diam.
+      excludedCount: result.excludedCount,
+      truncated: result.truncated,
+      data: result.activities,
+    });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: error.errors });
+      return;
+    }
+    res.status(502).json({ error: 'MAPID Competition API - Survey gagal', message: error.message });
   }
 }
 

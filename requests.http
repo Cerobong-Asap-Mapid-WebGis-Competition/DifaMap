@@ -73,10 +73,18 @@ Content-Type: application/json
   "endDate": "2026-09-30"
 }
 
+### 11a. Data survei RESMI (sudah disaring ke anggota tim) <- PAKAI INI
+# Inilah sumber yang akan dipakai importer. Respons menyertakan excludedCount
+# supaya jumlah titik yang dibuang tidak lewat tanpa terlihat.
+POST {{baseUrl}}/mapid/competition/survey
+Content-Type: application/json
+
+{}
+
 ### 11b. Uji apakah filter tagar benar-benar cocok
-# MAPID mencocokkan hashtag ke kolom description saja, BUKAN title.
-# Bandingkan jumlah hasilnya dengan no. 11 - kalau jauh lebih sedikit atau 0,
-# berarti tagar hanya ditulis di judul dan filter ini tidak boleh dipakai.
+# TERUJI 2 Sep 2026: filternya bekerja (79 dari 89 record), tapi JANGAN dipakai
+# untuk menyaring data survei. Lima titik sah milik atyas & amarr tidak bertagar
+# karena surveyornya lupa mengetik, dan akan terbuang diam-diam. Pakai no. 11a.
 POST {{baseUrl}}/mapid/competition/activities
 Content-Type: application/json
 

@@ -103,6 +103,34 @@ export const STUDY_AREA_POLYGON = bboxToPolygon(
 export const SURVEY_HASHTAG = 'cerobongasap';
 
 /**
+ * Akun MAPID anggota Tim Cerobong Asap. INILAH penyaring utama data survei,
+ * bukan tagar.
+ *
+ * Alasannya terbukti dari data sungguhan (tarikan 2 Sep 2026, 89 record):
+ *
+ *   randymuflih   53 titik, 53 bertagar
+ *   atyas         18 titik, 14 bertagar  <- 4 titik sah tanpa tagar
+ *   amarr         10 titik,  9 bertagar  <- 1 titik sah tanpa tagar
+ *   aixii16        3 titik,  3 bertagar
+ *
+ * Menyaring dengan tagar akan membuang 5 titik survei sah milik tim, semata
+ * karena surveyornya lupa mengetik tagar. Keanggotaan tim adalah fakta yang
+ * stabil; tagar bergantung pada ingatan orang saat mengunggah.
+ *
+ * Yang sengaja TIDAK masuk daftar:
+ *   andio  (Andi Batario Tenratu) - peserta lain, titiknya bertanda #GALIGO
+ *   record tanpa user_name        - asal-usulnya tidak bisa dipertanggungjawabkan
+ */
+export const SURVEY_TEAM_USERNAMES = ['randymuflih', 'atyas', 'amarr', 'aixii16'] as const;
+
+/** Benar bila activity ditulis anggota tim. Record tanpa user_name selalu ditolak. */
+export function isTeamSurveyActivity(activity: CompetitionActivity): boolean {
+  const author = activity.user_name?.trim().toLowerCase();
+  if (!author) return false;
+  return (SURVEY_TEAM_USERNAMES as readonly string[]).includes(author);
+}
+
+/**
  * Rentang tarikan data survei lapangan (13-30 Agustus 2026).
  *
  * `endDate` sengaja dilebihkan sampai akhir September: MAPID memfilter
@@ -336,20 +364,32 @@ class MapIdCompetitionService {
   }
 
   /**
-   * Menarik data survei DifaMap: rentang tanggal kampanye + area studi.
+   * Menarik data survei resmi DifaMap: rentang tanggal kampanye + area studi,
+   * lalu disaring ke anggota tim saja.
    *
-   * Tagar TIDAK diterapkan secara default. Karena MAPID mencocokkannya ke
-   * `description` saja, memfilter di sini berisiko membuang titik yang tagar-nya
-   * hanya ada di judul. Lebih aman menarik semua lalu menyaring saat cleaning.
+   * Penyaringan dilakukan di sisi kita, bukan lewat parameter `author` MAPID,
+   * karena parameter itu hanya menerima SATU nama dan mencocokkannya secara
+   * parsial (substring) ke name atau full_name — terlalu longgar dan butuh
+   * empat permintaan terpisah. Menarik sekali lalu menyaring lebih tepat dan
+   * lebih murah; jumlah datanya kecil.
    */
-  fetchSurveyActivities(options: { polygon?: SearchPolygon; withHashtag?: boolean } = {}) {
-    const { polygon = STUDY_AREA_POLYGON, withHashtag = false } = options;
-    return this.fetchActivities({
+  async fetchSurveyActivities(options: { polygon?: SearchPolygon } = {}) {
+    const { polygon = STUDY_AREA_POLYGON } = options;
+
+    const hasil = await this.fetchActivities({
       polygon,
       startDate: SURVEY_PERIOD.startDate,
       endDate: SURVEY_PERIOD.endDate,
-      hashtag: withHashtag ? [SURVEY_HASHTAG] : undefined,
     });
+
+    const milikTim = hasil.activities.filter(isTeamSurveyActivity);
+
+    return {
+      ...hasil,
+      activities: milikTim,
+      /** Berapa titik yang dibuang karena bukan tulisan anggota tim. */
+      excludedCount: hasil.activities.length - milikTim.length,
+    };
   }
 
   /** Menu Go - kuliner & UMKM, membawa juga `kondisi_tempat` dan `mobilitas`. */
