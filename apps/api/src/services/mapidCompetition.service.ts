@@ -125,9 +125,19 @@ export interface CompetitionActivity {
   description: string;
   geometry: { type: 'Point'; coordinates: [number, number] };
   medias: string[];
-  user_name: string;
-  user_full_name: string;
+
+  // Ketiganya OPSIONAL, berbeda dari dokumentasi yang menyatakannya selalu ada.
+  // Terbukti dari 89 record survei sungguhan (uji 2 Sep 2026):
+  //   user_name            hadir di 87/89
+  //   user_full_name       hadir di 59/89
+  //   user_profile_picture tidak pernah dikirim sama sekali
+  // Sebelumnya dua yang pertama dideklarasikan wajib, sehingga kode seperti
+  // `a.user_full_name.trim()` lolos typecheck tapi meledak saat berjalan pada
+  // sepertiga data. Selalu sediakan fallback saat menampilkannya.
+  user_name?: string;
+  user_full_name?: string;
   user_profile_picture?: string;
+
   community_name?: string;
   community_picture?: string;
   community_description?: string;
