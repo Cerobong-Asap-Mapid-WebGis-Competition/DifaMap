@@ -10,6 +10,45 @@
 -- ==============================================================================
 
 -- ------------------------------------------------------------------------------
+-- 0. PEMBERSIHAN ARTEFAK SKRIP LAMA
+--
+-- Database sungguhan ternyata masih memuat objek dari versi skrip terdahulu
+-- (terverifikasi 2 Sep 2026). Dua di antaranya membuat skrip ini gagal atau
+-- berbahaya bila dibiarkan:
+--
+--   calculate_buffer_economic_score(...) -> json
+--     Versi lama mengembalikan `json`, versi ini `jsonb`. CREATE OR REPLACE
+--     tidak bisa mengubah tipe kembalian, jadi harus di-DROP lebih dulu.
+--
+--   update_location_accessibility_score()
+--     Fungsi lama yang merata-ratakan skor laporan lalu menimpanya ke skor
+--     resmi lokasi. Triggernya sudah tidak ada karena tabel `reports` sudah
+--     dihapus, tapi fungsinya masih menggantung dan bisa terpasang ulang
+--     tanpa sengaja. Dibuang.
+--
+--   sync_location_geometry() + trigger trg_sync_location_geometry
+--     Berganti nama menjadi sync_geometry_from_latlng() karena kini dipakai
+--     tiga tabel, bukan hanya locations. Nama lamanya dibersihkan agar tidak
+--     ada dua trigger yang mengerjakan hal sama.
+--
+-- Bagian ini membuat skrip aman dijalankan berulang kali.
+-- ------------------------------------------------------------------------------
+-- Seluruh trigger yang bergantung pada fungsi lama harus dilepas lebih dulu;
+-- economic_points memakai NAMA trigger yang sama dengan versi baru, tapi masih
+-- menunjuk fungsi lama. Ketiganya dipasang ulang di bagian 3.
+DROP TRIGGER IF EXISTS trg_sync_location_geometry        ON public.locations;
+DROP TRIGGER IF EXISTS trg_sync_locations_geometry       ON public.locations;
+DROP TRIGGER IF EXISTS trg_sync_economic_points_geometry ON public.economic_points;
+DROP TRIGGER IF EXISTS trg_sync_activities_geometry      ON public.activities;
+DROP TRIGGER IF EXISTS trg_update_location_accessibility ON public.locations;
+
+DROP FUNCTION IF EXISTS public.sync_location_geometry();
+DROP FUNCTION IF EXISTS public.update_location_accessibility_score();
+DROP FUNCTION IF EXISTS public.calculate_buffer_economic_score(uuid, double precision);
+DROP FUNCTION IF EXISTS public.refresh_priority_index(uuid);
+
+
+-- ------------------------------------------------------------------------------
 -- 1. EKSTENSI
 -- ------------------------------------------------------------------------------
 CREATE EXTENSION IF NOT EXISTS postgis WITH SCHEMA extensions;
