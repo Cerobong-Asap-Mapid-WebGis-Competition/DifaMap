@@ -1,5 +1,6 @@
 import { openai } from '../lib/openai.js';
 import { prisma } from '../lib/prisma.js';
+import { catatPemakaian } from '../lib/aiUsage.js';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -184,6 +185,8 @@ Gaya Jawaban:
       temperature: 0.3,
       max_tokens: 600,
     });
+
+    catatPemakaian('chatbot', response.usage);
 
     const reply = response.choices[0]?.message?.content || 'Maaf, saya sedang tidak dapat merespon saat ini. Silakan coba sesaat lagi.';
 

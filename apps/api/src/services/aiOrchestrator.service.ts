@@ -1,5 +1,6 @@
 import { openai } from '../lib/openai.js';
 import { prisma } from '../lib/prisma.js';
+import { catatPemakaian } from '../lib/aiUsage.js';
 import {
   RampStatus,
   GuidingBlockStatus,
@@ -10,6 +11,60 @@ import {
   LightingLevel,
   CrowdLevel,
 } from '@prisma/client';
+
+/**
+ * Skema Structured Outputs untuk penilaian titik.
+ *
+ * Berbeda dari mode `json_object` yang hanya menjamin keluarannya JSON yang
+ * SAH, skema ini menjamin BENTUKNYA. Nilai di luar daftar enum tidak mungkin
+ * keluar - AI tidak bisa menjawab "ADA_BAIK" atau "tidak_terlihat" alih-alih
+ * "GOOD" atau "NOT_VISIBLE".
+ *
+ * Sebelumnya, jawaban yang melenceng akan diam-diam jatuh ke nilai cadangan
+ * saat parsing, dan tidak ada yang tahu penilaiannya gagal. Untuk sistem yang
+ * keluarannya menjadi skor keselamatan, kegagalan senyap seperti itu mahal.
+ *
+ * Mode strict menuntut SELURUH properti terdaftar di `required` dan
+ * additionalProperties: false. Itu justru sejalan dengan yang kita mau: AI
+ * harus menjawab kedelapan parameter, memakai NOT_VISIBLE bila tidak yakin,
+ * bukan menghilangkan field-nya.
+ */
+const SKEMA_PENILAIAN = {
+  type: 'object',
+  additionalProperties: false,
+  required: [
+    'overallScore', 'physicalScore', 'safetyScore', 'confidence',
+    'tags', 'summary', 'barrierType', 'actionRecommendation', 'observedParameters',
+  ],
+  properties: {
+    overallScore: { type: 'number', description: 'Skor aksesibilitas keseluruhan, 1.0 sampai 5.0' },
+    physicalScore: { type: 'number', description: 'Skor kondisi fisik, 1.0 sampai 5.0' },
+    safetyScore: { type: 'number', description: 'Skor keamanan & kenyamanan, 1.0 sampai 5.0' },
+    confidence: { type: 'number', description: 'Keyakinan atas penilaian ini, 0.0 sampai 1.0' },
+    tags: { type: 'array', items: { type: 'string' } },
+    summary: { type: 'string' },
+    barrierType: { type: 'string' },
+    actionRecommendation: { type: 'string' },
+    observedParameters: {
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'rampStatus', 'guidingBlockStatus', 'sidewalkCondition', 'surfaceCondition',
+        'seatingAvailability', 'toiletAccessibility', 'lightingLevel', 'crowdLevel',
+      ],
+      properties: {
+        rampStatus: { type: 'string', enum: ['GOOD', 'DAMAGED', 'NONE', 'NOT_VISIBLE'] },
+        guidingBlockStatus: { type: 'string', enum: ['GOOD', 'DAMAGED', 'NONE', 'NOT_VISIBLE'] },
+        sidewalkCondition: { type: 'string', enum: ['GOOD', 'NARROW', 'DAMAGED', 'BLOCKED', 'NOT_APPLICABLE', 'NOT_VISIBLE'] },
+        surfaceCondition: { type: 'string', enum: ['SMOOTH', 'SLIPPERY', 'POTHOLE', 'UNEVEN', 'NOT_VISIBLE'] },
+        seatingAvailability: { type: 'string', enum: ['AVAILABLE', 'NOT_AVAILABLE', 'NOT_VISIBLE'] },
+        toiletAccessibility: { type: 'string', enum: ['AVAILABLE_GOOD', 'AVAILABLE_DAMAGED', 'NOT_AVAILABLE', 'NOT_VISIBLE'] },
+        lightingLevel: { type: 'string', enum: ['BRIGHT', 'DIM', 'DARK', 'NOT_VISIBLE'] },
+        crowdLevel: { type: 'string', enum: ['QUIET', 'MODERATE', 'CROWDED', 'NOT_VISIBLE'] },
+      },
+    },
+  },
+} as const;
 
 export interface AIAnalysisOutput {
   overallScore: number; // 1.0 - 5.0 (Rating Bintang)
@@ -157,13 +212,18 @@ Foto Lampiran: ${mediaUrls.length > 0 ? mediaUrls.join(', ') : 'Tidak ada foto.'
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      response_format: { type: 'json_object' },
+      response_format: {
+        type: 'json_schema',
+        json_schema: { name: 'penilaian_aksesibilitas', strict: true, schema: SKEMA_PENILAIAN as any },
+      },
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userContent },
       ],
       temperature: 0.2,
     });
+
+    catatPemakaian('penilaian-titik', response.usage);
 
     const rawContent = response.choices[0]?.message?.content;
     if (!rawContent) {
@@ -318,6 +378,8 @@ Keluarkan JSON format:
       ],
       temperature: 0.2,
     });
+
+    catatPemakaian('rangkuman-lokasi', response.usage);
 
     const raw = response.choices[0]?.message?.content;
     if (raw) {
