@@ -67,10 +67,7 @@ export function useActivities(locationId?: string) {
   }, [fetchActivities]);
 
   const postActivity = async (payload: CreateActivityPayload) => {
-    if (!session?.access_token) {
-      throw new Error('Anda harus login terlebih dahulu untuk membuat aktivitas');
-    }
-    const res = await difaMapApi.createActivity(payload, session.access_token);
+    const res = await difaMapApi.createActivity(payload, session?.access_token);
     await fetchActivities();
     return res;
   };

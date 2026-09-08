@@ -11,6 +11,7 @@ export interface AuthenticatedRequest extends Request {
 
 /**
  * Middleware untuk memverifikasi token JWT dari Supabase Auth
+ * Jika tidak ada token (Mode Guest/Publik), secara otomatis mengalokasikan user guest default
  */
 export async function requireAuth(
   req: AuthenticatedRequest,
@@ -19,27 +20,29 @@ export async function requireAuth(
 ): Promise<void> {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({ error: 'Unauthorized: Missing or invalid Bearer token' });
-      return;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const { data } = await supabase.auth.getUser(token);
+      if (data?.user) {
+        req.user = {
+          id: data.user.id,
+          email: data.user.email || '',
+          role: data.user.app_metadata?.role || 'USER',
+        };
+        return next();
+      }
     }
-
-    const token = authHeader.split(' ')[1];
-    const { data, error } = await supabase.auth.getUser(token);
-
-    if (error || !data.user) {
-      res.status(401).json({ error: 'Unauthorized: Invalid Supabase token' });
-      return;
-    }
-
-    req.user = {
-      id: data.user.id,
-      email: data.user.email || '',
-      role: data.user.app_metadata?.role || 'USER',
-    };
-
-    next();
   } catch (err) {
-    res.status(500).json({ error: 'Internal auth verification error' });
+    // Abaikan error koneksi Supabase di mode publik
   }
+
+  // Alokasi default Public Guest Contributor agar posting laporan & ulasan tetap berjalan mulus
+  req.user = {
+    id: 'a0000000-0000-0000-0000-000000000001',
+    email: 'kontributor@difamap.id',
+    role: 'USER',
+  };
+
+  next();
 }
+

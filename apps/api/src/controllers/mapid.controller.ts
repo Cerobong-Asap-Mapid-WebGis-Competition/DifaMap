@@ -8,8 +8,8 @@ export async function getMapStyleController(req: Request, res: Response): Promis
 
     const styleData = await mapIdService.getMapStyle(styleId);
 
-    // Cache-Control header agar browser/MapLibre tidak berulang kali memanggil basemap yang sama
-    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+    // Cache-Control header agar browser selalu meminta basemap style terbaru dari proxy
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.json(styleData);
   } catch (error: any) {
     res.status(502).json({

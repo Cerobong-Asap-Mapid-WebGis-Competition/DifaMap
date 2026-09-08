@@ -101,21 +101,49 @@ export const difaMapApi = {
   },
 
   /**
-   * Membuat postingan aktivitas baru (Wajib Login)
+   * Membuat postingan aktivitas baru (Bisa publik / guest)
    */
-  async createActivity(payload: CreateActivityPayload, token: string) {
+  async createActivity(payload: CreateActivityPayload, token?: string) {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
     const res = await fetch(`${API_BASE_URL}/api/activities`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify(payload),
     });
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.message || err.error || 'Failed to post activity');
+    }
+    return res.json();
+  },
+
+  /**
+   * Membuat ulasan / komentar baru pada lokasi atau aktivitas
+   */
+  async createComment(payload: { locationId?: string; activityId?: string; content: string; photoUrls?: string[] }, token?: string) {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const res = await fetch(`${API_BASE_URL}/api/comments`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || err.error || 'Failed to post comment');
     }
     return res.json();
   },

@@ -92,26 +92,107 @@ class MapIdService {
   }
 
   /**
-   * Mengambil Mapbox/MapLibre Style JSON dari MAPID Basemap (dengan in-memory caching)
+   * Mengambil Mapbox/MapLibre Style JSON dari MAPID Basemap (dengan in-memory caching & seamless fallback)
    * Endpoint: https://basemap.mapid.io/styles/{styleId}/style.json?key={API_KEY}
    */
   async getMapStyle(styleId: string) {
-    const cacheKey = `style_${styleId}`;
+    const activeKey = env.MAPID_API_KEY || '6a8a7eedffc137c94307a71c';
+    const targetStyle = styleId === 'basic' ? 'light' : styleId;
+    const cacheKey = `style_${targetStyle}_${activeKey}`;
     const cached = this.getCached(cacheKey);
     if (cached) return cached;
 
     try {
-      const response = await this.basemapClient.get(`/styles/${styleId}/style.json`, {
+      const response = await this.basemapClient.get(`/styles/${targetStyle}/style.json`, {
         params: {
-          key: env.MAPID_API_KEY,
+          key: activeKey,
         },
       });
-      this.setCached(cacheKey, response.data, 1800); // Cache 30 menit
-      return response.data;
+      if (response.data && response.data.version) {
+        this.setCached(cacheKey, response.data, 1800); // Cache 30 menit untuk style valid
+        return response.data;
+      }
     } catch (error: any) {
-      console.error(`[MAPID Proxy] Error fetching style ${styleId}:`, error.message);
-      throw new Error(error.response?.data?.message || `Failed to fetch MAPID map style for '${styleId}'`);
+      console.warn(`[MAPID Proxy] MAPID server error for style '${targetStyle}':`, error.message);
     }
+
+    // Clean & Crisp Fallback Styles (OpenStreetMap Standard / Esri without any watermark)
+    const fallbackStyles: Record<string, any> = {
+      basic: {
+        version: 8,
+        name: 'OpenStreetMap Standard',
+        sources: {
+          osm: {
+            type: 'raster',
+            tiles: [
+              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            ],
+            tileSize: 256,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          },
+        },
+        layers: [
+          {
+            id: 'osm-layer',
+            type: 'raster',
+            source: 'osm',
+            minzoom: 0,
+            maxzoom: 19,
+          },
+        ],
+      },
+      dark: {
+        version: 8,
+        name: 'Esri Canvas Dark',
+        sources: {
+          'esri-dark': {
+            type: 'raster',
+            tiles: [
+              'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+            ],
+            tileSize: 256,
+            attribution: '&copy; Esri, HERE, Garmin',
+          },
+        },
+        layers: [
+          {
+            id: 'esri-dark-layer',
+            type: 'raster',
+            source: 'esri-dark',
+            minzoom: 0,
+            maxzoom: 18,
+          },
+        ],
+      },
+      satellite: {
+        version: 8,
+        name: 'DifaMap Satelit',
+        sources: {
+          satellite: {
+            type: 'raster',
+            tiles: [
+              'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            ],
+            tileSize: 256,
+            attribution: '&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye',
+          },
+        },
+        layers: [
+          {
+            id: 'satellite-layer',
+            type: 'raster',
+            source: 'satellite',
+            minzoom: 0,
+            maxzoom: 19,
+          },
+        ],
+      },
+    };
+
+    const selectedStyle = fallbackStyles[styleId] || fallbackStyles.basic;
+    // JANGAN cache fallback terlalu lama (hanya 5 detik) agar langsung retry ke MAPID Geoserver
+    this.setCached(cacheKey, selectedStyle, 5);
+    return selectedStyle;
   }
 
   /**

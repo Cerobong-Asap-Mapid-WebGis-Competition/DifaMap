@@ -1,18 +1,31 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  --bg-primary: #0a0f1d;
-  --bg-secondary: #11192e;
-  --bg-card: rgba(18, 26, 47, 0.85);
-  --border-color: rgba(255, 255, 255, 0.08);
-  --accent-blue: #3b82f6;
-  --accent-cyan: #06b6d4;
-  --accent-emerald: #10b981;
-  --accent-amber: #f59e0b;
-  --accent-rose: #f43f5e;
-  --text-main: #f1f5f9;
-  --text-muted: #94a3b8;
-  --font-sans: 'Plus Jakarta Sans', sans-serif;
+  /* Figma Palette Tokens */
+  --brand-yellow: #FDC323;
+  --brand-yellow-hover: #e5b01e;
+  --brand-teal: #539BA9;
+  --brand-teal-dark: #3e7b87;
+  --brand-black: #000000;
+  --brand-dark: #151515;
+  --brand-gray: #767676;
+  --brand-gray-light: #A7A7A7;
+  --brand-border: #EFEFEF;
+  --brand-bg: #FFFFFF;
+  --brand-surface: #F8FAFC;
+
+  /* Status Indicators */
+  --status-good: #5FD300;
+  --status-damaged: #EF0004;
+  --status-warning: #FFBB00;
+
+  /* Shadows */
+  --shadow-sm: 0px 2px 6px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0px 4px 10px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0px 8px 24px rgba(0, 0, 0, 0.15);
+  --shadow-polaroid: 0px 4px 12px rgba(0, 0, 0, 0.35);
+
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
 
@@ -22,67 +35,208 @@
   padding: 0;
 }
 
-body {
-  background-color: var(--bg-primary);
-  color: var(--text-main);
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--brand-bg);
+  color: var(--brand-black);
   font-family: var(--font-sans);
-  min-height: 100vh;
-  overflow-x: hidden;
-  background-image: 
-    radial-gradient(circle at 15% 15%, rgba(59, 130, 246, 0.12) 0%, transparent 40%),
-    radial-gradient(circle at 85% 85%, rgba(6, 182, 212, 0.1) 0%, transparent 40%);
+  -webkit-font-smoothing: antialiased;
 }
 
-.glass-panel {
-  background: var(--bg-card);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
+/* Custom Smooth Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
-.gradient-text {
-  background: linear-gradient(135deg, #60a5fa 0%, #34d399 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.badge {
+/* Base Buttons */
+.btn-yellow-pill {
+  background-color: var(--brand-yellow);
+  color: var(--brand-black);
+  border: none;
+  border-radius: 50px;
+  height: 48px;
+  padding: 0 24px;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  gap: 10px;
+  box-shadow: var(--shadow-md);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+}
+.btn-yellow-pill:hover {
+  background-color: var(--brand-yellow-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
+}
+.btn-yellow-pill:active {
+  transform: translateY(0);
 }
 
-.badge-blue {
-  background: rgba(59, 130, 246, 0.15);
-  color: #93c5fd;
-  border: 1px solid rgba(59, 130, 246, 0.3);
+.btn-white-pill {
+  background-color: var(--brand-bg);
+  color: var(--brand-black);
+  border: none;
+  border-radius: 50px;
+  height: 48px;
+  padding: 0 24px;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: var(--shadow-md);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+}
+.btn-white-pill:hover {
+  background-color: #f1f5f9;
+  color: var(--brand-black);
+  transform: translateY(-1px);
 }
 
-.badge-emerald {
-  background: rgba(16, 185, 129, 0.15);
-  color: #6ee7b7;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+.btn-circle-action {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: var(--brand-bg);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  transition: all 0.2s ease;
+  color: var(--brand-black);
+}
+.btn-circle-action:hover {
+  background-color: #f8fafc;
+  transform: scale(1.05);
 }
 
-.badge-amber {
-  background: rgba(245, 158, 11, 0.15);
-  color: #fcd34d;
-  border: 1px solid rgba(245, 158, 11, 0.3);
-}
-
-.code-block {
-  font-family: var(--font-mono);
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+/* Skeleton Loading Shimmer */
+.skeleton {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
   border-radius: 8px;
-  padding: 12px 16px;
-  font-size: 0.85rem;
-  color: #38bdf8;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Map Polaroid Marker Styling */
+.polaroid-pin-wrapper {
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.polaroid-pin-wrapper:hover {
+  transform: translateY(-6px) scale(1.08);
+  z-index: 50 !important;
+}
+
+.polaroid-card {
+  box-sizing: border-box;
+  background: #FFFFFF;
+  border: 5px solid #FFFFFF;
+  border-radius: 6px;
+  box-shadow: var(--shadow-polaroid);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.polaroid-card-stacked {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  transform: rotate(-7deg);
+  opacity: 0.85;
+  z-index: 1;
+}
+
+.polaroid-card-main {
+  position: relative;
+  z-index: 2;
+  transform: rotate(2deg);
+}
+
+.polaroid-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+  background-color: #e2e8f0;
+}
+
+.polaroid-pin-point {
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 10px solid #FFFFFF;
+  margin-top: -2px;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2));
+}
+
+/* Place Pin Marker */
+.place-pin-wrapper {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.2s ease;
+}
+.place-pin-wrapper:hover {
+  transform: scale(1.18);
+  z-index: 50 !important;
+}
+
+/* Glass & Card Surfaces */
+.card-panel {
+  background: #FFFFFF;
+  border: 1px solid var(--brand-border);
+  border-radius: 12px;
+}
+
+/* Fade & Slide Animations */
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slideInLeft 0.25s ease-out forwards;
 }
