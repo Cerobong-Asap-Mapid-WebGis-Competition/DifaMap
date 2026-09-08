@@ -227,6 +227,11 @@ model Location {
   @@index([entityType])
   @@index([category])
   @@index([overallScore])
+  // Index spasial GIST dideklarasikan di sini, bukan hanya di skrip SQL manual.
+  // Kalau tidak, setiap `prisma db push` akan menghapusnya karena Prisma
+  // menganggapnya index asing - dan seluruh query ST_DWithin diam-diam berubah
+  // jadi pemindaian tabel penuh tanpa ada yang menyadari.
+  @@index([geom], type: Gist)
   @@map("locations")
 }
 
@@ -265,6 +270,8 @@ model Activity {
   @@index([userId])
   @@index([locationId])
   @@index([status])
+  // Lihat catatan di model Location soal alasan index ini dideklarasikan di sini.
+  @@index([geom], type: Gist)
   @@map("activities")
 }
 
@@ -304,6 +311,8 @@ model EconomicPoint {
 
   createdAt          DateTime           @default(now()) @map("created_at")
 
+  // Lihat catatan di model Location soal alasan index ini dideklarasikan di sini.
+  @@index([geom], type: Gist)
   @@map("economic_points")
 }
 

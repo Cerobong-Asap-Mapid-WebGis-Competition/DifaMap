@@ -58,10 +58,30 @@ CREATE EXTENSION IF NOT EXISTS postgis WITH SCHEMA extensions;
 -- 2. SPATIAL INDEX (GIST)
 -- Mempercepat ST_DWithin, ST_Contains, dan pencarian titik terdekat.
 -- ------------------------------------------------------------------------------
-CREATE INDEX IF NOT EXISTS idx_locations_geom        ON public.locations       USING GIST (geom);
-CREATE INDEX IF NOT EXISTS idx_economic_points_geom  ON public.economic_points USING GIST (geom);
--- activities.geom sebelumnya tidak pernah diindeks maupun diisi.
-CREATE INDEX IF NOT EXISTS idx_activities_geom       ON public.activities      USING GIST (geom);
+-- Index GEOMETRI (locations_geom_idx dsb) tidak dibuat di sini. Ia sudah
+-- dideklarasikan di schema.prisma sebagai @@index([geom], type: Gist), sehingga
+-- dikelola Prisma dan tidak terhapus saat `prisma db push`. Membuatnya lagi di
+-- sini hanya menghasilkan index kembar atas kolom yang sama.
+--
+-- Sisa duplikat dari versi terdahulu dibuang.
+DROP INDEX IF EXISTS public.idx_locations_geom;
+DROP INDEX IF EXISTS public.idx_economic_points_geom;
+DROP INDEX IF EXISTS public.idx_activities_geom;
+
+-- Index EKSPRESI atas (geom::geography). INI yang sebenarnya dipakai seluruh
+-- query jarak DifaMap, karena semuanya berbasis meter dan memakai cast
+-- ::geography — ST_DWithin(geom::geography, ..., 200).
+--
+-- Terbukti lewat EXPLAIN dengan enable_seqscan=off:
+--   ST_DWithin(geom::geography, ...)  -> Seq Scan   (index geometri TIDAK terpakai)
+--   ST_DWithin(geom, ...)             -> Index Scan
+-- Cast mengubah ekspresinya, sehingga index atas kolom mentah tidak cocok.
+--
+-- Prisma tidak bisa mendeklarasikan index ekspresi, jadi ketiganya akan
+-- terhapus setiap `prisma db push`. Jalankan ulang skrip ini setelahnya.
+CREATE INDEX IF NOT EXISTS idx_locations_geog        ON public.locations       USING GIST ((geom::geography));
+CREATE INDEX IF NOT EXISTS idx_economic_points_geog  ON public.economic_points USING GIST ((geom::geography));
+CREATE INDEX IF NOT EXISTS idx_activities_geog       ON public.activities      USING GIST ((geom::geography));
 
 
 -- ------------------------------------------------------------------------------
