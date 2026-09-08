@@ -31,6 +31,23 @@ export default function MapCanvas({
   const [styleId, setStyleId] = useState<string>('basic');
   const [isMapLoaded, setIsMapLoaded] = useState(false);
 
+  /**
+   * Kegagalan pemuatan peta.
+   *
+   * Tanpa ini, peta yang gagal memuat tampil sebagai kotak abu-abu polos tanpa
+   * penjelasan apa pun - pengguna tidak punya cara tahu apakah wilayah itu
+   * memang kosong, koneksinya putus, atau aplikasinya rusak.
+   *
+   *   'style' = berkas gaya peta gagal diambil; tidak ada yang bisa digambar
+   *   'tile'  = gaya berhasil, tapi sebagian petak data gagal diunduh
+   *
+   * Perbedaan itu penting: gaya gagal berarti peta pasti kosong, sedangkan
+   * petak gagal berarti peta tampil sebagian. Tile vector berukuran ratusan
+   * kilobyte per petak, jadi jauh lebih rentan putus daripada petak raster -
+   * itulah sebabnya basemap satelit bisa tetap tampil saat yang lain kosong.
+   */
+  const [mapError, setMapError] = useState<{ kind: 'style' | 'tile'; count: number } | null>(null);
+
   // 1. Inisialisasi Peta MapLibre dengan Basemap MAPID
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
@@ -52,6 +69,30 @@ export default function MapCanvas({
       setIsMapLoaded(true);
     });
 
+    map.on('error', (e: any) => {
+      // MapLibre memakai satu event untuk segala kesalahan. Kehadiran sourceId
+      // membedakan gagalnya satu petak data dari gagalnya berkas gaya.
+      const gagalPetak = Boolean(e?.sourceId);
+      console.error(
+        '[MapCanvas]',
+        gagalPetak ? 'petak peta gagal dimuat' : 'gaya peta gagal dimuat',
+        e?.error || e
+      );
+
+      setMapError((sebelumnya) => {
+        if (!gagalPetak) return { kind: 'style', count: 1 };
+        // Kegagalan gaya lebih parah; jangan diturunkan derajatnya oleh petak.
+        if (sebelumnya?.kind === 'style') return sebelumnya;
+        return { kind: 'tile', count: (sebelumnya?.count ?? 0) + 1 };
+      });
+    });
+
+    // Begitu ada sumber data yang benar-benar selesai dimuat, peringatan
+    // sebelumnya tidak lagi relevan - jangan biarkan menggantung.
+    map.on('sourcedata', (e: any) => {
+      if (e?.isSourceLoaded) setMapError(null);
+    });
+
     map.on('click', (e: any) => {
       if (onPickCoordinate && e.lngLat) {
         onPickCoordinate({ latitude: e.lngLat.lat, longitude: e.lngLat.lng });
@@ -66,6 +107,12 @@ export default function MapCanvas({
       mapRef.current = null;
     };
   }, []);
+
+  /** Memuat ulang gaya yang sedang dipakai. Cukup untuk kegagalan sementara. */
+  const cobaMuatUlangPeta = () => {
+    setMapError(null);
+    mapRef.current?.setStyle(difaMapApi.getMapStyleUrl(styleId));
+  };
 
   // 2. Render Pin Marker untuk Lokasi (Places & Sidewalks) dan Aktivitas
   useEffect(() => {
@@ -157,6 +204,46 @@ export default function MapCanvas({
       {/* Canvas MapLibre Container */}
       <div ref={mapContainerRef} style={{ width: '100%', height: '100%', minHeight: '500px' }} />
 
+      {/*
+        Peringatan kegagalan peta. Sengaja ditaruh di dalam area peta dan bukan
+        di panel lain, supaya penjelasannya berada tepat di tempat masalahnya
+        terlihat. role="alert" membuat pembaca layar ikut mengumumkannya, karena
+        pengguna tunanetra tidak akan pernah menyadari peta yang kosong.
+      */}
+      {mapError && (
+        <div className="map-error" role="alert">
+          <strong>
+            {mapError.kind === 'style'
+              ? 'Peta gagal dimuat'
+              : 'Sebagian peta gagal dimuat'}
+          </strong>
+          <p>
+            {mapError.kind === 'style'
+              ? 'Server basemap MAPID tidak merespons, jadi tidak ada yang bisa digambar. Koneksi internet Anda sendiri kemungkinan baik-baik saja.'
+              : `${mapError.count} petak peta gagal diunduh. Bagian yang kosong bukan berarti wilayahnya tidak ada data.`}
+          </p>
+          <div className="map-error-actions">
+            <button type="button" onClick={cobaMuatUlangPeta}>
+              Coba muat ulang
+            </button>
+            {/* Satelit memakai petak raster kecil yang jauh lebih tahan koneksi
+                buruk daripada tile vector yang ratusan kilobyte per petak. */}
+            {styleId !== 'satellite' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setStyleId('satellite');
+                  setMapError(null);
+                  mapRef.current?.setStyle(difaMapApi.getMapStyleUrl('satellite'));
+                }}
+              >
+                Pakai basemap Satelit
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Floating Basemap Style Switcher (MAPID Styles) */}
       <div style={{
         position: 'absolute',
@@ -181,6 +268,7 @@ export default function MapCanvas({
           onChange={(e) => {
             const newStyle = e.target.value;
             setStyleId(newStyle);
+            setMapError(null);
             if (mapRef.current) {
               mapRef.current.setStyle(difaMapApi.getMapStyleUrl(newStyle));
             }

@@ -427,3 +427,60 @@ body {
   font-size: 0.75rem;
   color: var(--text-muted);
 }
+
+/* --------------------------------------------------------------------------
+   Peringatan kegagalan peta
+   Ditaruh sebagai kelas, bukan inline style, supaya desainer bisa menatanya
+   ulang dari satu berkas bersama komponen lain.
+   -------------------------------------------------------------------------- */
+.map-error {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 12;
+  max-width: 460px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  background: rgba(20, 16, 6, 0.94);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--text-main);
+}
+
+.map-error strong {
+  display: block;
+  font-size: 0.95rem;
+  color: #fcd34d;
+  margin-bottom: 4px;
+}
+
+.map-error p {
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.map-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.map-error-actions button {
+  min-height: 44px; /* target sentuh minimum, sama seperti kontrol lain */
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.map-error-actions button:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
