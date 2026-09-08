@@ -46,7 +46,12 @@ export default function MapCanvas({
    * kilobyte per petak, jadi jauh lebih rentan putus daripada petak raster -
    * itulah sebabnya basemap satelit bisa tetap tampil saat yang lain kosong.
    */
-  const [mapError, setMapError] = useState<{ kind: 'style' | 'tile'; count: number } | null>(null);
+  const [mapError, setMapError] = useState<{
+    kind: 'style' | 'tile';
+    count: number;
+    /** Ringkasan sumber daya yang gagal, ditampilkan agar bisa didiagnosis tanpa membuka DevTools. */
+    detail?: string;
+  } | null>(null);
 
   // 1. Inisialisasi Peta MapLibre dengan Basemap MAPID
   useEffect(() => {
@@ -79,18 +84,24 @@ export default function MapCanvas({
         e?.error || e
       );
 
-      setMapError((sebelumnya) => {
-        if (!gagalPetak) return { kind: 'style', count: 1 };
-        // Kegagalan gaya lebih parah; jangan diturunkan derajatnya oleh petak.
-        if (sebelumnya?.kind === 'style') return sebelumnya;
-        return { kind: 'tile', count: (sebelumnya?.count ?? 0) + 1 };
-      });
-    });
+      // Ringkas sumber daya yang gagal supaya bisa didiagnosis dari layar,
+      // tanpa pengguna perlu membuka DevTools.
+      const url: string | undefined = e?.error?.url;
+      const status: number | undefined = e?.error?.status;
+      const berkas = url ? url.split('?')[0].split('/').slice(-3).join('/') : undefined;
+      const detail = [
+        e?.sourceId ? `sumber "${e.sourceId}"` : null,
+        berkas,
+        status ? `HTTP ${status}` : e?.error?.message?.slice(0, 60),
+      ]
+        .filter(Boolean)
+        .join(' · ');
 
-    // Begitu ada sumber data yang benar-benar selesai dimuat, peringatan
-    // sebelumnya tidak lagi relevan - jangan biarkan menggantung.
-    map.on('sourcedata', (e: any) => {
-      if (e?.isSourceLoaded) setMapError(null);
+      setMapError((sebelumnya) => {
+        if (!gagalPetak) return { kind: 'style', count: 1, detail };
+        if (sebelumnya?.kind === 'style') return sebelumnya;
+        return { kind: 'tile', count: (sebelumnya?.count ?? 0) + 1, detail };
+      });
     });
 
     map.on('click', (e: any) => {
@@ -220,8 +231,9 @@ export default function MapCanvas({
           <p>
             {mapError.kind === 'style'
               ? 'Server basemap MAPID tidak merespons, jadi tidak ada yang bisa digambar. Koneksi internet Anda sendiri kemungkinan baik-baik saja.'
-              : `${mapError.count} petak peta gagal diunduh. Bagian yang kosong bukan berarti wilayahnya tidak ada data.`}
+              : `${mapError.count} bagian peta gagal diunduh. Area yang kosong bukan berarti wilayahnya tidak ada data.`}
           </p>
+          {mapError.detail && <p className="map-error-detail">{mapError.detail}</p>}
           <div className="map-error-actions">
             <button type="button" onClick={cobaMuatUlangPeta}>
               Coba muat ulang
