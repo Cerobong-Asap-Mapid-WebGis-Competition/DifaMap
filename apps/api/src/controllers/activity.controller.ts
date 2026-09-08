@@ -261,6 +261,7 @@ export async function createActivityController(req: AuthenticatedRequest, res: R
         status: validated.status,
         accessibilityTags: combinedTags,
         aiScore: aiAnalysis.overallScore,
+        aiConfidence: aiAnalysis.confidence,
         aiAnalysis: {
           summary: aiAnalysis.summary,
           barrierType: aiAnalysis.barrierType,

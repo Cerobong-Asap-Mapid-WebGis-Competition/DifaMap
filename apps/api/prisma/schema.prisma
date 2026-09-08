@@ -47,12 +47,14 @@ enum RampStatus {
   GOOD             // Ada & kondisi baik / ramah kursi roda (< 8% kelandaian)
   DAMAGED          // Ada tapi rusak / terlalu curam / terhalang / tanpa pegangan
   NONE             // Tidak ada ramp
+  NOT_VISIBLE      // Tidak terlihat dari foto - BUKAN berarti tidak ada
 }
 
 enum GuidingBlockStatus {
   GOOD             // Ada & tersambung dengan baik
   DAMAGED          // Ada tapi rusak / terputus / terhalang
   NONE             // Tidak ada ubin pemandu sama sekali
+  NOT_VISIBLE      // Tidak terlihat dari foto - BUKAN berarti tidak ada
 }
 
 enum SidewalkCondition {
@@ -61,6 +63,7 @@ enum SidewalkCondition {
   DAMAGED          // Trotoar berlubang / paving terlepas
   BLOCKED          // Terhalang PKL, tiang, kabel, parkir liar
   NOT_APPLICABLE   // Bukan jalan trotoar (misal: bangunan mall/indoor)
+  NOT_VISIBLE      // Tidak terlihat dari foto - berbeda dari NOT_APPLICABLE
 }
 
 enum SurfaceCondition {
@@ -68,17 +71,20 @@ enum SurfaceCondition {
   SLIPPERY         // Licin (terutama saat basah/keramik)
   POTHOLE          // Berlubang / pecah-pecah
   UNEVEN           // Bergelombang / berbatu
+  NOT_VISIBLE      // Tidak terlihat dari foto
 }
 
 enum SeatingAvailability {
   AVAILABLE        // Tersedia tempat duduk / istirahat
   NOT_AVAILABLE    // Tidak ada tempat istirahat
+  NOT_VISIBLE      // Tidak terlihat dari foto
 }
 
 enum ToiletAccessibility {
   AVAILABLE_GOOD   // Tersedia toilet ramah disabilitas layak pakai
   AVAILABLE_DAMAGED // Tersedia tapi rusak / sempit / tidak terawat
   NOT_AVAILABLE    // Tidak tersedia toilet disabilitas
+  NOT_VISIBLE      // Tidak terlihat dari foto
 }
 
 // ==========================================
@@ -89,12 +95,14 @@ enum LightingLevel {
   BRIGHT           // Sangat terang / lampu jalan aktif & merata
   DIM              // Redup / pencahayaan minim
   DARK             // Gelap / tidak ada lampu jalan
+  NOT_VISIBLE      // Tidak dapat dinilai dari foto
 }
 
 enum CrowdLevel {
   QUIET            // Sepi
   MODERATE         // Sedang / normal
   CROWDED          // Ramai / sangat padat
+  NOT_VISIBLE      // Tidak dapat dinilai dari foto
 }
 
 // ==========================================
@@ -155,16 +163,21 @@ model Location {
   geom                  Unsupported("geometry(Point, 4326)")?
 
   // Parameter Fisik & Aksesibilitas Terkini (Disintesis dari AI & Input Laporan)
-  rampStatus            RampStatus          @default(NONE) @map("ramp_status")
-  guidingBlockStatus    GuidingBlockStatus  @default(NONE) @map("guiding_block_status")
-  sidewalkCondition     SidewalkCondition   @default(NOT_APPLICABLE) @map("sidewalk_condition")
-  surfaceCondition      SurfaceCondition    @default(SMOOTH) @map("surface_condition")
-  seatingAvailability   SeatingAvailability @default(NOT_AVAILABLE) @map("seating_availability")
-  toiletAccessibility   ToiletAccessibility @default(NOT_AVAILABLE) @map("toilet_accessibility")
+  //
+  // Default seluruhnya NOT_VISIBLE, bukan nilai konkret. Default lama adalah
+  // KLAIM: surfaceCondition SMOOTH menyatakan "permukaan halus" untuk lokasi
+  // yang belum pernah dinilai sama sekali. Untuk produk yang dipakai memutuskan
+  // apakah aman berangkat dengan kursi roda, diam lebih baik daripada menebak.
+  rampStatus            RampStatus          @default(NOT_VISIBLE) @map("ramp_status")
+  guidingBlockStatus    GuidingBlockStatus  @default(NOT_VISIBLE) @map("guiding_block_status")
+  sidewalkCondition     SidewalkCondition   @default(NOT_VISIBLE) @map("sidewalk_condition")
+  surfaceCondition      SurfaceCondition    @default(NOT_VISIBLE) @map("surface_condition")
+  seatingAvailability   SeatingAvailability @default(NOT_VISIBLE) @map("seating_availability")
+  toiletAccessibility   ToiletAccessibility @default(NOT_VISIBLE) @map("toilet_accessibility")
 
   // Parameter Keamanan & Kenyamanan
-  lightingLevel         LightingLevel       @default(BRIGHT) @map("lighting_level")
-  crowdLevel            CrowdLevel          @default(MODERATE) @map("crowd_level")
+  lightingLevel         LightingLevel       @default(NOT_VISIBLE) @map("lighting_level")
+  crowdLevel            CrowdLevel          @default(NOT_VISIBLE) @map("crowd_level")
 
   // Parameter Temporal (Waktu)
   peakHours             String?             @map("peak_hours") // Contoh: "07:00-09:00, 17:00-19:30"
@@ -182,6 +195,11 @@ model Location {
   safetyScore           Float               @default(0.0) @map("safety_score") // 1.0 - 5.0
   aiSummary             String?             @db.Text @map("ai_summary") // Ringkasan poin-poin aksesibilitas
   aiInsights            Json?               @map("ai_insights") // Rekomendasi perbaikan & detail parameter
+
+  // Keyakinan AI atas penilaiannya sendiri, 0.0 - 1.0 (PRD Bab 8).
+  // Tanpa ini, tebakan ragu-ragu dan pengamatan jelas tersimpan dengan bobot
+  // yang sama persis - bertentangan dengan mitigasi halusinasi di PRD Bab 12.
+  aiConfidence          Float?              @map("ai_confidence")
 
   // ==========================================
   // SKOR KOMUNITAS - agregat laporan pengguna, bersifat INDIKATIF.
@@ -234,6 +252,7 @@ model Activity {
   // Hasil Ekstraksi & Scoring Otomatis oleh AI Orchestrator
   aiScore            Float?             @map("ai_score") // Skor 1.0 - 5.0 dari AI
   aiAnalysis         Json?              @map("ai_analysis") // Ekstraksi rintangan, isu, rekomendasi
+  aiConfidence       Float?             @map("ai_confidence") // 0.0 - 1.0
   observedParameters Json?              @map("observed_parameters") // Parameter fisik yang terdeteksi
 
   createdAt          DateTime           @default(now()) @map("created_at")

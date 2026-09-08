@@ -13,6 +13,8 @@ import {
 
 export interface AIAnalysisOutput {
   overallScore: number; // 1.0 - 5.0 (Rating Bintang)
+  /** Keyakinan AI atas penilaiannya, 0.0 - 1.0. Turun bila banyak NOT_VISIBLE. */
+  confidence: number;
   physicalScore: number; // 1.0 - 5.0
   safetyScore: number; // 1.0 - 5.0
   tags: string[];
@@ -69,19 +71,43 @@ Pedoman Penilaian Aksesibilitas (Scoring Murni dari AI):
    - 2.5 - 3.4: Kurang aksesibel, membutuhkan pendamping bagi pengguna kursi roda atau tunanetra (trotoar sempit/rusak, tidak ada ramp, pencahayaan redup).
    - 1.0 - 2.4: Sangat tidak ramah disabilitas / berbahaya (guiding block terputus parah, trotoar terhalang total oleh PKL/tiang, tangga tanpa ramp sama sekali).
 
-2. **Parameter Fisik & Aksesibilitas**:
-   - rampStatus: "GOOD" | "DAMAGED" | "NONE"
-   - guidingBlockStatus: "GOOD" | "DAMAGED" | "NONE"
-   - sidewalkCondition: (khusus trotoar/jalan) "GOOD" | "NARROW" | "DAMAGED" | "BLOCKED" | "NOT_APPLICABLE"
-   - surfaceCondition: "SMOOTH" | "SLIPPERY" | "POTHOLE" | "UNEVEN"
-   - seatingAvailability: "AVAILABLE" | "NOT_AVAILABLE"
-   - toiletAccessibility: "AVAILABLE_GOOD" | "AVAILABLE_DAMAGED" | "NOT_AVAILABLE"
+2. **ATURAN PALING PENTING - JANGAN MENEBAK**:
+   Gunakan "NOT_VISIBLE" setiap kali foto dan deskripsi TIDAK memperlihatkan
+   parameter tersebut dengan jelas. "NOT_VISIBLE" berarti "saya tidak dapat
+   menilai", dan itu jawaban yang BENAR serta dihargai.
 
-3. **Parameter Keamanan & Kenyamanan**:
-   - lightingLevel: "BRIGHT" | "DIM" | "DARK"
-   - crowdLevel: "QUIET" | "MODERATE" | "CROWDED"
+   JANGAN PERNAH menjawab "NONE" hanya karena sesuatu tidak terlihat. "NONE"
+   berarti Anda benar-benar melihat bahwa fasilitas itu tidak ada di lokasi.
+   Perbedaan ini menentukan keselamatan: menyatakan "tidak ada ramp" padahal
+   ramp hanya tidak tertangkap kamera akan membuat pengguna kursi roda
+   membatalkan perjalanan ke tempat yang sebenarnya layak, dan membuat
+   pemerintah salah mengalokasikan anggaran perbaikan.
 
-4. **Keluarkan JSON Murni dengan format berikut**:
+3. **Parameter Fisik & Aksesibilitas**:
+   - rampStatus: "GOOD" | "DAMAGED" | "NONE" | "NOT_VISIBLE"
+   - guidingBlockStatus: "GOOD" | "DAMAGED" | "NONE" | "NOT_VISIBLE"
+   - sidewalkCondition: (khusus trotoar/jalan) "GOOD" | "NARROW" | "DAMAGED" | "BLOCKED" | "NOT_APPLICABLE" | "NOT_VISIBLE"
+     (NOT_APPLICABLE = memang bukan trotoar, misal lobi mall. NOT_VISIBLE = trotoar mungkin ada tapi tidak terlihat.)
+   - surfaceCondition: "SMOOTH" | "SLIPPERY" | "POTHOLE" | "UNEVEN" | "NOT_VISIBLE"
+   - seatingAvailability: "AVAILABLE" | "NOT_AVAILABLE" | "NOT_VISIBLE"
+   - toiletAccessibility: "AVAILABLE_GOOD" | "AVAILABLE_DAMAGED" | "NOT_AVAILABLE" | "NOT_VISIBLE"
+     (Toilet hampir selalu di dalam bangunan - pakai NOT_VISIBLE kecuali laporan menyebutnya.)
+
+4. **Parameter Keamanan & Kenyamanan**:
+   - lightingLevel: "BRIGHT" | "DIM" | "DARK" | "NOT_VISIBLE"
+     (Foto siang hari TIDAK menunjukkan kondisi lampu jalan malam - pakai NOT_VISIBLE.)
+   - crowdLevel: "QUIET" | "MODERATE" | "CROWDED" | "NOT_VISIBLE"
+
+5. **confidence (0.0 - 1.0)**:
+   Seberapa yakin Anda atas penilaian keseluruhan. Turunkan nilainya bila foto
+   buram, gelap, sudutnya sempit, atau banyak parameter yang NOT_VISIBLE.
+
+6. **Skor dinilai HANYA dari yang terlihat**:
+   Jangan menurunkan skor karena parameter tidak terlihat. Lokasi berfoto buruk
+   bukan lokasi buruk. Nilailah dari bukti yang ada, lalu nyatakan
+   ketidakpastiannya lewat confidence dan NOT_VISIBLE.
+
+7. **Keluarkan JSON Murni dengan format berikut**:
 {
   "overallScore": number (1.0 to 5.0),
   "physicalScore": number (1.0 to 5.0),
@@ -90,15 +116,16 @@ Pedoman Penilaian Aksesibilitas (Scoring Murni dari AI):
   "summary": string,
   "barrierType": string,
   "actionRecommendation": string,
+  "confidence": number (0.0 to 1.0),
   "observedParameters": {
-    "rampStatus": "GOOD" | "DAMAGED" | "NONE",
-    "guidingBlockStatus": "GOOD" | "DAMAGED" | "NONE",
-    "sidewalkCondition": "GOOD" | "NARROW" | "DAMAGED" | "BLOCKED" | "NOT_APPLICABLE",
-    "surfaceCondition": "SMOOTH" | "SLIPPERY" | "POTHOLE" | "UNEVEN",
-    "seatingAvailability": "AVAILABLE" | "NOT_AVAILABLE",
-    "toiletAccessibility": "AVAILABLE_GOOD" | "AVAILABLE_DAMAGED" | "NOT_AVAILABLE",
-    "lightingLevel": "BRIGHT" | "DIM" | "DARK",
-    "crowdLevel": "QUIET" | "MODERATE" | "CROWDED"
+    "rampStatus": "GOOD" | "DAMAGED" | "NONE" | "NOT_VISIBLE",
+    "guidingBlockStatus": "GOOD" | "DAMAGED" | "NONE" | "NOT_VISIBLE",
+    "sidewalkCondition": "GOOD" | "NARROW" | "DAMAGED" | "BLOCKED" | "NOT_APPLICABLE" | "NOT_VISIBLE",
+    "surfaceCondition": "SMOOTH" | "SLIPPERY" | "POTHOLE" | "UNEVEN" | "NOT_VISIBLE",
+    "seatingAvailability": "AVAILABLE" | "NOT_AVAILABLE" | "NOT_VISIBLE",
+    "toiletAccessibility": "AVAILABLE_GOOD" | "AVAILABLE_DAMAGED" | "NOT_AVAILABLE" | "NOT_VISIBLE",
+    "lightingLevel": "BRIGHT" | "DIM" | "DARK" | "NOT_VISIBLE",
+    "crowdLevel": "QUIET" | "MODERATE" | "CROWDED" | "NOT_VISIBLE"
   }
 }
 `;
@@ -146,48 +173,60 @@ Foto Lampiran: ${mediaUrls.length > 0 ? mediaUrls.join(', ') : 'Tidak ada foto.'
     const parsed = JSON.parse(rawContent);
 
     const overallScore = Math.max(1.0, Math.min(5.0, Number(parsed.overallScore) || 3.0));
+    const confidence = Math.max(0, Math.min(1, Number(parsed.confidence) ?? 0.5));
     const physicalScore = Math.max(1.0, Math.min(5.0, Number(parsed.physicalScore) || overallScore));
     const safetyScore = Math.max(1.0, Math.min(5.0, Number(parsed.safetyScore) || 3.5));
 
     return {
       overallScore: parseFloat(overallScore.toFixed(1)),
+      confidence: parseFloat(confidence.toFixed(2)),
       physicalScore: parseFloat(physicalScore.toFixed(1)),
       safetyScore: parseFloat(safetyScore.toFixed(1)),
       tags: Array.isArray(parsed.tags) ? parsed.tags : ['aksesibilitas-makassar'],
       summary: parsed.summary || 'Aktivitas pemetaan aksesibilitas disabilitas di Makassar.',
       barrierType: parsed.barrierType || 'Tidak ada hambatan signifikan',
       actionRecommendation: parsed.actionRecommendation || 'Pertahankan kondisi fasilitas yang sudah ramah disabilitas.',
+      // Cadangan selalu NOT_VISIBLE, tidak pernah nilai konkret.
+      //
+      // Versi lama jatuh ke NONE, SMOOTH, BRIGHT, dan MODERATE ketika AI tidak
+      // menjawab. Artinya kegagalan AI diam-diam berubah menjadi pernyataan
+      // fakta: "tidak ada ramp", "permukaan halus", "penerangan terang" —
+      // padahal tidak ada yang pernah mengamatinya.
       observedParameters: {
-        rampStatus: parsed.observedParameters?.rampStatus || userObservedHints?.rampStatus || RampStatus.NONE,
-        guidingBlockStatus: parsed.observedParameters?.guidingBlockStatus || userObservedHints?.guidingBlockStatus || GuidingBlockStatus.NONE,
-        sidewalkCondition: parsed.observedParameters?.sidewalkCondition || userObservedHints?.sidewalkCondition || SidewalkCondition.NOT_APPLICABLE,
-        surfaceCondition: parsed.observedParameters?.surfaceCondition || userObservedHints?.surfaceCondition || SurfaceCondition.SMOOTH,
-        seatingAvailability: parsed.observedParameters?.seatingAvailability || userObservedHints?.seatingAvailability || SeatingAvailability.NOT_AVAILABLE,
-        toiletAccessibility: parsed.observedParameters?.toiletAccessibility || userObservedHints?.toiletAccessibility || ToiletAccessibility.NOT_AVAILABLE,
-        lightingLevel: parsed.observedParameters?.lightingLevel || userObservedHints?.lightingLevel || LightingLevel.BRIGHT,
-        crowdLevel: parsed.observedParameters?.crowdLevel || userObservedHints?.crowdLevel || CrowdLevel.MODERATE,
+        rampStatus: parsed.observedParameters?.rampStatus || userObservedHints?.rampStatus || RampStatus.NOT_VISIBLE,
+        guidingBlockStatus: parsed.observedParameters?.guidingBlockStatus || userObservedHints?.guidingBlockStatus || GuidingBlockStatus.NOT_VISIBLE,
+        sidewalkCondition: parsed.observedParameters?.sidewalkCondition || userObservedHints?.sidewalkCondition || SidewalkCondition.NOT_VISIBLE,
+        surfaceCondition: parsed.observedParameters?.surfaceCondition || userObservedHints?.surfaceCondition || SurfaceCondition.NOT_VISIBLE,
+        seatingAvailability: parsed.observedParameters?.seatingAvailability || userObservedHints?.seatingAvailability || SeatingAvailability.NOT_VISIBLE,
+        toiletAccessibility: parsed.observedParameters?.toiletAccessibility || userObservedHints?.toiletAccessibility || ToiletAccessibility.NOT_VISIBLE,
+        lightingLevel: parsed.observedParameters?.lightingLevel || userObservedHints?.lightingLevel || LightingLevel.NOT_VISIBLE,
+        crowdLevel: parsed.observedParameters?.crowdLevel || userObservedHints?.crowdLevel || CrowdLevel.NOT_VISIBLE,
       },
     };
   } catch (error) {
     console.error('Error in analyzeAccessibilityActivity AI orchestrator:', error);
     // Fallback cerdas heuristik
+    // Panggilan AI gagal: tidak ada yang teramati, jadi jangan mengaku tahu apa pun.
+    // confidence 0 menandai skor 3.0 di bawah sebagai penampung sementara,
+    // bukan penilaian.
     return {
       overallScore: 3.0,
+      confidence: 0,
       physicalScore: 3.0,
       safetyScore: 3.0,
-      tags: ['laporan-komunitas', 'makassar'],
+      tags: ['laporan-komunitas', 'makassar', 'perlu-penilaian-ulang'],
       summary: description || title,
       barrierType: 'Perlu verifikasi lanjutan',
       actionRecommendation: 'Jadwalkan survei validasi fasilitas aksesibilitas.',
       observedParameters: {
-        rampStatus: userObservedHints?.rampStatus || RampStatus.NONE,
-        guidingBlockStatus: userObservedHints?.guidingBlockStatus || GuidingBlockStatus.NONE,
-        sidewalkCondition: userObservedHints?.sidewalkCondition || SidewalkCondition.NOT_APPLICABLE,
-        surfaceCondition: userObservedHints?.surfaceCondition || SurfaceCondition.SMOOTH,
-        seatingAvailability: userObservedHints?.seatingAvailability || SeatingAvailability.NOT_AVAILABLE,
-        toiletAccessibility: userObservedHints?.toiletAccessibility || ToiletAccessibility.NOT_AVAILABLE,
-        lightingLevel: userObservedHints?.lightingLevel || LightingLevel.BRIGHT,
-        crowdLevel: userObservedHints?.crowdLevel || CrowdLevel.MODERATE,
+        rampStatus: userObservedHints?.rampStatus || RampStatus.NOT_VISIBLE,
+        guidingBlockStatus: userObservedHints?.guidingBlockStatus || GuidingBlockStatus.NOT_VISIBLE,
+        sidewalkCondition: userObservedHints?.sidewalkCondition || SidewalkCondition.NOT_VISIBLE,
+        surfaceCondition: userObservedHints?.surfaceCondition || SurfaceCondition.NOT_VISIBLE,
+        seatingAvailability: userObservedHints?.seatingAvailability || SeatingAvailability.NOT_VISIBLE,
+        toiletAccessibility: userObservedHints?.toiletAccessibility || ToiletAccessibility.NOT_VISIBLE,
+        lightingLevel: userObservedHints?.lightingLevel || LightingLevel.NOT_VISIBLE,
+        crowdLevel: userObservedHints?.crowdLevel || CrowdLevel.NOT_VISIBLE,
       },
     };
   }

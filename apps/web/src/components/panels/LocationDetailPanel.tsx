@@ -8,6 +8,39 @@ export interface LocationDetailPanelProps {
   onClose: () => void;
 }
 
+/**
+ * Terjemahan nilai enum ke bahasa yang dibaca pengguna.
+ *
+ * Yang paling penting: NOT_VISIBLE tidak boleh ditampilkan sebagai "tidak ada".
+ * "Tidak ada ramp" adalah pernyataan fakta tentang keselamatan; "belum
+ * terverifikasi" adalah pengakuan jujur bahwa fotonya tidak memperlihatkan.
+ * Yang kedua lebih berguna: pengguna tahu ia perlu memastikan sendiri, bukan
+ * mencoret tempat itu berdasarkan informasi yang mungkin keliru.
+ */
+const LABEL_NILAI: Record<string, string> = {
+  NOT_VISIBLE: 'Belum terverifikasi dari foto',
+  GOOD: 'Baik',
+  DAMAGED: 'Rusak',
+  NONE: 'Tidak ada',
+  NARROW: 'Sempit',
+  BLOCKED: 'Terhalang',
+  NOT_APPLICABLE: 'Tidak berlaku',
+  SMOOTH: 'Halus / rata',
+  SLIPPERY: 'Licin',
+  POTHOLE: 'Berlubang',
+  UNEVEN: 'Bergelombang',
+  AVAILABLE: 'Tersedia',
+  NOT_AVAILABLE: 'Tidak tersedia',
+  AVAILABLE_GOOD: 'Tersedia, layak pakai',
+  AVAILABLE_DAMAGED: 'Tersedia, tapi rusak',
+  BRIGHT: 'Terang',
+  DIM: 'Redup',
+  DARK: 'Gelap',
+  QUIET: 'Sepi',
+  MODERATE: 'Sedang',
+  CROWDED: 'Ramai',
+};
+
 const LABEL_PARAMETER: Record<string, string> = {
   rampStatus: 'Ramp',
   guidingBlockStatus: 'Guiding block',
@@ -98,13 +131,39 @@ export default function LocationDetailPanel({ location, onClose }: LocationDetai
           </dd>
         </div>
 
-        {Object.entries(LABEL_PARAMETER).map(([key, label]) => (
-          <div key={key}>
-            <dt>{label}</dt>
-            <dd>{location[key] ?? '—'}</dd>
-          </div>
-        ))}
+        {Object.entries(LABEL_PARAMETER).map(([key, label]) => {
+          const nilai = location[key];
+          const belumTerverifikasi = nilai === 'NOT_VISIBLE';
+          return (
+            <div key={key}>
+              <dt>{label}</dt>
+              <dd className={belumTerverifikasi ? 'nilai-belum-terverifikasi' : undefined}>
+                {nilai ? LABEL_NILAI[nilai] ?? nilai : '—'}
+              </dd>
+            </div>
+          );
+        })}
       </dl>
+
+      {/*
+        Penanda kelengkapan. Berguna dua arah: pengguna tahu seberapa jauh
+        informasi ini bisa diandalkan, dan Mode Urban Planner bisa memakainya
+        untuk menemukan titik yang perlu disurvei ulang.
+      */}
+      {(() => {
+        const kunci = Object.keys(LABEL_PARAMETER);
+        const belum = kunci.filter((k) => location[k] === 'NOT_VISIBLE').length;
+        if (belum === 0) return null;
+        return (
+          <p className="panel-state" role="status">
+            {belum} dari {kunci.length} parameter belum terverifikasi dari foto survei
+            {typeof location.aiConfidence === 'number'
+              ? ` · keyakinan AI ${Math.round(location.aiConfidence * 100)}%`
+              : ''}
+            .
+          </p>
+        );
+      })()}
 
       {location.aiSummary && (
         <p className="ph-summary">
