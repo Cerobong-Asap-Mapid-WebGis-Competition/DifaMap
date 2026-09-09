@@ -76,8 +76,8 @@ export async function getCompetitionActivitiesController(req: Request, res: Resp
 
 /**
  * POST /api/mapid/competition/survey
- * Data survei RESMI DifaMap: rentang kampanye + area studi, disaring ke
- * anggota tim saja. Inilah sumber yang akan dipakai importer nanti.
+ * Seluruh data survei di area studi sepanjang periode kampanye, tanpa
+ * penyaringan penulis. Asal titik dilaporkan di `rincianPenulis`.
  */
 export async function getSurveyActivitiesController(req: Request, res: Response): Promise<void> {
   try {
@@ -93,9 +93,9 @@ export async function getSurveyActivitiesController(req: Request, res: Response)
       period: SURVEY_PERIOD,
       teamUsernames: SURVEY_TEAM_USERNAMES,
       count: result.activities.length,
-      // Jumlah titik yang ikut tertarik tapi bukan tulisan anggota tim.
-      // Ditampilkan supaya penyaringan tidak terjadi diam-diam.
-      excludedCount: result.excludedCount,
+      // Asal titik dilaporkan, bukan dipakai menyaring. Seluruh Activity di
+      // area studi ikut terpakai, termasuk kiriman peserta lain.
+      rincianPenulis: result.rincianPenulis,
       truncated: result.truncated,
       data: result.activities,
     });

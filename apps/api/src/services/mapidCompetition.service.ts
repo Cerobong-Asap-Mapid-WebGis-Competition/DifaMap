@@ -103,27 +103,26 @@ export const STUDY_AREA_POLYGON = bboxToPolygon(
 export const SURVEY_HASHTAG = 'cerobongasap';
 
 /**
- * Akun MAPID anggota Tim Cerobong Asap. INILAH penyaring utama data survei,
- * bukan tagar.
+ * Akun MAPID anggota Tim Cerobong Asap.
  *
- * Alasannya terbukti dari data sungguhan (tarikan 2 Sep 2026, 89 record):
+ * PENTING - ini PENANDA, bukan penyaring. Seluruh Activity di area studi
+ * diperlakukan sama, termasuk kiriman peserta lain, karena Survey Activities
+ * adalah data milik bersama dan aturan lomba mengizinkannya (keputusan tim,
+ * 9 Sep 2026). Sebelumnya daftar ini dipakai membuang 5 titik dari peserta
+ * lain; itu sudah tidak berlaku, dan menyamakan hasilnya dengan importer yang
+ * dipakai anggota tim lain.
  *
- *   randymuflih   53 titik, 53 bertagar
- *   atyas         18 titik, 14 bertagar  <- 4 titik sah tanpa tagar
- *   amarr         10 titik,  9 bertagar  <- 1 titik sah tanpa tagar
- *   aixii16        3 titik,  3 bertagar
+ * Daftarnya tetap disimpan karena asal titik masih informasi berguna - untuk
+ * presentasi ke juri, dan untuk menelusuri kualitas data bila ada kejanggalan.
+ * Yang berubah hanya perlakuannya: ditandai, tidak dibuang.
  *
- * Menyaring dengan tagar akan membuang 5 titik survei sah milik tim, semata
- * karena surveyornya lupa mengetik tagar. Keanggotaan tim adalah fakta yang
- * stabil; tagar bergantung pada ingatan orang saat mengunggah.
- *
- * Yang sengaja TIDAK masuk daftar:
- *   andio  (Andi Batario Tenratu) - peserta lain, titiknya bertanda #GALIGO
- *   record tanpa user_name        - asal-usulnya tidak bisa dipertanggungjawabkan
+ * Tagar #cerobongasap sengaja tidak dipakai sebagai penanda. Terbukti tidak
+ * andal pada data sungguhan: 4 titik atyas dan 1 titik amarr tidak bertagar
+ * semata karena surveyornya lupa mengetiknya.
  */
 export const SURVEY_TEAM_USERNAMES = ['randymuflih', 'atyas', 'amarr', 'aixii16'] as const;
 
-/** Benar bila activity ditulis anggota tim. Record tanpa user_name selalu ditolak. */
+/** Benar bila activity ditulis anggota Tim Cerobong Asap. Untuk penandaan saja. */
 export function isTeamSurveyActivity(activity: CompetitionActivity): boolean {
   const author = activity.user_name?.trim().toLowerCase();
   if (!author) return false;
@@ -382,13 +381,17 @@ class MapIdCompetitionService {
       endDate: SURVEY_PERIOD.endDate,
     });
 
-    const milikTim = hasil.activities.filter(isTeamSurveyActivity);
+    const dariTim = hasil.activities.filter(isTeamSurveyActivity).length;
 
     return {
       ...hasil,
-      activities: milikTim,
-      /** Berapa titik yang dibuang karena bukan tulisan anggota tim. */
-      excludedCount: hasil.activities.length - milikTim.length,
+      // Asal titik dilaporkan, bukan dipakai membuang. Informasinya tetap ada
+      // untuk presentasi dan penelusuran kualitas data.
+      rincianPenulis: {
+        total: hasil.activities.length,
+        timSendiri: dariTim,
+        pesertaLain: hasil.activities.length - dariTim,
+      },
     };
   }
 

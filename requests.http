@@ -73,9 +73,12 @@ Content-Type: application/json
   "endDate": "2026-09-30"
 }
 
-### 11a. Data survei RESMI (sudah disaring ke anggota tim) <- PAKAI INI
-# Inilah sumber yang akan dipakai importer. Respons menyertakan excludedCount
-# supaya jumlah titik yang dibuang tidak lewat tanpa terlihat.
+### 11a. Data survei area studi <- PAKAI INI
+# Seluruh Activity di area studi sepanjang periode kampanye, tanpa penyaringan
+# penulis. Survey Activities adalah data milik bersama dan aturan lomba
+# mengizinkan memakai kiriman peserta lain (keputusan tim, 9 Sep 2026).
+# Respons menyertakan rincianPenulis: berapa dari tim sendiri, berapa dari
+# peserta lain - dilaporkan, tidak dipakai menyaring.
 POST {{baseUrl}}/mapid/competition/survey
 Content-Type: application/json
 
