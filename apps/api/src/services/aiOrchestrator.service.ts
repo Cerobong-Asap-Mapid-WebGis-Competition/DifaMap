@@ -127,9 +127,13 @@ Pedoman Penilaian Aksesibilitas (Scoring Murni dari AI):
    - 1.0 - 2.4: Sangat tidak ramah disabilitas / berbahaya (guiding block terputus parah, trotoar terhalang total oleh PKL/tiang, tangga tanpa ramp sama sekali).
 
 2. **ATURAN PALING PENTING - JANGAN MENEBAK**:
-   Gunakan "NOT_VISIBLE" setiap kali foto dan deskripsi TIDAK memperlihatkan
-   parameter tersebut dengan jelas. "NOT_VISIBLE" berarti "saya tidak dapat
-   menilai", dan itu jawaban yang BENAR serta dihargai.
+   Sebelum menjawab SETIAP parameter, tanyakan pada diri sendiri:
+
+     "Apakah saya MELIHAT buktinya di foto atau MEMBACANYA di deskripsi?
+      Atau saya menyimpulkannya dari konteks umum?"
+
+   Kalau menyimpulkan, jawabannya WAJIB "NOT_VISIBLE". Itu jawaban yang benar
+   dan dihargai, bukan kegagalan.
 
    JANGAN PERNAH menjawab "NONE" hanya karena sesuatu tidak terlihat. "NONE"
    berarti Anda benar-benar melihat bahwa fasilitas itu tidak ada di lokasi.
@@ -137,6 +141,25 @@ Pedoman Penilaian Aksesibilitas (Scoring Murni dari AI):
    ramp hanya tidak tertangkap kamera akan membuat pengguna kursi roda
    membatalkan perjalanan ke tempat yang sebenarnya layak, dan membuat
    pemerintah salah mengalokasikan anggaran perbaikan.
+
+   **TIGA PARAMETER YANG PALING SERING SALAH DIJAWAB** - baca definisinya
+   baik-baik, karena nama enumnya menyesatkan:
+
+   - lightingLevel BUKAN tentang terangnya foto. Ini tentang PENERANGAN BUATAN
+     (lampu jalan, lampu taman) yang menentukan apakah lokasi aman dilewati
+     PADA MALAM HARI. Foto siang hari yang cerah TIDAK memberi tahu apa pun
+     soal ini. Jawab "BRIGHT" HANYA bila lampu jalan terlihat menyala, atau
+     deskripsi menyebutkan kondisi penerangan malam. Selain itu: "NOT_VISIBLE".
+
+   - crowdLevel adalah POLA keramaian lokasi, bukan jumlah orang pada satu
+     jepretan. Foto sepi bisa jadi diambil saat jam sepi di lokasi yang biasanya
+     ramai. Jawab selain "NOT_VISIBLE" hanya bila deskripsi surveyor menyebutkan
+     tingkat keramaiannya.
+
+   - seatingAvailability dan toiletAccessibility: jawab "NOT_AVAILABLE" HANYA
+     bila Anda melihat area yang jelas tidak menyediakannya, atau deskripsi
+     menyatakannya. Tidak terlihatnya bangku di satu sudut foto bukan bukti
+     tidak ada bangku di lokasi.
 
 3. **Parameter Fisik & Aksesibilitas**:
    - rampStatus: "GOOD" | "DAMAGED" | "NONE" | "NOT_VISIBLE"
