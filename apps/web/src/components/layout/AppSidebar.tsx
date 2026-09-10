@@ -10,12 +10,14 @@ interface AppSidebarProps {
   currentMode: SidebarMode;
   onSelectMode: (mode: SidebarMode) => void;
   onOpenInfoModal: () => void;
+  onResetToDefault?: () => void;
 }
 
 export default function AppSidebar({
   currentMode,
   onSelectMode,
   onOpenInfoModal,
+  onResetToDefault,
 }: AppSidebarProps) {
   const isMobile = useIsMobile(768);
 
@@ -211,7 +213,9 @@ export default function AppSidebar({
     >
       {/* 1. Top Logo DifaMap (Brand Logo) */}
       <div
-        title="DifaMap — Peta Cerdas Aksesibilitas"
+        title="Kembali ke Tampilan Normal (DifaMap)"
+        role="button"
+        tabIndex={0}
         style={{
           width: '56px',
           height: '56px',
@@ -226,7 +230,19 @@ export default function AppSidebar({
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
           transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
         }}
-        onClick={() => onSelectMode('PUBLIC')}
+        onClick={() => {
+          if (onResetToDefault) {
+            onResetToDefault();
+          } else {
+            onSelectMode('PUBLIC');
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            if (onResetToDefault) onResetToDefault();
+          }
+        }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = 'scale(1.08)';
         }}

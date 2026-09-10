@@ -90,6 +90,23 @@ export default function AiChatbotDrawer({
     }
   }, [messages, isOpen]);
 
+  // Handle ESC key to close AiChatbotDrawer
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   // When analysisTarget changes (user picked point on map), trigger Site Analysis automatically
   useEffect(() => {
     if (analysisTarget && activeTab === 'SITE_ANALYSIS') {

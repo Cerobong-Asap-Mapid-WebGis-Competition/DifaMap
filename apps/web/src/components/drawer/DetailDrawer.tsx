@@ -61,6 +61,31 @@ export default function DetailDrawer({
     setIsLightboxOpen(false);
   }, [selectedItem?.data?.id]);
 
+  // Handle ESC key: close comment box first, or close drawer
+  useEffect(() => {
+    if (!selectedItem) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        // If lightbox is open, let ImageLightboxModal handle it
+        if (isLightboxOpen) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+
+        if (showCommentInput) {
+          setShowCommentInput(false);
+        } else {
+          onClose();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedItem, showCommentInput, isLightboxOpen, onClose]);
+
   // Fetch comments when selected item changes
   useEffect(() => {
     if (!selectedItem) return;

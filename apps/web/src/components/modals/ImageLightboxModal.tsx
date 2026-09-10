@@ -72,6 +72,9 @@ export default function ImageLightboxModal({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
         onClose();
       } else if (e.key === 'ArrowLeft') {
         handlePrev();

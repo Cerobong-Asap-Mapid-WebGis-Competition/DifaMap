@@ -29,6 +29,7 @@ interface MapCanvasProps {
   onPickCoordinate?: (coord: { latitude: number; longitude: number }) => void;
   onMapClick?: () => void;
   isPickingLocation?: boolean;
+  resetMapTrigger?: number;
 }
 
 export default function MapCanvas({
@@ -49,6 +50,7 @@ export default function MapCanvas({
   onPickCoordinate,
   onMapClick,
   isPickingLocation = false,
+  resetMapTrigger = 0,
 }: MapCanvasProps) {
   const isMobile = useIsMobile(768);
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -287,6 +289,23 @@ export default function MapCanvas({
       }
     }
   }, [selectedLocationId, selectedActivityId, isMapLoaded, locations, activities]);
+
+  // Reset map camera to default Makassar & Gowa overview
+  useEffect(() => {
+    if (!resetMapTrigger || !mapRef.current || !isMapLoaded) return;
+    try {
+      mapRef.current.flyTo({
+        center: [119.4500, -5.1700],
+        zoom: 13,
+        pitch: 30,
+        bearing: -5,
+        duration: 900,
+        essential: true,
+      });
+    } catch (err) {
+      console.warn('[MapCanvas] flyTo reset failed:', err);
+    }
+  }, [resetMapTrigger, isMapLoaded]);
 
   // 2. Render Markers Berdasarkan Mode (Aktivitas vs Tempat vs Urban Planner)
   useEffect(() => {

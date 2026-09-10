@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import AppSidebar, { SidebarMode } from '../components/layout/AppSidebar';
 import TopSearchBar, { PublicSubMode, UrbanPlannerFilter } from '../components/layout/TopSearchBar';
 import DetailDrawer, { SelectedItemState } from '../components/drawer/DetailDrawer';
@@ -51,6 +51,30 @@ export default function HomePage() {
   const [isSiniGridVisible, setIsSiniGridVisible] = useState(false);
   const [siniGridSize, setSiniGridSize] = useState<number>(1000);
   const [isochroneGeoJSON, setIsochroneGeoJSON] = useState<any>(null);
+
+  // 7. Reset map camera trigger
+  const [resetMapTrigger, setResetMapTrigger] = useState<number>(0);
+
+  // Fungsi untuk kembali ke tampilan normal (default) DifaMap
+  const handleResetToDefault = useCallback(() => {
+    setSidebarMode('PUBLIC');
+    setPublicSubMode('NONE');
+    setUrbanFilter('PROPERTI_GO');
+    setBufferRadius(500);
+    setIsBufferVisible(true);
+    setSearchQuery('');
+    setSelectedItem(null);
+    setIsAiChatOpen(false);
+    setIsCreateModalOpen(false);
+    setIsInfoModalOpen(false);
+    setIsPickingLocation(false);
+    setIsPickingAnalysisTarget(false);
+    setPickedCoordinate(null);
+    setAnalysisTarget(null);
+    setIsochroneGeoJSON(null);
+    setIsSiniGridVisible(false);
+    setResetMapTrigger((prev) => prev + 1);
+  }, []);
 
   // 7. Data Fetching Hooks (Reactive to search & filters)
   const { locations, isLoading: isLoadingLocations, refetch: refetchLocations } = useLocations({
@@ -170,6 +194,80 @@ export default function HomePage() {
     }
   };
 
+  // Global ESC key handler: navigasi ke langkah/halaman sebelumnya & menutup popup/drawer yang sedang aktif
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        // 1. Tutup Info Modal jika terbuka
+        if (isInfoModalOpen) {
+          setIsInfoModalOpen(false);
+          return;
+        }
+        // 2. Tutup Create Modal / batalkan pemilihan titik jika terbuka
+        if (isCreateModalOpen) {
+          setIsCreateModalOpen(false);
+          setIsPickingLocation(false);
+          return;
+        }
+        // 3. Batalkan mode petunjuk pemilihan koordinat analisis
+        if (isPickingAnalysisTarget) {
+          setIsPickingAnalysisTarget(false);
+          setIsAiChatOpen(true);
+          return;
+        }
+        if (isPickingLocation) {
+          setIsPickingLocation(false);
+          return;
+        }
+        // 4. Tutup drawer AI Chatbot jika terbuka
+        if (isAiChatOpen) {
+          setIsAiChatOpen(false);
+          setIsochroneGeoJSON(null);
+          setAnalysisTarget(null);
+          return;
+        }
+        // 5. Tutup Detail Drawer (item yang dipilih)
+        if (selectedItem) {
+          setSelectedItem(null);
+          setIsochroneGeoJSON(null);
+          setAnalysisTarget(null);
+          return;
+        }
+        // 6. Jika kolom pencarian ada teks, bersihkan
+        if (searchQuery) {
+          setSearchQuery('');
+          return;
+        }
+        // 7. Jika submode aktif (misal filter TEMPAT / AKTIVITAS), kembalikan ke NONE
+        if (publicSubMode !== 'NONE') {
+          setPublicSubMode('NONE');
+          return;
+        }
+        // 8. Jika di Urban Planner mode, kembalikan ke normal
+        if (sidebarMode !== 'PUBLIC') {
+          handleResetToDefault();
+          return;
+        }
+        // 9. Reset view peta ke koordinat awal
+        handleResetToDefault();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    isInfoModalOpen,
+    isCreateModalOpen,
+    isPickingAnalysisTarget,
+    isPickingLocation,
+    isAiChatOpen,
+    selectedItem,
+    searchQuery,
+    publicSubMode,
+    sidebarMode,
+    handleResetToDefault,
+  ]);
+
   return (
     <main
       style={{
@@ -185,6 +283,7 @@ export default function HomePage() {
         currentMode={sidebarMode}
         onSelectMode={(mode) => setSidebarMode(mode)}
         onOpenInfoModal={() => setIsInfoModalOpen(true)}
+        onResetToDefault={handleResetToDefault}
       />
 
       {/* 2. Top Floating Header & Filter Bar */}
@@ -198,6 +297,7 @@ export default function HomePage() {
         onSearchChange={setSearchQuery}
         locations={locations}
         activities={activities}
+        onResetToDefault={handleResetToDefault}
         onSelectSuggestion={(item) => {
           if (item.type === 'LOCATION') {
             handleSelectLocation(item.data);
@@ -280,6 +380,7 @@ export default function HomePage() {
         onPickCoordinate={handlePickCoordinate}
         onMapClick={handleMapClick}
         isPickingLocation={isPickingLocation || isPickingAnalysisTarget}
+        resetMapTrigger={resetMapTrigger}
       />
 
       {/* 4. Left Detail Drawer (Automatically slides in when a pin / polaroid is clicked) */}

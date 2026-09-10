@@ -24,6 +24,23 @@ interface InfoModalProps {
 export default function InfoModal({ isOpen, onClose }: InfoModalProps) {
   const isMobile = useIsMobile(768);
 
+  // Handle ESC key to close InfoModal
+  React.useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (

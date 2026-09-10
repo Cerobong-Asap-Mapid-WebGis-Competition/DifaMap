@@ -39,6 +39,7 @@ interface TopSearchBarProps {
   locations?: any[];
   activities?: any[];
   onSelectSuggestion?: (item: { type: 'LOCATION' | 'ACTIVITY'; data: any }) => void;
+  onResetToDefault?: () => void;
 }
 
 export default function TopSearchBar({
@@ -58,6 +59,7 @@ export default function TopSearchBar({
   locations = [],
   activities = [],
   onSelectSuggestion,
+  onResetToDefault,
 }: TopSearchBarProps) {
   const isMobile = useIsMobile(768);
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
@@ -73,7 +75,21 @@ export default function TopSearchBar({
     };
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setIsInputFocused(false);
+        if (isFilterDropdownOpen) {
+          setIsFilterDropdownOpen(false);
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          return;
+        }
+        if (isInputFocused) {
+          setIsInputFocused(false);
+          (document.activeElement as HTMLElement)?.blur();
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          return;
+        }
       }
     };
 
@@ -228,7 +244,29 @@ export default function TopSearchBar({
             transition: 'all 0.2s ease',
           }}
         >
-          <Search size={22} color={isInputFocused ? '#000000' : '#767676'} style={{ flexShrink: 0 }} />
+          {isMobile ? (
+            <button
+              onClick={onResetToDefault}
+              title="Kembali ke Tampilan Normal (DifaMap)"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+            >
+              <img
+                src="/difamap-icon.png"
+                alt="DifaMap"
+                style={{ width: '28px', height: '28px', objectFit: 'contain' }}
+              />
+            </button>
+          ) : (
+            <Search size={22} color={isInputFocused ? '#000000' : '#767676'} style={{ flexShrink: 0 }} />
+          )}
 
           <input
             type="text"
