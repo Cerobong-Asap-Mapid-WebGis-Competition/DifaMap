@@ -88,13 +88,6 @@ async function syncMapIdData() {
     const lng = act.geometry.coordinates[0];
     const lat = act.geometry.coordinates[1];
 
-    // Deteksi skor heuristik dari teks deskripsi
-    const descLower = (act.description || '').toLowerCase();
-    let score = 3.5;
-    if (descLower.includes('ramah') || descLower.includes('baik') || descLower.includes('tersedia ramp')) score = 4.5;
-    if (descLower.includes('sempit') || descLower.includes('rusak') || descLower.includes('belum ramah') || descLower.includes('macet')) score = 2.5;
-    if (descLower.includes('tangga') && descLower.includes('tidak tersedia')) score = 2.0;
-
     const sortedMedias = prioritizeCameraPhotos(act.medias || []);
     const primaryPhoto = sortedMedias[0] || null;
     const locId = toUuid(`mapid_loc_${act._id}`);
@@ -129,6 +122,7 @@ async function syncMapIdData() {
     }
 
     // 1. Buat atau perbarui Tempat (Location) secara otomatis
+    // Catatan: pada update, overallScore TIDAK ditimpa agar skor hasil evaluasi OpenAI tetap terjaga
     await prisma.location.upsert({
       where: { id: locId },
       update: {
@@ -138,7 +132,6 @@ async function syncMapIdData() {
         coverImageUrl: primaryPhoto,
         latitude: lat,
         longitude: lng,
-        overallScore: score,
         entityType,
         category,
       },
@@ -150,7 +143,7 @@ async function syncMapIdData() {
         coverImageUrl: primaryPhoto,
         latitude: lat,
         longitude: lng,
-        overallScore: score,
+        overallScore: 0.0,
         entityType,
         category,
         totalActivities: 1,
@@ -167,7 +160,6 @@ async function syncMapIdData() {
         mediaUrls: sortedMedias,
         latitude: lat,
         longitude: lng,
-        aiScore: score,
         updatedAt: new Date(act.created_at || Date.now()),
       },
       create: {
@@ -182,7 +174,6 @@ async function syncMapIdData() {
         longitude: lng,
         status: ActivityStatus.PUBLIC,
         accessibilityTags: ['Survei MAPID', authorUsername || 'Tim Cerobong Asap'],
-        aiScore: score,
         createdAt: new Date(act.created_at || Date.now()),
       },
     });

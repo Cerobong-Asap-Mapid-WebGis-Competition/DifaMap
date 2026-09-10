@@ -11,7 +11,10 @@
     "db:generate": "prisma generate && node scripts/sync-prisma.js",
     "db:push": "prisma db push && node scripts/sync-prisma.js",
     "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "score:ai": "tsx scripts/score-locations-openai.ts",
+    "score:ai:test": "tsx scripts/score-locations-openai.ts --test",
+    "score:ai:all": "tsx scripts/score-locations-openai.ts --all"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
