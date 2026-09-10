@@ -87,7 +87,7 @@ export default function CreateActivityModal({
         longitude: lng,
         mediaUrls: imageUrl.trim()
           ? [imageUrl.trim()]
-          : ['https://upload.wikimedia.org/wikipedia/id/6/64/Anjungan_Losari.jpg'],
+          : ['/photos/losari.jpg'],
         userObservedHints: {
           rampStatus,
           guidingBlockStatus,

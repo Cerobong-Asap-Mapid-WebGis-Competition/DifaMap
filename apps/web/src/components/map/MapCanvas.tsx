@@ -376,7 +376,7 @@ export default function MapCanvas({
                 transform: rotate(-8deg);
                 z-index: 1;
               ">
-                <img src="${secondPhotoUrl}" onerror="this.onerror=null; this.src='https://upload.wikimedia.org/wikipedia/id/6/64/Anjungan_Losari.jpg';" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px; filter: grayscale(20%);" />
+                <img src="${secondPhotoUrl}" onerror="this.onerror=null; this.src='/photos/default-accessibility.jpg';" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px; filter: grayscale(20%);" />
               </div>
             ` : ''}
 
@@ -395,7 +395,7 @@ export default function MapCanvas({
               transform: ${isSelected ? 'scale(1.15) rotate(0deg)' : 'rotate(3deg)'};
               transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
             ">
-              <img src="${photoUrl}" onerror="this.onerror=null; this.src='https://upload.wikimedia.org/wikipedia/id/6/64/Anjungan_Losari.jpg';" style="width: 100%; height: 75%; object-fit: cover; border-radius: 3px;" />
+              <img src="${photoUrl}" onerror="this.onerror=null; this.src='/photos/default-accessibility.jpg';" style="width: 100%; height: 75%; object-fit: cover; border-radius: 3px;" />
               <div style="
                 width: 100%;
                 height: 25%;

@@ -296,6 +296,10 @@ export default function ImageLightboxModal({
             key={currentItem.url}
             src={currentItem.url}
             alt={currentItem.title || 'Foto Survei'}
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = '/photos/default-accessibility.jpg';
+            }}
             style={{
               maxWidth: '92vw',
               maxHeight: '74vh',
@@ -410,6 +414,10 @@ export default function ImageLightboxModal({
                   <img
                     src={item.url}
                     alt={`Thumbnail ${idx + 1}`}
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = '/photos/default-accessibility.jpg';
+                    }}
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                 </button>

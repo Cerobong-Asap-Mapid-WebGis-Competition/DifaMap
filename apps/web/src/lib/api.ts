@@ -233,7 +233,7 @@ export const difaMapApi = {
  */
 export function getPrimaryPhotoUrl(mediaUrls?: string[] | null, fallback?: string): string {
   if (!mediaUrls || mediaUrls.length === 0) {
-    return fallback || 'https://upload.wikimedia.org/wikipedia/id/6/64/Anjungan_Losari.jpg';
+    return fallback || '/photos/default-accessibility.jpg';
   }
   const realPhoto = mediaUrls.find((url) => !url.includes('_map_') && !url.toLowerCase().endsWith('.png'));
   return realPhoto || mediaUrls[0];

@@ -467,7 +467,8 @@ export default function DetailDrawer({
                   src={currentPhoto}
                   alt={title}
                   onError={(e) => {
-                    (e.currentTarget as HTMLElement).style.display = 'none';
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = '/photos/default-accessibility.jpg';
                   }}
                   style={{
                     width: '100%',
@@ -569,6 +570,10 @@ export default function DetailDrawer({
                         <img
                           src={url}
                           alt={`Thumb ${idx + 1}`}
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = '/photos/default-accessibility.jpg';
+                          }}
                           style={{ width: '28px', height: '28px', borderRadius: '4px', objectFit: 'cover' }}
                         />
                         <span style={{ fontSize: '11px', fontWeight: isSelected ? 700 : 500, color: '#1E293B' }}>
