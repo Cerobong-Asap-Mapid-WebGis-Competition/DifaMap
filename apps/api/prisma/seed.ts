@@ -170,7 +170,7 @@ async function main() {
       category: PlaceCategory.TOURISM,
       specificLocation: 'Kawasan Reklamasi Centre Point of Indonesia (CPI), Mariso, Makassar',
       description: 'Landmark ikonik ruang terbuka publik dan tempat ibadah dengan pelataran marmer luas datar yang terhubung jalur ramp.',
-      coverImageUrl: '/photos/losari.jpg',
+      coverImageUrl: '/photos/masjid-99-kubah.jpg',
       latitude: -5.15010,
       longitude: 119.40350,
       rampStatus: RampStatus.GOOD,
