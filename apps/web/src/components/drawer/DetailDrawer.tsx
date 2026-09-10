@@ -18,9 +18,12 @@ import {
   ChevronRight,
   Eye,
   Sun,
-  Accessibility
+  Accessibility,
+  ZoomIn,
 } from 'lucide-react';
 import { difaMapApi } from '../../lib/api';
+import ImageLightboxModal from '../modals/ImageLightboxModal';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 export interface SelectedItemState {
   type: 'ACTIVITY' | 'LOCATION';
@@ -38,12 +41,62 @@ export default function DetailDrawer({
   onClose,
   onOpenCreateModalWithLocation,
 }: DetailDrawerProps) {
+  const isMobile = useIsMobile(768);
   const [comments, setComments] = useState<any[]>([]);
+
+  const getFacilityInfo = (field: 'ramp' | 'guiding' | 'lighting' | 'sidewalk', value?: string) => {
+    if (field === 'ramp') {
+      if (!value || value === 'AVAILABLE' || value === 'AVAILABLE_GOOD' || value === 'GOOD') {
+        return { label: 'Ramp Kursi Roda', status: 'Tersedia & Landai', bg: '#DCFCE7', color: '#166534', border: '#BBF7D0' };
+      }
+      if (value === 'DAMAGED' || value === 'STEEP') {
+        return { label: 'Ramp Kursi Roda', status: 'Curam / Perlu Bantuan', bg: '#FEF3C7', color: '#B45309', border: '#FDE68A' };
+      }
+      return { label: 'Ramp Kursi Roda', status: 'Tidak Ada Ramp', bg: '#FEE2E2', color: '#991B1B', border: '#FECACA' };
+    }
+    if (field === 'guiding') {
+      if (value === 'GOOD' || value === 'AVAILABLE' || value === 'AVAILABLE_GOOD') {
+        return { label: 'Ubin Pemandu (Tunanetra)', status: 'Terpasang Baik', bg: '#DCFCE7', color: '#166534', border: '#BBF7D0' };
+      }
+      if (value === 'DAMAGED' || value === 'BLOCKED') {
+        return { label: 'Ubin Pemandu (Tunanetra)', status: 'Rusak / Terhalang', bg: '#FEE2E2', color: '#991B1B', border: '#FECACA' };
+      }
+      return { label: 'Ubin Pemandu (Tunanetra)', status: 'Belum Terpasang', bg: '#F1F5F9', color: '#475569', border: '#E2E8F0' };
+    }
+    if (field === 'lighting') {
+      if (value === 'BRIGHT' || value === 'GOOD' || value === 'AVAILABLE') {
+        return { label: 'Penerangan Jalan', status: 'Terang & Jelas', bg: '#DCFCE7', color: '#166534', border: '#BBF7D0' };
+      }
+      if (value === 'MODERATE' || value === 'DIM') {
+        return { label: 'Penerangan Jalan', status: 'Cukup Terang', bg: '#FEF3C7', color: '#B45309', border: '#FDE68A' };
+      }
+      return { label: 'Penerangan Jalan', status: 'Kurang Terang / Gelap', bg: '#FEE2E2', color: '#991B1B', border: '#FECACA' };
+    }
+    if (value === 'GOOD' || value === 'WIDE' || value === 'SMOOTH' || value === 'AVAILABLE') {
+      return { label: 'Kondisi Trotoar', status: 'Lebar & Nyaman', bg: '#DCFCE7', color: '#166534', border: '#BBF7D0' };
+    }
+    if (value === 'DAMAGED' || value === 'NARROW' || value === 'OBSTACLE') {
+      return { label: 'Kondisi Trotoar', status: 'Sempit / Berlubang', bg: '#FEE2E2', color: '#991B1B', border: '#FECACA' };
+    }
+    return { label: 'Kondisi Trotoar', status: 'Standar Pejalan', bg: '#F8FAFC', color: '#334155', border: '#E2E8F0' };
+  };
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [authorName, setAuthorName] = useState('');
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+
+  // Lightbox Pop-up State
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [lightboxImages, setLightboxImages] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  // Reset photo index when selected item changes
+  useEffect(() => {
+    setSelectedPhotoIndex(0);
+    setIsLightboxOpen(false);
+  }, [selectedItem?.data?.id]);
 
   // Fetch comments when selected item changes
   useEffect(() => {
@@ -89,9 +142,9 @@ export default function DetailDrawer({
   const starCount = Math.round(overallScore);
   const totalReviews = isLocation ? (data.totalComments || comments.length || 1) : (comments.length || 1);
 
-  // Status Colors for 5 Main Accessibility Features
+  // Status Colors for Main Accessibility Features
   const getStatusColor = (status?: string) => {
-    if (!status) return '#5FD300';
+    if (!status || status === 'NOT_VISIBLE') return '#94A3B8'; // Slate/Gray (Belum Teramati)
     if (status === 'GOOD' || status === 'AVAILABLE' || status === 'AVAILABLE_GOOD' || status === 'BRIGHT') return '#5FD300'; // Green
     if (status === 'DAMAGED' || status === 'NONE' || status === 'NOT_AVAILABLE' || status === 'DARK' || status === 'BLOCKED') return '#EF0004'; // Red
     return '#FFBB00'; // Yellow (Warning/Moderate)
@@ -135,28 +188,35 @@ export default function DetailDrawer({
 
   return (
     <aside
-      className="animate-slide-in"
+      className={isMobile ? 'animate-slide-up' : 'animate-slide-in'}
+      onClick={(e) => e.stopPropagation()}
       style={{
         position: 'fixed',
-        left: '104px',
-        top: '24px',
-        bottom: '24px',
-        width: '464px',
-        maxWidth: 'calc(100vw - 128px)',
+        left: isMobile ? 0 : '104px',
+        right: isMobile ? 0 : 'auto',
+        top: isMobile ? 'auto' : '24px',
+        bottom: isMobile ? 0 : '24px',
+        width: isMobile ? '100%' : '464px',
+        maxWidth: isMobile ? '100vw' : 'calc(100vw - 128px)',
+        maxHeight: isMobile ? '84vh' : 'calc(100vh - 48px)',
         backgroundColor: '#FFFFFF',
-        borderRadius: '16px',
-        boxShadow: '0px 8px 30px rgba(0, 0, 0, 0.15)',
+        borderRadius: isMobile ? '24px 24px 0 0' : '16px',
+        boxShadow: isMobile ? '0px -8px 36px rgba(0, 0, 0, 0.25)' : '0px 8px 30px rgba(0, 0, 0, 0.15)',
         border: '1px solid rgba(0, 0, 0, 0.08)',
-        zIndex: 35,
+        borderBottom: isMobile ? 'none' : undefined,
+        zIndex: 50,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
       }}
     >
+      {/* Mobile Top Drag Handle Bar */}
+      {isMobile && <div className="bottom-sheet-drag-handle" />}
+
       {/* 1. Header Toolbar with Close Button */}
       <div
         style={{
-          padding: '16px 20px',
+          padding: isMobile ? '12px 18px' : '16px 20px',
           borderBottom: '1px solid #EFEFEF',
           display: 'flex',
           alignItems: 'center',
@@ -172,7 +232,7 @@ export default function DetailDrawer({
               padding: '4px 10px',
               borderRadius: '20px',
               fontSize: '12px',
-              fontWeight: '700',
+              fontWeight: '800',
               letterSpacing: '0.04em',
               textTransform: 'uppercase',
             }}
@@ -180,31 +240,36 @@ export default function DetailDrawer({
             {isLocation ? 'Detail Tempat' : 'Detail Aktivitas'}
           </span>
           {data.category && (
-            <span style={{ fontSize: '13px', color: '#767676', fontWeight: '500' }}>
+            <span style={{ fontSize: '13px', color: '#64748B', fontWeight: '600' }}>
               • {data.category}
             </span>
           )}
         </div>
 
+        {/* Elderly-friendly large Close Button */}
         <button
           onClick={onClose}
           title="Tutup Panel"
           style={{
-            background: 'transparent',
+            background: isMobile ? '#F1F5F9' : 'transparent',
             border: 'none',
             cursor: 'pointer',
-            padding: '6px',
-            borderRadius: '50%',
-            color: '#000000',
+            padding: isMobile ? '6px 14px' : '6px',
+            borderRadius: isMobile ? '20px' : '50%',
+            color: '#0F172A',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
+            gap: '4px',
+            fontSize: isMobile ? '13.5px' : '13px',
+            fontWeight: '700',
+            minHeight: isMobile ? '38px' : undefined,
             transition: 'background-color 0.15s ease',
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F1F5F9')}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E2E8F0')}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = isMobile ? '#F1F5F9' : 'transparent')}
         >
-          <X size={20} />
+          <X size={isMobile ? 18 : 20} strokeWidth={2.5} />
+          {isMobile && <span>Tutup</span>}
         </button>
       </div>
 
@@ -244,6 +309,165 @@ export default function DetailDrawer({
           </p>
         </div>
 
+        {/* Photo Gallery & Preview (Clickable to open high-res pop-up) */}
+        {(() => {
+          const rawMedias: string[] = data.mediaUrls && data.mediaUrls.length > 0
+            ? data.mediaUrls
+            : (data.coverImageUrl ? [data.coverImageUrl] : []);
+          
+          if (rawMedias.length === 0) return null;
+
+          // Urutkan agar foto kamera survei selalu di awal
+          const mediaList = [...rawMedias].sort((a, b) => {
+            const isMapA = a.includes('_map_') || a.toLowerCase().endsWith('.png');
+            const isMapB = b.includes('_map_') || b.toLowerCase().endsWith('.png');
+            if (isMapA && !isMapB) return 1;
+            if (!isMapA && isMapB) return -1;
+            return 0;
+          });
+
+          const currentPhoto = mediaList[selectedPhotoIndex] || mediaList[0];
+          const isCurrentMap = currentPhoto.includes('_map_') || currentPhoto.toLowerCase().endsWith('.png');
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+              <div
+                onClick={() => {
+                  setLightboxImages(mediaList);
+                  setLightboxIndex(selectedPhotoIndex);
+                  setIsLightboxOpen(true);
+                }}
+                title="Klik untuk melihat foto lebih spesifik (Pop-up Modal)"
+                style={{
+                  position: 'relative',
+                  borderRadius: '12px',
+                  overflow: 'hidden',
+                  height: '220px',
+                  width: '100%',
+                  backgroundColor: '#0F172A',
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
+                  cursor: 'pointer',
+                }}
+              >
+                <img
+                  src={currentPhoto}
+                  alt={title}
+                  onError={(e) => {
+                    (e.currentTarget as HTMLElement).style.display = 'none';
+                  }}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    transition: 'transform 0.3s ease',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                />
+
+                {/* Badge tipe media */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '10px',
+                    right: '10px',
+                    padding: '5px 12px',
+                    borderRadius: '20px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                    color: '#ffffff',
+                    backdropFilter: 'blur(6px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                  }}
+                >
+                  {isCurrentMap ? (
+                    <>
+                      <MapPin size={13} color="#FDC323" />
+                      <span>Cuplikan Peta MAPID</span>
+                    </>
+                  ) : (
+                    <>
+                      <Camera size={13} color="#34D399" />
+                      <span>Foto Survei Lapangan</span>
+                    </>
+                  )}
+                </div>
+
+                {/* Hover affordance: Klik untuk memperbesar */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '10px',
+                    left: '10px',
+                    padding: '5px 12px',
+                    borderRadius: '20px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                    color: '#ffffff',
+                    backdropFilter: 'blur(6px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                  }}
+                >
+                  <ZoomIn size={14} color="#FDC323" />
+                  <span>Klik untuk melihat foto lebih spesifik</span>
+                </div>
+              </div>
+
+              {/* Thumbnails Row (Jika ada lebih dari 1 media) */}
+              {mediaList.length > 1 && (
+                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+                  {mediaList.map((url, idx) => {
+                    const isMap = url.includes('_map_') || url.toLowerCase().endsWith('.png');
+                    const isSelected = idx === selectedPhotoIndex;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setSelectedPhotoIndex(idx)}
+                        onDoubleClick={() => {
+                          setLightboxImages(mediaList);
+                          setLightboxIndex(idx);
+                          setIsLightboxOpen(true);
+                        }}
+                        title="Klik untuk memilih, klik 2x untuk perbesar"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '4px 8px',
+                          borderRadius: '8px',
+                          border: isSelected ? '2px solid #FDC323' : '1px solid #E2E8F0',
+                          backgroundColor: isSelected ? '#FFFBEB' : '#FFFFFF',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <img
+                          src={url}
+                          alt={`Thumbnail ${idx + 1}`}
+                          style={{ width: '32px', height: '32px', borderRadius: '4px', objectFit: 'cover' }}
+                        />
+                        <span style={{ fontSize: '11px', fontWeight: isSelected ? 700 : 500, color: '#1E293B' }}>
+                          {isMap ? 'Peta GPS' : `Foto #${idx + 1}`}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Rating & 5 Status Indicators (Frame 40 & Frame 24) */}
         <div
           style={{
@@ -258,8 +482,15 @@ export default function DetailDrawer({
         >
           {/* Rating Summary Row */}
           <div>
-            <div style={{ fontSize: '13px', fontWeight: '600', color: '#767676', marginBottom: '6px' }}>
-              Ulasan Aksesibilitas:
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span style={{ fontSize: '13px', fontWeight: '700', color: '#000000' }}>
+                {isLocation ? 'Skor Resmi (Survei Lapangan)' : 'Penilaian Aksesibilitas'}
+              </span>
+              {isLocation && data.communityScore !== null && data.communityScore !== undefined && (
+                <span style={{ fontSize: '11px', color: '#539BA9', fontWeight: '700', backgroundColor: '#EBF5F7', padding: '2px 8px', borderRadius: '12px' }}>
+                  Komunitas: {Number(data.communityScore).toFixed(1)}★ ({data.communityReportCount || 0} lap.)
+                </span>
+              )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '24px', fontWeight: '800', color: '#000000' }}>
@@ -280,7 +511,7 @@ export default function DetailDrawer({
               </div>
 
               <span style={{ fontSize: '14px', color: '#767676', fontWeight: '500' }}>
-                ({totalReviews})
+                ({totalReviews} ulasan)
               </span>
             </div>
           </div>
@@ -374,6 +605,170 @@ export default function DetailDrawer({
                 }}
               />
             </div>
+          </div>
+        </div>
+
+        {/* Status Aksesibilitas Fasilitas Lengkap (Ramah Lansia & Awam Teknologi) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h3 style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Fasilitas Aksesibilitas
+            </h3>
+            <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '600' }}>
+              Panduan Ramah Lansia & Difabel
+            </span>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+              gap: '8px',
+            }}
+          >
+            {/* Card 1: Ramp Kursi Roda */}
+            {(() => {
+              const info = getFacilityInfo('ramp', data.rampStatus);
+              return (
+                <div
+                  style={{
+                    backgroundColor: info.bg,
+                    border: `1.5px solid ${info.border}`,
+                    borderRadius: '12px',
+                    padding: '10px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '10px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Accessibility size={20} color={info.color} strokeWidth={2.4} />
+                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A' }}>
+                      {info.label}
+                    </span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: '800',
+                      color: info.color,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {info.status}
+                  </span>
+                </div>
+              );
+            })()}
+
+            {/* Card 2: Guiding Block */}
+            {(() => {
+              const info = getFacilityInfo('guiding', data.guidingBlockStatus);
+              return (
+                <div
+                  style={{
+                    backgroundColor: info.bg,
+                    border: `1.5px solid ${info.border}`,
+                    borderRadius: '12px',
+                    padding: '10px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '10px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Eye size={20} color={info.color} strokeWidth={2.4} />
+                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A' }}>
+                      {info.label}
+                    </span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: '800',
+                      color: info.color,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {info.status}
+                  </span>
+                </div>
+              );
+            })()}
+
+            {/* Card 3: Lighting */}
+            {(() => {
+              const info = getFacilityInfo('lighting', data.lightingLevel);
+              return (
+                <div
+                  style={{
+                    backgroundColor: info.bg,
+                    border: `1.5px solid ${info.border}`,
+                    borderRadius: '12px',
+                    padding: '10px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '10px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Sun size={20} color={info.color} strokeWidth={2.4} />
+                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A' }}>
+                      {info.label}
+                    </span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: '800',
+                      color: info.color,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {info.status}
+                  </span>
+                </div>
+              );
+            })()}
+
+            {/* Card 4: Sidewalk */}
+            {(() => {
+              const info = getFacilityInfo('sidewalk', data.sidewalkCondition || data.surfaceCondition);
+              return (
+                <div
+                  style={{
+                    backgroundColor: info.bg,
+                    border: `1.5px solid ${info.border}`,
+                    borderRadius: '12px',
+                    padding: '10px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '10px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Layers size={20} color={info.color} strokeWidth={2.4} />
+                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A' }}>
+                      {info.label}
+                    </span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: '800',
+                      color: info.color,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {info.status}
+                  </span>
+                </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -484,17 +879,6 @@ export default function DetailDrawer({
               </button>
             </div>
           </form>
-        )}
-
-        {/* Main Photo Preview (If Activity or Location has photo) */}
-        {(data.mediaUrls?.[0] || data.coverImageUrl) && (
-          <div style={{ borderRadius: '10px', overflow: 'hidden', maxHeight: '220px', width: '100%' }}>
-            <img
-              src={data.mediaUrls?.[0] || data.coverImageUrl}
-              alt={title}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
-          </div>
         )}
 
         {/* AI Insight Summary (If available) */}
@@ -611,7 +995,21 @@ export default function DetailDrawer({
 
                   {/* Comment Photo if attached */}
                   {comment.photoUrls && comment.photoUrls.length > 0 && (
-                    <div style={{ borderRadius: '8px', overflow: 'hidden', maxHeight: '160px' }}>
+                    <div
+                      onClick={() => {
+                        setLightboxImages(comment.photoUrls);
+                        setLightboxIndex(0);
+                        setIsLightboxOpen(true);
+                      }}
+                      title="Klik untuk melihat foto lebih spesifik (Pop-up Modal)"
+                      style={{
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        maxHeight: '160px',
+                        cursor: 'pointer',
+                        position: 'relative',
+                      }}
+                    >
                       <img
                         src={comment.photoUrls[0]}
                         alt="Foto Ulasan"
@@ -639,6 +1037,16 @@ export default function DetailDrawer({
           )}
         </div>
       </div>
+
+      {/* Lightbox Pop-up Modal untuk melihat foto survei lapangan lebih spesifik */}
+      <ImageLightboxModal
+        isOpen={isLightboxOpen}
+        onClose={() => setIsLightboxOpen(false)}
+        images={lightboxImages}
+        initialIndex={lightboxIndex}
+        locationName={title}
+        specificLocation={address}
+      />
     </aside>
   );
 }

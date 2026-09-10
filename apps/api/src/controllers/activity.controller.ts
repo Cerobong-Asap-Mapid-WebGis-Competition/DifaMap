@@ -4,6 +4,8 @@ import { prisma } from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware.js';
 import {
   ActivityStatus,
+  EntityType,
+  PlaceCategory,
   RampStatus,
   GuidingBlockStatus,
   SidewalkCondition,
@@ -76,7 +78,7 @@ export async function getActivitiesController(req: Request, res: Response): Prom
       ];
     }
 
-    const take = Math.min(100, Math.max(1, parseInt(limit as string, 10) || 30));
+    const take = Math.min(250, Math.max(1, parseInt(limit as string, 10) || 100));
     const skip = (Math.max(1, parseInt(page as string, 10) || 1) - 1) * take;
 
     const [activities, total] = await Promise.all([
@@ -215,9 +217,13 @@ export async function createActivityController(req: AuthenticatedRequest, res: R
 
     // Cek apakah ada target location yang terhubung
     let targetLocationId = validated.locationId || null;
+    const primaryPhoto =
+      (validated.mediaUrls || []).find((u) => !u.includes('_map_') && !u.endsWith('.png')) ||
+      validated.mediaUrls?.[0] ||
+      null;
 
     // Jika user mengisi specificLocation tetapi tidak menyertakan locationId secara eksplisit,
-    // kita cocokkan secara cerdas dengan nama tempat / alamat di database
+    // cocokkan dengan nama tempat / alamat di database
     if (!targetLocationId && validated.specificLocation && validated.specificLocation.trim() !== '') {
       const matchedLocation = await prisma.location.findFirst({
         where: {
@@ -241,6 +247,98 @@ export async function createActivityController(req: AuthenticatedRequest, res: R
       mediaUrls: validated.mediaUrls,
       userObservedHints: validated.userObservedHints,
     });
+
+    // Otomatis Buat atau Perbarui Tempat (Location) dari Aktivitas
+    if (targetLocationId) {
+      // Jika tempat sudah ada: perbarui atau tambahkan fotonya
+      if (primaryPhoto) {
+        await prisma.location.update({
+          where: { id: targetLocationId },
+          data: {
+            coverImageUrl: primaryPhoto,
+            totalActivities: { increment: 1 },
+          },
+        });
+      } else {
+        await prisma.location.update({
+          where: { id: targetLocationId },
+          data: { totalActivities: { increment: 1 } },
+        });
+      }
+    } else {
+      // Cari apakah ada lokasi dalam radius ~80 meter (~0.0008 deg)
+      const nearbyLocation = await prisma.location.findFirst({
+        where: {
+          latitude: { gte: validated.latitude - 0.0008, lte: validated.latitude + 0.0008 },
+          longitude: { gte: validated.longitude - 0.0008, lte: validated.longitude + 0.0008 },
+        },
+      });
+
+      if (nearbyLocation) {
+        targetLocationId = nearbyLocation.id;
+        if (primaryPhoto && (!nearbyLocation.coverImageUrl || nearbyLocation.coverImageUrl.includes('unsplash.com'))) {
+          await prisma.location.update({
+            where: { id: nearbyLocation.id },
+            data: {
+              coverImageUrl: primaryPhoto,
+              totalActivities: { increment: 1 },
+            },
+          });
+        } else {
+          await prisma.location.update({
+            where: { id: nearbyLocation.id },
+            data: { totalActivities: { increment: 1 } },
+          });
+        }
+      } else {
+        // Otomatis buat Tempat baru dari foto & data aktivitas jika belum ada
+        const titleLower = validated.title.toLowerCase();
+        let entityType: EntityType = EntityType.PLACE;
+        let category: PlaceCategory = PlaceCategory.OTHER;
+
+        if (titleLower.includes('halte') || titleLower.includes('shelter') || titleLower.includes('stasiun')) {
+          entityType = EntityType.TRANSIT_HUB;
+          category = PlaceCategory.BUS_STOP;
+        } else if (titleLower.includes('trotoar') || titleLower.includes('jalan') || titleLower.includes('jl.')) {
+          entityType = EntityType.SIDEWALK;
+          category = PlaceCategory.PEDESTRIAN_PATH;
+        } else if (titleLower.includes('mall') || titleLower.includes('plaza')) {
+          category = PlaceCategory.MALL;
+        } else if (
+          titleLower.includes('rs') ||
+          titleLower.includes('rumah sakit') ||
+          titleLower.includes('klinik') ||
+          titleLower.includes('puskesmas')
+        ) {
+          category = PlaceCategory.HEALTHCARE;
+        } else if (
+          titleLower.includes('unhas') ||
+          titleLower.includes('kampus') ||
+          titleLower.includes('sekolah') ||
+          titleLower.includes('universitas')
+        ) {
+          category = PlaceCategory.EDUCATION;
+        }
+
+        const autoCreatedLoc = await prisma.location.create({
+          data: {
+            name: validated.specificLocation || validated.title,
+            specificLocation: validated.specificLocation || 'Kota Makassar',
+            description: validated.description || 'Titik survei aksesibilitas fasilitas publik.',
+            coverImageUrl: primaryPhoto,
+            latitude: validated.latitude,
+            longitude: validated.longitude,
+            overallScore: aiAnalysis.overallScore || 4.0,
+            physicalScore: aiAnalysis.physicalScore || 4.0,
+            safetyScore: aiAnalysis.safetyScore || 4.0,
+            entityType,
+            category,
+            totalActivities: 1,
+          },
+        });
+        targetLocationId = autoCreatedLoc.id;
+      }
+    }
 
     // Gabungkan tags dari input user dan hasil ekstraksi AI
     const combinedTags = Array.from(

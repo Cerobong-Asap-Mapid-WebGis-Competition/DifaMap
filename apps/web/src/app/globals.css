@@ -240,3 +240,59 @@ html, body {
 .animate-slide-in {
   animation: slideInLeft 0.25s ease-out forwards;
 }
+
+/* Responsive Animations & Bottom Sheet Utilities */
+@keyframes slideUpBottom {
+  from {
+    transform: translateY(100%);
+    opacity: 0.5;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slideUpBottom 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Bottom Sheet Drag Handle */
+.bottom-sheet-drag-handle {
+  width: 48px;
+  height: 5px;
+  background-color: #CBD5E1;
+  border-radius: 9999px;
+  margin: 8px auto 6px auto;
+  flex-shrink: 0;
+}
+
+/* MapLibre Controls offset on mobile so they don't hide behind Bottom Nav */
+@media (max-width: 768px) {
+  .maplibregl-ctrl-bottom-right {
+    margin-bottom: 74px !important;
+    margin-right: 12px !important;
+  }
+
+  .maplibregl-ctrl-group {
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15) !important;
+  }
+
+  .maplibregl-ctrl-group button {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  body {
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Accessible focus ring for seniors & keyboard navigation */
+button:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2.5px solid var(--brand-teal);
+  outline-offset: 2px;
+}

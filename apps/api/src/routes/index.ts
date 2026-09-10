@@ -4,6 +4,7 @@ import locationRoutes from './location.routes.js';
 import activityRoutes from './activity.routes.js';
 import commentRoutes from './comment.routes.js';
 import chatbotRoutes from './chatbot.routes.js';
+import economicPointRoutes from './economicPoint.routes.js';
 
 const apiRouter = Router();
 
@@ -19,6 +20,7 @@ apiRouter.use('/locations', locationRoutes);
 apiRouter.use('/activities', activityRoutes);
 apiRouter.use('/comments', commentRoutes);
 apiRouter.use('/chatbot', chatbotRoutes);
+apiRouter.use('/economic-points', economicPointRoutes);
 apiRouter.use('/mapid', mapidRoutes);
 
 export default apiRouter;

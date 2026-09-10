@@ -30,11 +30,11 @@ export interface CreateActivityPayload {
   status?: 'DRAFT' | 'PUBLIC';
   accessibilityTags?: string[];
   userObservedHints?: {
-    rampStatus?: 'GOOD' | 'DAMAGED' | 'NONE';
-    guidingBlockStatus?: 'GOOD' | 'DAMAGED' | 'NONE';
-    sidewalkCondition?: 'GOOD' | 'NARROW' | 'DAMAGED' | 'BLOCKED';
-    surfaceCondition?: 'SMOOTH' | 'SLIPPERY' | 'POTHOLE' | 'UNEVEN';
-    lightingLevel?: 'BRIGHT' | 'DIM' | 'DARK';
+    rampStatus?: 'GOOD' | 'DAMAGED' | 'NONE' | 'NOT_VISIBLE';
+    guidingBlockStatus?: 'GOOD' | 'DAMAGED' | 'NONE' | 'NOT_VISIBLE';
+    sidewalkCondition?: 'GOOD' | 'NARROW' | 'DAMAGED' | 'BLOCKED' | 'NOT_VISIBLE';
+    surfaceCondition?: 'SMOOTH' | 'SLIPPERY' | 'POTHOLE' | 'UNEVEN' | 'NOT_VISIBLE';
+    lightingLevel?: 'BRIGHT' | 'DIM' | 'DARK' | 'NOT_VISIBLE';
   };
 }
 
@@ -80,11 +80,13 @@ export const difaMapApi = {
   /**
    * Mengambil feed aktivitas komunitas
    */
-  async getActivities(params: { locationId?: string; search?: string; status?: string } = {}) {
+  async getActivities(params: { locationId?: string; search?: string; status?: string; limit?: number; page?: number } = {}) {
     const query = new URLSearchParams();
     if (params.locationId) query.append('locationId', params.locationId);
     if (params.search) query.append('search', params.search);
     if (params.status) query.append('status', params.status);
+    query.append('limit', (params.limit || 150).toString());
+    if (params.page) query.append('page', params.page.toString());
 
     const res = await fetch(`${API_BASE_URL}/api/activities?${query.toString()}`);
     if (!res.ok) throw new Error('Failed to fetch activities');
@@ -98,6 +100,25 @@ export const difaMapApi = {
     const res = await fetch(`${API_BASE_URL}/api/activities/${id}`);
     if (!res.ok) throw new Error('Failed to fetch activity detail');
     return res.json();
+  },
+
+  /**
+   * Mengambil daftar titik ekonomi (Menu Go & Properti Go) dari database & MAPID
+   */
+  async getEconomicPoints(type?: 'MENU_GO' | 'PROPERTI_GO' | 'ALL') {
+    try {
+      const query = new URLSearchParams();
+      if (type && type !== 'ALL') query.append('type', type);
+      const res = await fetch(`${API_BASE_URL}/api/economic-points?${query.toString()}`);
+      if (!res.ok) {
+        console.warn(`[api.getEconomicPoints] Server returned status ${res.status}`);
+        return { success: false, data: [] };
+      }
+      return await res.json();
+    } catch (err) {
+      console.warn('[api.getEconomicPoints] Network or service warning:', err);
+      return { success: false, data: [] };
+    }
   },
 
   /**
@@ -205,4 +226,33 @@ export const difaMapApi = {
     return res.json();
   },
 };
+
+/**
+ * Mengambil URL foto utama dengan memprioritaskan foto kamera survei asli
+ * dibanding tangkapan layar minimap MAPID (yang berakhiran .png atau mengandung _map_)
+ */
+export function getPrimaryPhotoUrl(mediaUrls?: string[] | null, fallback?: string): string {
+  if (!mediaUrls || mediaUrls.length === 0) {
+    return fallback || 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=160&q=80';
+  }
+  const realPhoto = mediaUrls.find((url) => !url.includes('_map_') && !url.toLowerCase().endsWith('.png'));
+  return realPhoto || mediaUrls[0];
+}
+
+/**
+ * Memisahkan mediaUrls menjadi { photos: string[], mapSnippets: string[] }
+ */
+export function categorizeMediaUrls(mediaUrls?: string[] | null): { photos: string[]; mapSnippets: string[] } {
+  if (!mediaUrls || mediaUrls.length === 0) return { photos: [], mapSnippets: [] };
+  const photos: string[] = [];
+  const mapSnippets: string[] = [];
+  for (const url of mediaUrls) {
+    if (url.includes('_map_') || url.toLowerCase().endsWith('.png')) {
+      mapSnippets.push(url);
+    } else {
+      photos.push(url);
+    }
+  }
+  return { photos, mapSnippets };
+}
 

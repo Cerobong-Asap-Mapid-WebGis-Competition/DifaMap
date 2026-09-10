@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Search,
   SlidersHorizontal,
@@ -10,11 +10,16 @@ import {
   Building,
   UtensilsCrossed,
   Activity,
-  MapPin
+  MapPin,
+  Layers,
+  Bus,
+  Star,
+  ChevronRight,
 } from 'lucide-react';
 import { SidebarMode } from './AppSidebar';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
-export type PublicSubMode = 'AKTIVITAS' | 'TEMPAT';
+export type PublicSubMode = 'AKTIVITAS' | 'TEMPAT' | 'NONE';
 export type UrbanPlannerFilter = 'PROPERTI_GO' | 'MENU_GO';
 
 interface TopSearchBarProps {
@@ -29,6 +34,11 @@ interface TopSearchBarProps {
   onOpenCreateModal: () => void;
   bufferRadius: number;
   onChangeBufferRadius: (radius: number) => void;
+  isBufferVisible?: boolean;
+  onToggleBufferVisible?: (visible: boolean) => void;
+  locations?: any[];
+  activities?: any[];
+  onSelectSuggestion?: (item: { type: 'LOCATION' | 'ACTIVITY'; data: any }) => void;
 }
 
 export default function TopSearchBar({
@@ -43,146 +53,476 @@ export default function TopSearchBar({
   onOpenCreateModal,
   bufferRadius,
   onChangeBufferRadius,
+  isBufferVisible = true,
+  onToggleBufferVisible,
+  locations = [],
+  activities = [],
+  onSelectSuggestion,
 }: TopSearchBarProps) {
+  const isMobile = useIsMobile(768);
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+  const [isInputFocused, setIsInputFocused] = useState(false);
+  const searchWrapperRef = useRef<HTMLDivElement>(null);
+
+  // Close suggestions when clicking outside or pressing Escape
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target as Node)) {
+        setIsInputFocused(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsInputFocused(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  // Filter dynamic suggestions based on user query
+  const suggestions = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase().trim();
+
+    const matchedLocs = locations
+      .filter((loc) =>
+        loc.name?.toLowerCase().includes(q) ||
+        loc.specificLocation?.toLowerCase().includes(q) ||
+        loc.category?.toLowerCase().includes(q)
+      )
+      .slice(0, 6)
+      .map((loc) => ({
+        type: 'LOCATION' as const,
+        id: loc.id,
+        name: loc.name,
+        subtitle: loc.specificLocation || 'Kota Makassar',
+        category: loc.category,
+        score: loc.overallScore,
+        entityType: loc.entityType,
+        coverImageUrl: loc.coverImageUrl,
+        data: loc,
+      }));
+
+    const matchedActs = activities
+      .filter((act) =>
+        act.title?.toLowerCase().includes(q) ||
+        act.specificLocation?.toLowerCase().includes(q) ||
+        act.description?.toLowerCase().includes(q)
+      )
+      .slice(0, 4)
+      .map((act) => ({
+        type: 'ACTIVITY' as const,
+        id: act.id,
+        name: act.title,
+        subtitle: act.specificLocation || 'Laporan Lapangan',
+        category: 'Laporan Komunitas',
+        score: act.aiScore,
+        coverImageUrl: act.mediaUrls?.[0],
+        data: act,
+      }));
+
+    return [...matchedLocs, ...matchedActs];
+  }, [searchQuery, locations, activities]);
+
+  // Helper function to highlight matched character sequences
+  const highlightMatch = (text: string, query: string) => {
+    if (!query || !text) return text;
+    const index = text.toLowerCase().indexOf(query.toLowerCase());
+    if (index === -1) return text;
+    const before = text.substring(0, index);
+    const match = text.substring(index, index + query.length);
+    const after = text.substring(index + query.length);
+    return (
+      <>
+        {before}
+        <span style={{ backgroundColor: '#FEF08A', color: '#854D0E', fontWeight: '700', borderRadius: '2px', padding: '0 2px' }}>
+          {match}
+        </span>
+        {after}
+      </>
+    );
+  };
+
+  // Helper function to render thematic icons for each place category
+  const renderItemIcon = (item: any) => {
+    if (item.type === 'ACTIVITY') {
+      return (
+        <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Activity size={18} color="#D97706" />
+        </div>
+      );
+    }
+    const cat = (item.category || '').toUpperCase();
+    if (item.entityType === 'TRANSIT_HUB' || cat.includes('BUS') || cat.includes('HALTE')) {
+      return (
+        <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#E0F2FE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Bus size={18} color="#0284C7" />
+        </div>
+      );
+    }
+    if (cat.includes('MALL') || cat.includes('PLAZA')) {
+      return (
+        <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#FFE4E6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Building size={18} color="#E11D48" />
+        </div>
+      );
+    }
+    if (cat.includes('HEALTH') || cat.includes('RS') || cat.includes('RUMAH SAKIT') || cat.includes('KLINIK')) {
+      return (
+        <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#D1FAE5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <MapPin size={18} color="#059669" />
+        </div>
+      );
+    }
+    return (
+      <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <MapPin size={18} color="#000000" />
+      </div>
+    );
+  };
 
   return (
     <header
       style={{
         position: 'fixed',
-        top: '24px',
-        left: '104px', // 80px sidebar + 24px gap
-        right: '24px',
+        top: isMobile ? '12px' : '24px',
+        left: isMobile ? '12px' : '104px',
+        right: isMobile ? '12px' : '24px',
         display: 'flex',
-        alignItems: 'center',
+        flexDirection: isMobile ? 'column' : 'row',
+        alignItems: isMobile ? 'stretch' : 'center',
         justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '16px',
+        gap: isMobile ? '8px' : '16px',
         zIndex: 30,
-        pointerEvents: 'none', // Allow clicking map through empty spaces
+        pointerEvents: 'none',
       }}
     >
-      {/* 1. Search Bar Container (464px) */}
+      {/* 1. Search Bar Wrapper with Autocomplete Dropdown */}
       <div
+        ref={searchWrapperRef}
         style={{
-          width: '464px',
+          position: 'relative',
+          width: isMobile ? '100%' : '464px',
           maxWidth: '100%',
-          height: '60px',
-          backgroundColor: '#FFFFFF',
-          borderRadius: '16px',
-          boxShadow: '0px 4px 14px rgba(0, 0, 0, 0.08)',
-          border: '1px solid rgba(0, 0, 0, 0.06)',
-          display: 'flex',
-          alignItems: 'center',
-          padding: '0 16px',
-          gap: '12px',
           pointerEvents: 'auto',
-          transition: 'box-shadow 0.2s ease',
         }}
       >
-        <Search size={22} color="#000000" style={{ flexShrink: 0 }} />
-
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder={
-            sidebarMode === 'PUBLIC'
-              ? publicSubMode === 'AKTIVITAS'
-                ? 'Cari laporan kondisi jalan, halte, trotoar...'
-                : 'Cari Halte Bus, RS Grestelina, Mall...'
-              : 'Cari titik analisis spasial (Halte / Hub)...'
-          }
+        <div
           style={{
-            flex: 1,
-            border: 'none',
-            outline: 'none',
-            fontFamily: 'inherit',
-            fontSize: '15px',
-            color: '#000000',
-            fontWeight: '500',
-            backgroundColor: 'transparent',
+            width: '100%',
+            height: isMobile ? '52px' : '60px',
+            backgroundColor: '#FFFFFF',
+            borderRadius: '16px',
+            boxShadow: isInputFocused ? '0px 8px 24px rgba(0, 0, 0, 0.12)' : '0px 4px 14px rgba(0, 0, 0, 0.08)',
+            border: isInputFocused ? '1.5px solid #FDC323' : '1px solid rgba(0, 0, 0, 0.06)',
+            display: 'flex',
+            alignItems: 'center',
+            padding: '0 16px',
+            gap: '12px',
+            transition: 'all 0.2s ease',
           }}
-        />
+        >
+          <Search size={22} color={isInputFocused ? '#000000' : '#767676'} style={{ flexShrink: 0 }} />
 
-        {searchQuery && (
+          <input
+            type="text"
+            value={searchQuery}
+            onFocus={() => setIsInputFocused(true)}
+            onChange={(e) => {
+              onSearchChange(e.target.value);
+              setIsInputFocused(true);
+            }}
+            placeholder={
+              sidebarMode === 'PUBLIC'
+                ? publicSubMode === 'AKTIVITAS'
+                  ? 'Cari laporan kondisi jalan, halte, trotoar...'
+                  : 'Cari Halte Bus, RS Grestelina, Mall...'
+                : 'Cari titik analisis spasial (Halte / Hub)...'
+            }
+            style={{
+              flex: 1,
+              border: 'none',
+              outline: 'none',
+              fontFamily: 'inherit',
+              fontSize: '16px', // 16px prevents iOS Safari auto-zoom & enhances elderly readability
+              color: '#000000',
+              fontWeight: '500',
+              backgroundColor: 'transparent',
+            }}
+          />
+
+          {searchQuery && (
+            <button
+              onClick={() => {
+                onSearchChange('');
+                setIsInputFocused(false);
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#767676',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <X size={18} />
+            </button>
+          )}
+
+          {/* Separator Line */}
+          <div style={{ width: '1px', height: '28px', backgroundColor: '#EFEFEF' }} />
+
+          {/* Filter / Category Quick Toggle */}
           <button
-            onClick={() => onSearchChange('')}
+            onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+            title="Opsi Filter"
             style={{
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
-              color: '#767676',
+              color: isFilterDropdownOpen ? '#FDC323' : '#539BA9',
               padding: '4px',
               display: 'flex',
               alignItems: 'center',
+              transition: 'color 0.2s ease',
             }}
           >
-            <X size={18} />
+            <SlidersHorizontal size={20} />
           </button>
+        </div>
+
+        {/* Autocomplete / Search Suggestions Dropdown */}
+        {isInputFocused && searchQuery.trim().length > 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              top: isMobile ? '58px' : '68px',
+              left: 0,
+              right: 0,
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              boxShadow: '0 14px 40px rgba(0, 0, 0, 0.18)',
+              border: '1px solid rgba(0, 0, 0, 0.08)',
+              overflow: 'hidden',
+              zIndex: 100,
+              maxHeight: isMobile ? '300px' : '380px',
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              display: 'flex',
+              flexDirection: 'column',
+              animation: 'fadeIn 0.15s ease-out',
+            }}
+          >
+            {/* Header / Counter */}
+            <div
+              style={{
+                padding: '10px 16px',
+                backgroundColor: '#F8FAFC',
+                borderBottom: '1px solid #E2E8F0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '12px',
+                fontWeight: '700',
+                color: '#64748B',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+              }}
+            >
+              <span>Hasil Pencarian Tempat ({suggestions.length})</span>
+              <span style={{ fontSize: '11px', fontWeight: '500', color: '#94A3B8' }}>Pilih untuk menuju ke lokasi</span>
+            </div>
+
+            {/* List of suggestions */}
+            {suggestions.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {suggestions.map((item) => (
+                  <div
+                    key={`${item.type}-${item.id}`}
+                    onClick={() => {
+                      onSearchChange(item.name);
+                      setIsInputFocused(false);
+                      if (onSelectSuggestion) {
+                        onSelectSuggestion({ type: item.type, data: item.data });
+                      }
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '12px 16px',
+                      borderBottom: '1px solid #F1F5F9',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.15s ease',
+                      backgroundColor: '#FFFFFF',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#F8FAFC';
+                      e.currentTarget.style.borderLeft = '3px solid #FDC323';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#FFFFFF';
+                      e.currentTarget.style.borderLeft = 'none';
+                    }}
+                  >
+                    {/* Thematic Category Icon */}
+                    {renderItemIcon(item)}
+
+                    {/* Title and Subtitle */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: '14px',
+                          fontWeight: '700',
+                          color: '#0F172A',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {highlightMatch(item.name, searchQuery)}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '12px',
+                          color: '#64748B',
+                          marginTop: '2px',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {item.subtitle}
+                      </div>
+                    </div>
+
+                    {/* Right side: Rating & Type Badge */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                      {item.score && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            color: '#0F172A',
+                            backgroundColor: '#FEF9C3',
+                            padding: '2px 6px',
+                            borderRadius: '6px',
+                          }}
+                        >
+                          <Star size={12} fill="#FACC15" color="#EAB308" />
+                          <span>{Number(item.score).toFixed(1)}</span>
+                        </div>
+                      )}
+
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                          backgroundColor: item.type === 'LOCATION' ? '#EBF5F7' : '#FEF3C7',
+                          color: item.type === 'LOCATION' ? '#0E7490' : '#B45309',
+                        }}
+                      >
+                        {item.type === 'LOCATION' ? 'Tempat' : 'Aktivitas'}
+                      </span>
+
+                      <ChevronRight size={16} color="#CBD5E1" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div
+                style={{
+                  padding: '28px 20px',
+                  textAlign: 'center',
+                  color: '#64748B',
+                  fontSize: '13.5px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <div style={{ fontSize: '20px' }}>🔍</div>
+                <div style={{ fontWeight: '600', color: '#1E293B' }}>Tidak ada tempat yang cocok</div>
+                <div style={{ fontSize: '12px', color: '#94A3B8' }}>
+                  Tidak ditemukan hasil untuk &ldquo;{searchQuery}&rdquo;. Coba kata kunci lain seperti halte, mall, atau rumah sakit.
+                </div>
+              </div>
+            )}
+          </div>
         )}
-
-        {/* Separator Line */}
-        <div style={{ width: '1px', height: '28px', backgroundColor: '#EFEFEF' }} />
-
-        {/* Filter / Category Quick Toggle */}
-        <button
-          onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-          title="Opsi Filter"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            color: isFilterDropdownOpen ? '#FDC323' : '#539BA9',
-            padding: '4px',
-            display: 'flex',
-            alignItems: 'center',
-            transition: 'color 0.2s ease',
-          }}
-        >
-          <SlidersHorizontal size={20} />
-        </button>
       </div>
 
-      {/* 2. Floating Filter & Action Tabs (Right Side) */}
+      {/* 2. Floating Filter & Action Tabs */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '12px',
+          gap: isMobile ? '8px' : '12px',
           pointerEvents: 'auto',
-          flexWrap: 'wrap',
+          overflowX: isMobile ? 'auto' : 'visible',
+          flexWrap: isMobile ? 'nowrap' : 'wrap',
+          paddingBottom: isMobile ? '4px' : '0px',
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'none',
+          maxWidth: '100%',
         }}
       >
-        {/* PUBLIC MODE (Aktivitas & Tempat Tabs inside the same public sidebar mode) */}
+        {/* PUBLIC MODE (Aktivitas & Tempat Quick Toggles) */}
         {sidebarMode === 'PUBLIC' ? (
           <>
-            {/* Tab: Aktivitas */}
-            <button
-              onClick={() => onSelectPublicSubMode('AKTIVITAS')}
-              className={publicSubMode === 'AKTIVITAS' ? 'btn-yellow-pill' : 'btn-white-pill'}
-              style={{
-                backgroundColor: publicSubMode === 'AKTIVITAS' ? '#FDC323' : '#FFFFFF',
-              }}
-            >
-              <Activity size={18} strokeWidth={2.4} />
-              <span>Aktivitas</span>
-            </button>
-
             {/* Tab: Tempat */}
             <button
-              onClick={() => onSelectPublicSubMode('TEMPAT')}
+              onClick={() => onSelectPublicSubMode(publicSubMode === 'TEMPAT' ? 'NONE' : 'TEMPAT')}
               className={publicSubMode === 'TEMPAT' ? 'btn-yellow-pill' : 'btn-white-pill'}
               style={{
                 backgroundColor: publicSubMode === 'TEMPAT' ? '#FDC323' : '#FFFFFF',
+                height: isMobile ? '42px' : '48px',
+                padding: isMobile ? '0 14px' : '0 24px',
+                fontSize: isMobile ? '14px' : '15px',
+                fontWeight: '700',
+                flexShrink: 0,
               }}
+              title="Tampilkan Titik Tempat"
             >
               <Building size={18} strokeWidth={2.4} />
               <span>Tempat</span>
             </button>
+
+            {/* Tab: Aktivitas */}
+            <button
+              onClick={() => onSelectPublicSubMode(publicSubMode === 'AKTIVITAS' ? 'NONE' : 'AKTIVITAS')}
+              className={publicSubMode === 'AKTIVITAS' ? 'btn-yellow-pill' : 'btn-white-pill'}
+              style={{
+                backgroundColor: publicSubMode === 'AKTIVITAS' ? '#FDC323' : '#FFFFFF',
+                height: isMobile ? '42px' : '48px',
+                padding: isMobile ? '0 14px' : '0 24px',
+                fontSize: isMobile ? '14px' : '15px',
+                fontWeight: '700',
+                flexShrink: 0,
+              }}
+              title="Tampilkan Laporan Aktivitas"
+            >
+              <Activity size={18} strokeWidth={2.4} />
+              <span>Aktivitas</span>
+            </button>
           </>
         ) : (
-          /* URBAN PLANNER MODE (Properti Go & Menu Go Tabs + Radius) */
+          /* URBAN PLANNER MODE (Properti Go & Menu Go Tabs) */
           <>
             {/* Tab: Properti Go */}
             <button
@@ -190,6 +530,11 @@ export default function TopSearchBar({
               className={urbanFilter === 'PROPERTI_GO' ? 'btn-yellow-pill' : 'btn-white-pill'}
               style={{
                 backgroundColor: urbanFilter === 'PROPERTI_GO' ? '#FDC323' : '#FFFFFF',
+                height: isMobile ? '42px' : '48px',
+                padding: isMobile ? '0 14px' : '0 24px',
+                fontSize: isMobile ? '14px' : '15px',
+                fontWeight: '700',
+                flexShrink: 0,
               }}
             >
               <Building size={18} strokeWidth={2.4} />
@@ -202,61 +547,37 @@ export default function TopSearchBar({
               className={urbanFilter === 'MENU_GO' ? 'btn-yellow-pill' : 'btn-white-pill'}
               style={{
                 backgroundColor: urbanFilter === 'MENU_GO' ? '#FDC323' : '#FFFFFF',
+                height: isMobile ? '42px' : '48px',
+                padding: isMobile ? '0 14px' : '0 24px',
+                fontSize: isMobile ? '14px' : '15px',
+                fontWeight: '700',
+                flexShrink: 0,
               }}
             >
               <UtensilsCrossed size={18} strokeWidth={2.4} />
               <span>Menu Go</span>
             </button>
-
-            {/* Radius Buffer Selector */}
-            <div
-              style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: '50px',
-                height: '48px',
-                padding: '0 16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                boxShadow: 'var(--shadow-md)',
-                fontSize: '13px',
-                fontWeight: '600',
-              }}
-            >
-              <span style={{ color: '#767676' }}>Radius:</span>
-              {[300, 500].map((r) => (
-                <button
-                  key={r}
-                  onClick={() => onChangeBufferRadius(r)}
-                  style={{
-                    backgroundColor: bufferRadius === r ? '#539BA9' : 'transparent',
-                    color: bufferRadius === r ? '#FFFFFF' : '#000000',
-                    border: 'none',
-                    borderRadius: '20px',
-                    padding: '4px 10px',
-                    cursor: 'pointer',
-                    fontWeight: bufferRadius === r ? '700' : '500',
-                    fontSize: '12px',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {r}m
-                </button>
-              ))}
-            </div>
           </>
         )}
 
-        {/* 3. AI Sparkle Bot Trigger Button (garden:bot-sparkle-fill-16) */}
+        {/* 3. AI Assistant Trigger Button */}
         <button
           onClick={onOpenAiAssistant}
-          className="btn-circle-action"
+          className={isMobile ? 'btn-white-pill' : 'btn-circle-action'}
           title="Tanya Asisten AI DifaMap (Spatial RAG & SINI AI)"
           style={{
             position: 'relative',
+            height: isMobile ? '42px' : '48px',
+            padding: isMobile ? '0 14px' : undefined,
+            backgroundColor: '#FFFFFF',
+            flexShrink: 0,
+            fontSize: isMobile ? '14px' : undefined,
+            fontWeight: '700',
+            border: isMobile ? '1px solid rgba(0,0,0,0.08)' : undefined,
           }}
         >
-          <Sparkles size={22} color="#000000" />
+          <Sparkles size={isMobile ? 18 : 22} color="#D97706" />
+          {isMobile && <span>Tanya AI</span>}
           <span
             style={{
               position: 'absolute',
@@ -276,11 +597,15 @@ export default function TopSearchBar({
           className="btn-yellow-pill"
           title="Laporkan Aksesibilitas Baru"
           style={{
-            padding: '0 20px',
+            height: isMobile ? '42px' : '48px',
+            padding: isMobile ? '0 14px' : '0 20px',
+            fontSize: isMobile ? '14px' : '15px',
+            fontWeight: '700',
+            flexShrink: 0,
           }}
         >
           <Plus size={18} strokeWidth={3} />
-          <span>Bagikan Laporan</span>
+          <span>{isMobile ? 'Lapor' : 'Bagikan Laporan'}</span>
         </button>
       </div>
     </header>

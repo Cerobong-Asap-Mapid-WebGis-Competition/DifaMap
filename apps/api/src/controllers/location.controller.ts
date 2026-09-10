@@ -116,7 +116,7 @@ export async function getLocationsController(req: Request, res: Response): Promi
       ];
     }
 
-    const take = Math.min(100, Math.max(1, parseInt(limit as string, 10) || 50));
+    const take = Math.min(500, Math.max(1, parseInt(limit as string, 10) || 150));
     const skip = (Math.max(1, parseInt(page as string, 10) || 1) - 1) * take;
 
     const validSortFields = ['overallScore', 'physicalScore', 'safetyScore', 'priorityIndex', 'createdAt', 'name'];

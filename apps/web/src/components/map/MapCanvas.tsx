@@ -4,11 +4,12 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import * as turf from '@turf/turf';
-import { difaMapApi } from '../../lib/api';
+import { difaMapApi, getPrimaryPhotoUrl } from '../../lib/api';
 import { UrbanPlannerFilter, PublicSubMode } from '../layout/TopSearchBar';
 import { MapPin, Layers } from 'lucide-react';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
-export type MapDisplayMode = 'AKTIVITAS' | 'TEMPAT' | 'URBAN_PLANNER';
+export type MapDisplayMode = 'AKTIVITAS' | 'TEMPAT' | 'URBAN_PLANNER' | 'NONE';
 
 interface MapCanvasProps {
   locations?: any[];
@@ -17,6 +18,7 @@ interface MapCanvasProps {
   currentMode: MapDisplayMode;
   urbanFilter?: UrbanPlannerFilter;
   bufferRadius?: number;
+  isBufferVisible?: boolean;
   selectedLocationId?: string;
   selectedActivityId?: string;
   isSiniGridVisible?: boolean;
@@ -25,6 +27,7 @@ interface MapCanvasProps {
   onSelectLocation?: (location: any) => void;
   onSelectActivity?: (activity: any) => void;
   onPickCoordinate?: (coord: { latitude: number; longitude: number }) => void;
+  onMapClick?: () => void;
   isPickingLocation?: boolean;
 }
 
@@ -35,6 +38,7 @@ export default function MapCanvas({
   currentMode,
   urbanFilter = 'PROPERTI_GO',
   bufferRadius = 500,
+  isBufferVisible = true,
   selectedLocationId,
   selectedActivityId,
   isSiniGridVisible = false,
@@ -43,13 +47,24 @@ export default function MapCanvas({
   onSelectLocation,
   onSelectActivity,
   onPickCoordinate,
+  onMapClick,
   isPickingLocation = false,
 }: MapCanvasProps) {
+  const isMobile = useIsMobile(768);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
-  const [styleId, setStyleId] = useState<string>('dark');
+  const [styleId, setStyleId] = useState<string>(process.env.NEXT_PUBLIC_MAPID_STYLE_ID || 'basic');
+
+  const onMapClickRef = useRef(onMapClick);
+  onMapClickRef.current = onMapClick;
+
+  const onPickCoordinateRef = useRef(onPickCoordinate);
+  onPickCoordinateRef.current = onPickCoordinate;
+
+  const isPickingLocationRef = useRef(isPickingLocation);
+  isPickingLocationRef.current = isPickingLocation;
 
   // Helper untuk mendaftarkan semua GeoJSON sources dan layers custom (Buffer, SINI Grid, Isochrone)
   const setupCustomLayers = useCallback((map: maplibregl.Map) => {
@@ -174,7 +189,7 @@ export default function MapCanvas({
       ],
     };
 
-    const styleUrl = difaMapApi.getMapStyleUrl(styleId);
+    const styleUrl = styleId === 'osm' ? fallbackStyle : difaMapApi.getMapStyleUrl(styleId);
 
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
@@ -185,16 +200,44 @@ export default function MapCanvas({
       bearing: -5,
     });
 
-    // Pasang error handler untuk fallback style jika backend proxy/MAPID offline
-    map.on('error', (e) => {
-      if (e.error && (e.error as any).status === 502) {
+    let hasFallenBack = false;
+    const triggerFallback = () => {
+      if (hasFallenBack) return;
+      hasFallenBack = true;
+      console.warn('[MapCanvas] MAPID basemap service slow or errored; gracefully falling back to OpenStreetMap standard tiles.');
+      try {
         map.setStyle(fallbackStyle);
+      } catch (err) {
+        console.error('[MapCanvas] Failed to set fallback style:', err);
+      }
+    };
+
+    // Pasang error handler untuk fallback style jika backend proxy/MAPID offline atau tiles error
+    map.on('error', (e) => {
+      const errStatus = e.error && (e.error as any).status;
+      if (errStatus === 502 || errStatus === 500 || errStatus === 401 || errStatus === 403) {
+        triggerFallback();
       }
     });
 
+    // Timeout safety net: jika dalam 4 detik peta belum berhasil memuat style (misal MAPID timeout), auto-fallback
+    const timeoutId = setTimeout(() => {
+      if (!map.isStyleLoaded()) {
+        triggerFallback();
+      }
+    }, 4000);
+
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
+    map.addControl(
+      new maplibregl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true },
+        trackUserLocation: true,
+      }),
+      'bottom-right'
+    );
 
     map.on('load', () => {
+      clearTimeout(timeoutId);
       setIsMapLoaded(true);
       setupCustomLayers(map);
     });
@@ -205,18 +248,45 @@ export default function MapCanvas({
     });
 
     map.on('click', (e: any) => {
-      if (onPickCoordinate && e.lngLat) {
-        onPickCoordinate({ latitude: e.lngLat.lat, longitude: e.lngLat.lng });
+      if (isPickingLocationRef.current && onPickCoordinateRef.current && e.lngLat) {
+        onPickCoordinateRef.current({ latitude: e.lngLat.lat, longitude: e.lngLat.lng });
+      } else if (onMapClickRef.current) {
+        onMapClickRef.current();
       }
     });
 
     mapRef.current = map;
 
     return () => {
+      clearTimeout(timeoutId);
       map.remove();
       mapRef.current = null;
     };
-  }, [setupCustomLayers]);
+  }, [setupCustomLayers, styleId]);
+
+  // Auto-fly map to selected location or activity (termasuk saat dipilih dari autocomplete search)
+  useEffect(() => {
+    if (!mapRef.current || !isMapLoaded) return;
+    if (selectedLocationId) {
+      const loc = locations.find((l) => l.id === selectedLocationId);
+      if (loc && typeof loc.longitude === 'number' && typeof loc.latitude === 'number') {
+        mapRef.current.flyTo({
+          center: [loc.longitude, loc.latitude],
+          zoom: 16.5,
+          duration: 900,
+        });
+      }
+    } else if (selectedActivityId) {
+      const act = activities.find((a) => a.id === selectedActivityId);
+      if (act && typeof act.longitude === 'number' && typeof act.latitude === 'number') {
+        mapRef.current.flyTo({
+          center: [act.longitude, act.latitude],
+          zoom: 16,
+          duration: 900,
+        });
+      }
+    }
+  }, [selectedLocationId, selectedActivityId, isMapLoaded, locations, activities]);
 
   // 2. Render Markers Berdasarkan Mode (Aktivitas vs Tempat vs Urban Planner)
   useEffect(() => {
@@ -226,20 +296,22 @@ export default function MapCanvas({
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
 
-    // =========================================================================
-    // MODE 1: AKTIVITAS (Render Polaroid Photo Markers - Single & Multi-card)
-    // =========================================================================
-    if (currentMode === 'AKTIVITAS') {
-      activities.forEach((act, index) => {
+    const actsToRender = currentMode === 'AKTIVITAS'
+      ? activities
+      : (currentMode === 'NONE' && selectedActivityId
+          ? activities.filter((a) => a.id === selectedActivityId)
+          : []);
+
+    if (actsToRender.length > 0) {
+      actsToRender.forEach((act, index) => {
         const el = document.createElement('div');
         el.className = 'polaroid-pin-wrapper';
 
         const isSelected = act.id === selectedActivityId;
-        const photoUrl = act.mediaUrls && act.mediaUrls[0]
-          ? act.mediaUrls[0]
-          : 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=160&q=80';
-
-        const isMultiCard = index % 2 === 1; // Alternating multi-photo badge for visual richness
+        const photoUrl = getPrimaryPhotoUrl(act.mediaUrls);
+        const hasMultiple = Boolean(act.mediaUrls && act.mediaUrls.length > 1);
+        const secondPhotoUrl = hasMultiple && act.mediaUrls[1] ? act.mediaUrls[1] : photoUrl;
+        const isMultiCard = hasMultiple || index % 2 === 1; // Show stacked polaroid if multiple photos
 
         el.innerHTML = `
           <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
@@ -257,7 +329,7 @@ export default function MapCanvas({
                 transform: rotate(-8deg);
                 z-index: 1;
               ">
-                <img src="${photoUrl}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px; filter: grayscale(20%);" />
+                <img src="${secondPhotoUrl}" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=160&q=80';" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px; filter: grayscale(20%);" />
               </div>
             ` : ''}
 
@@ -276,7 +348,7 @@ export default function MapCanvas({
               transform: ${isSelected ? 'scale(1.15) rotate(0deg)' : 'rotate(3deg)'};
               transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
             ">
-              <img src="${photoUrl}" style="width: 100%; height: 75%; object-fit: cover; border-radius: 3px;" />
+              <img src="${photoUrl}" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=160&q=80';" style="width: 100%; height: 75%; object-fit: cover; border-radius: 3px;" />
               <div style="
                 width: 100%;
                 height: 25%;
@@ -325,40 +397,46 @@ export default function MapCanvas({
 
     // =========================================================================
     // MODE 2: TEMPAT (Render Place & Transit Hub Location Pins)
-    // =========================================================================
-    if (currentMode === 'TEMPAT') {
-      locations.forEach((loc) => {
+    const locsToRender = currentMode === 'TEMPAT'
+      ? locations
+      : (currentMode === 'NONE' && selectedLocationId
+          ? locations.filter((l) => l.id === selectedLocationId)
+          : []);
+
+    if (locsToRender.length > 0) {
+      locsToRender.forEach((loc) => {
         const el = document.createElement('div');
         el.className = 'place-pin-wrapper';
 
         const isSelected = loc.id === selectedLocationId;
         const isTransit = loc.entityType === 'TRANSIT_HUB' || loc.category === 'BUS_STOP';
 
-        el.innerHTML = `
+        el.innerHTML = isSelected ? `
           <div style="
             display: flex;
             flex-direction: column;
             align-items: center;
             cursor: pointer;
+            transform: scale(1.15);
+            transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            filter: drop-shadow(0 6px 14px rgba(0,0,0,0.4));
           ">
             <div style="
-              background: ${isSelected ? '#FDC323' : '#151515'};
-              color: ${isSelected ? '#000000' : '#FFFFFF'};
+              background: #FDC323;
+              color: #000000;
               border: 2px solid #FFFFFF;
-              padding: 6px 10px;
+              padding: 6px 12px;
               border-radius: 20px;
               display: flex;
               align-items: center;
               gap: 6px;
               font-size: 12px;
-              font-weight: 700;
-              box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-              transform: ${isSelected ? 'scale(1.15)' : 'scale(1)'};
-              transition: all 0.2s ease;
+              font-weight: 800;
+              white-space: nowrap;
             ">
               <span>${isTransit ? '🚏' : '🏢'}</span>
               <span>${loc.name}</span>
-              <span style="color: ${isSelected ? '#000000' : '#FDC323'}">${loc.overallScore ? loc.overallScore.toFixed(1) : '4.0'}★</span>
+              <span style="color: #000000">${loc.overallScore ? loc.overallScore.toFixed(1) : '4.0'}★</span>
             </div>
             
             <div style="
@@ -366,9 +444,23 @@ export default function MapCanvas({
               height: 0;
               border-left: 6px solid transparent;
               border-right: 6px solid transparent;
-              border-top: 8px solid ${isSelected ? '#FDC323' : '#151515'};
+              border-top: 8px solid #FDC323;
               margin-top: -2px;
             "></div>
+          </div>
+        ` : `
+          <div style="
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: transform 0.15s ease;
+            filter: drop-shadow(0 2px 5px rgba(0,0,0,0.35));
+          " onmouseenter="this.style.transform='scale(1.2) translateY(-2px)'" onmouseleave="this.style.transform='scale(1) translateY(0)'" title="${loc.name}">
+            <svg width="24" height="32" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 0C5.373 0 0 5.373 0 12C0 20.5 10.5 30.75 11.08 31.33C11.58 31.83 12.42 31.83 12.92 31.33C13.5 30.75 24 20.5 24 12C24 5.373 18.627 0 12 0Z" fill="#000000"/>
+              <circle cx="12" cy="11" r="4.2" fill="#FFFFFF"/>
+            </svg>
           </div>
         `;
 
@@ -382,7 +474,7 @@ export default function MapCanvas({
           });
         });
 
-        const marker = new maplibregl.Marker({ element: el })
+        const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
           .setLngLat([loc.longitude, loc.latitude])
           .addTo(mapRef.current!);
 
@@ -391,89 +483,77 @@ export default function MapCanvas({
     }
 
     // =========================================================================
-    // MODE 3: URBAN PLANNER (Render Buffer Catchment & Economic POIs)
+    // MODE 3: URBAN PLANNER (Render Khusus Titik Properti Go & Menu Go Saja)
     // =========================================================================
     if (currentMode === 'URBAN_PLANNER') {
-      const targetLoc = locations.find((l) => l.id === selectedLocationId) || locations[0];
-
-      if (targetLoc && mapRef.current) {
-        // 1. Draw Turf Circle Buffer on MapLibre Layer
-        const center = [targetLoc.longitude, targetLoc.latitude];
-        const circlePolygon = turf.circle(center, bufferRadius / 1000, {
-          steps: 64,
-          units: 'kilometers',
-        });
-
-        const source = mapRef.current.getSource('buffer-source') as maplibregl.GeoJSONSource;
-        if (source) {
-          source.setData({
-            type: 'FeatureCollection',
-            features: [circlePolygon],
-          });
-        }
-
-        // 2. Render Target Transit Hub Pin
-        const hubEl = document.createElement('div');
-        hubEl.innerHTML = `
-          <div style="
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: #151515;
-            border: 3px solid #FFFFFF;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 14px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-            cursor: pointer;
-          ">
-            🚏
-          </div>
-        `;
-        hubEl.addEventListener('click', () => {
-          if (onSelectLocation) onSelectLocation(targetLoc);
-        });
-
-        const hubMarker = new maplibregl.Marker({ element: hubEl })
-          .setLngLat([targetLoc.longitude, targetLoc.latitude])
-          .addTo(mapRef.current);
-
-        markersRef.current.push(hubMarker);
-
-        // 3. Render Economic Points (Menu Go or Properti Go POIs)
-        economicPoints.forEach((pt) => {
-          const ptEl = document.createElement('div');
-          const isMenuGo = pt.type === 'MENU_GO';
-
-          // Filter by active tab
-          if (urbanFilter === 'MENU_GO' && !isMenuGo) return;
-          if (urbanFilter === 'PROPERTI_GO' && isMenuGo) return;
-
-          ptEl.innerHTML = `
-            <div style="
-              background: ${isMenuGo ? '#FDC323' : '#539BA9'};
-              color: ${isMenuGo ? '#000000' : '#FFFFFF'};
-              border: 1.5px solid #FFFFFF;
-              padding: 3px 8px;
-              border-radius: 12px;
-              font-size: 11px;
-              font-weight: 700;
-              box-shadow: 0 2px 8px rgba(0,0,0,0.25);
-              cursor: pointer;
-            ">
-              ${isMenuGo ? '🍴' : '🏢'} ${pt.name}
-            </div>
-          `;
-
-          const ptMarker = new maplibregl.Marker({ element: ptEl })
-            .setLngLat([pt.longitude, pt.latitude])
-            .addTo(mapRef.current!);
-
-          markersRef.current.push(ptMarker);
+      // Bersihkan source buffer agar tidak ada lingkaran tersisa
+      const source = mapRef.current?.getSource('buffer-source') as maplibregl.GeoJSONSource;
+      if (source) {
+        source.setData({
+          type: 'FeatureCollection',
+          features: [],
         });
       }
+
+      // Render HANYA Economic Points sesuai tab aktif (Properti Go / Menu Go)
+      economicPoints.forEach((pt) => {
+        const isMenuGo = pt.type === 'MENU_GO';
+
+        // Filter ketat sesuai tab yang dipilih
+        if (urbanFilter === 'MENU_GO' && !isMenuGo) return;
+        if (urbanFilter === 'PROPERTI_GO' && isMenuGo) return;
+
+        const ptEl = document.createElement('div');
+        ptEl.className = 'economic-poi-wrapper';
+
+        ptEl.innerHTML = `
+          <div style="
+            background: ${isMenuGo ? '#FDC323' : '#539BA9'};
+            color: ${isMenuGo ? '#000000' : '#FFFFFF'};
+            border: 2px solid #FFFFFF;
+            padding: 5px 11px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+            cursor: pointer;
+            transition: transform 0.15s ease;
+          " onmouseenter="this.style.transform='scale(1.1)'" onmouseleave="this.style.transform='scale(1)'">
+            <span>${isMenuGo ? '🍴' : '🏢'}</span>
+            <span>${pt.name}</span>
+          </div>
+        `;
+
+        ptEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (onSelectLocation) {
+            onSelectLocation({
+              id: pt.id,
+              name: pt.name,
+              specificLocation: pt.address || 'Kawasan Kota Makassar',
+              category: isMenuGo ? 'Kuliner & UMKM (Menu Go)' : 'Properti & Hunian (Properti Go)',
+              latitude: pt.latitude,
+              longitude: pt.longitude,
+              overallScore: 4.5,
+              description: pt.description || (isMenuGo ? 'Titik kuliner & sentra ekonomi UMKM terverifikasi MAPID.' : 'Titik kawasan properti dan hunian terverifikasi MAPID.'),
+            });
+          }
+          mapRef.current?.flyTo({
+            center: [pt.longitude, pt.latitude],
+            zoom: 16,
+            duration: 900,
+          });
+        });
+
+        const ptMarker = new maplibregl.Marker({ element: ptEl })
+          .setLngLat([pt.longitude, pt.latitude])
+          .addTo(mapRef.current!);
+
+        markersRef.current.push(ptMarker);
+      });
     } else {
       const source = mapRef.current?.getSource('buffer-source') as maplibregl.GeoJSONSource;
       if (source) {
@@ -511,6 +591,7 @@ export default function MapCanvas({
     currentMode,
     urbanFilter,
     bufferRadius,
+    isBufferVisible,
     selectedLocationId,
     selectedActivityId,
     isSiniGridVisible,
@@ -548,29 +629,53 @@ export default function MapCanvas({
       <div
         style={{
           position: 'absolute',
-          bottom: '24px',
-          right: '72px', // Next to navigation control
+          bottom: isMobile ? '80px' : '24px',
+          right: isMobile ? '12px' : '72px',
           zIndex: 20,
           backgroundColor: '#FFFFFF',
           borderRadius: '24px',
-          padding: '6px 14px',
+          padding: isMobile ? '8px 14px' : '6px 14px',
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-          fontSize: '12px',
+          boxShadow: '0 4px 14px rgba(0, 0, 0, 0.15)',
+          fontSize: '13px',
           fontWeight: '600',
         }}
       >
-        <Layers size={15} color="#539BA9" />
-        <span style={{ color: '#767676' }}>Gaya:</span>
+        <Layers size={16} color="#539BA9" />
+        <span style={{ color: '#64748B' }}>Gaya:</span>
         <select
           value={styleId}
           onChange={(e) => {
             const nextStyle = e.target.value;
             setStyleId(nextStyle);
             if (mapRef.current) {
-              mapRef.current.setStyle(difaMapApi.getMapStyleUrl(nextStyle));
+              if (nextStyle === 'osm') {
+                mapRef.current.setStyle({
+                  version: 8,
+                  name: 'OpenStreetMap Standard',
+                  sources: {
+                    osm: {
+                      type: 'raster',
+                      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                      tileSize: 256,
+                      attribution: '&copy; OpenStreetMap contributors',
+                    },
+                  },
+                  layers: [
+                    {
+                      id: 'osm-layer',
+                      type: 'raster',
+                      source: 'osm',
+                      minzoom: 0,
+                      maxzoom: 19,
+                    },
+                  ],
+                } as any);
+              } else {
+                mapRef.current.setStyle(difaMapApi.getMapStyleUrl(nextStyle));
+              }
             }
           }}
           style={{
@@ -578,14 +683,16 @@ export default function MapCanvas({
             outline: 'none',
             backgroundColor: 'transparent',
             fontWeight: '700',
-            fontSize: '12px',
+            fontSize: '13px',
             color: '#000000',
             cursor: 'pointer',
           }}
         >
-          <option value="dark">Dark Mode (MAPID)</option>
+          <option value="basic">Street 3D / Basic (MAPID)</option>
           <option value="light">Street Light (MAPID)</option>
+          <option value="dark">Dark Mode (MAPID)</option>
           <option value="satellite">Satelit (MAPID)</option>
+          <option value="osm">OpenStreetMap (Cepat)</option>
         </select>
       </div>
 
@@ -594,7 +701,7 @@ export default function MapCanvas({
         <div
           style={{
             position: 'absolute',
-            bottom: '32px',
+            bottom: isMobile ? '82px' : '32px',
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 30,
@@ -603,11 +710,13 @@ export default function MapCanvas({
             padding: '10px 20px',
             borderRadius: '50px',
             fontWeight: '700',
-            fontSize: '14px',
+            fontSize: isMobile ? '13px' : '14px',
             boxShadow: '0 6px 20px rgba(253, 195, 35, 0.5)',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
+            maxWidth: '90vw',
+            textAlign: 'center',
             animation: 'pulse 2s infinite',
           }}
         >

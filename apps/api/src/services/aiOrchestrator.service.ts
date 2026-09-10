@@ -243,17 +243,21 @@ ${JSON.stringify(recentActivitiesContext, null, 2)}
 
 Buatkan deskripsi ringkas poin-poin aksesibilitas terkini (maksimal 3-4 kalimat padat dalam bahasa Indonesia) serta daftar poin kekuatan dan rintangan untuk disabilitas fisik/sensorik.
 
+PENTING: field "communityObserved" di bawah adalah CATATAN LAPORAN KOMUNITAS, bukan status resmi lokasi. Isi apa adanya sesuai yang dilaporkan pengguna, dan gunakan "TIDAK_DISEBUT" bila laporan tidak menyinggung parameter tersebut. Jangan menebak.
+
 Keluarkan JSON format:
 {
   "summary": string,
   "keyPoints": string[],
   "strengths": string[],
   "barriers": string[],
-  "latestRampStatus": "GOOD" | "DAMAGED" | "NONE",
-  "latestGuidingBlockStatus": "GOOD" | "DAMAGED" | "NONE",
-  "latestSidewalkCondition": "GOOD" | "NARROW" | "DAMAGED" | "BLOCKED" | "NOT_APPLICABLE",
-  "latestLightingLevel": "BRIGHT" | "DIM" | "DARK",
-  "latestToiletAccessibility": "AVAILABLE_GOOD" | "AVAILABLE_DAMAGED" | "NOT_AVAILABLE"
+  "communityObserved": {
+    "rampStatus": "GOOD" | "DAMAGED" | "NONE" | "TIDAK_DISEBUT",
+    "guidingBlockStatus": "GOOD" | "DAMAGED" | "NONE" | "TIDAK_DISEBUT",
+    "sidewalkCondition": "GOOD" | "NARROW" | "DAMAGED" | "BLOCKED" | "TIDAK_DISEBUT",
+    "lightingLevel": "BRIGHT" | "DIM" | "DARK" | "TIDAK_DISEBUT",
+    "toiletAccessibility": "AVAILABLE_GOOD" | "AVAILABLE_DAMAGED" | "NOT_AVAILABLE" | "TIDAK_DISEBUT"
+  }
 }
 `;
 
@@ -271,23 +275,20 @@ Keluarkan JSON format:
     if (raw) {
       const parsed = JSON.parse(raw);
 
+      // Hanya kolom naratif. Skor resmi dan status fasilitas survei tetap terjaga.
+      // communityScore dan communityReportCount dihitung otomatis oleh trigger database.
       await prisma.location.update({
         where: { id: locationId },
         data: {
-          overallScore: parseFloat(avgScore.toFixed(1)),
           aiSummary: parsed.summary || location.aiSummary,
           aiInsights: {
             keyPoints: parsed.keyPoints || [],
             strengths: parsed.strengths || [],
             barriers: parsed.barriers || [],
+            communityObserved: parsed.communityObserved || null,
+            basedOnActivityCount: location.activities.length,
             updatedAt: new Date().toISOString(),
           },
-          rampStatus: parsed.latestRampStatus || location.rampStatus,
-          guidingBlockStatus: parsed.latestGuidingBlockStatus || location.guidingBlockStatus,
-          sidewalkCondition: parsed.latestSidewalkCondition || location.sidewalkCondition,
-          lightingLevel: parsed.latestLightingLevel || location.lightingLevel,
-          toiletAccessibility: parsed.latestToiletAccessibility || location.toiletAccessibility,
-          totalActivities: location.activities.length,
         },
       });
     }

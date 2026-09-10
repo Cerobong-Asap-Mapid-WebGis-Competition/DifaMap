@@ -13,6 +13,7 @@ import {
   Accessibility
 } from 'lucide-react';
 import { difaMapApi, CreateActivityPayload } from '../../lib/api';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 interface CreateActivityModalProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ export default function CreateActivityModal({
   onStartPickCoordinate,
   onSuccessCreated,
 }: CreateActivityModalProps) {
+  const isMobile = useIsMobile(768);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [specificLocation, setSpecificLocation] = useState('');
@@ -36,10 +38,10 @@ export default function CreateActivityModal({
   const [authorName, setAuthorName] = useState('');
   
   // Physical Observed Hints
-  const [rampStatus, setRampStatus] = useState<'GOOD' | 'DAMAGED' | 'NONE'>('DAMAGED');
-  const [guidingBlockStatus, setGuidingBlockStatus] = useState<'GOOD' | 'DAMAGED' | 'NONE'>('DAMAGED');
-  const [lightingLevel, setLightingLevel] = useState<'BRIGHT' | 'DIM' | 'DARK'>('BRIGHT');
-  const [sidewalkCondition, setSidewalkCondition] = useState<'GOOD' | 'NARROW' | 'DAMAGED' | 'BLOCKED'>('DAMAGED');
+  const [rampStatus, setRampStatus] = useState<'GOOD' | 'DAMAGED' | 'NONE' | 'NOT_VISIBLE'>('NOT_VISIBLE');
+  const [guidingBlockStatus, setGuidingBlockStatus] = useState<'GOOD' | 'DAMAGED' | 'NONE' | 'NOT_VISIBLE'>('NOT_VISIBLE');
+  const [lightingLevel, setLightingLevel] = useState<'BRIGHT' | 'DIM' | 'DARK' | 'NOT_VISIBLE'>('NOT_VISIBLE');
+  const [sidewalkCondition, setSidewalkCondition] = useState<'GOOD' | 'NARROW' | 'DAMAGED' | 'BLOCKED' | 'NOT_VISIBLE'>('NOT_VISIBLE');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -98,7 +100,7 @@ export default function CreateActivityModal({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '20px',
+        padding: isMobile ? '12px' : '20px',
       }}
       onClick={onClose}
     >
@@ -106,10 +108,10 @@ export default function CreateActivityModal({
         onClick={(e) => e.stopPropagation()}
         style={{
           backgroundColor: '#FFFFFF',
-          borderRadius: '16px',
+          borderRadius: isMobile ? '20px' : '16px',
           width: '100%',
           maxWidth: '560px',
-          maxHeight: '90vh',
+          maxHeight: isMobile ? '94vh' : '90vh',
           overflowY: 'auto',
           boxShadow: '0 20px 50px rgba(0, 0, 0, 0.25)',
           display: 'flex',
@@ -119,7 +121,7 @@ export default function CreateActivityModal({
         {/* Header */}
         <div
           style={{
-            padding: '20px 24px',
+            padding: isMobile ? '14px 18px' : '20px 24px',
             borderBottom: '1px solid #EFEFEF',
             display: 'flex',
             alignItems: 'center',
@@ -142,11 +144,11 @@ export default function CreateActivityModal({
               <Camera size={18} color="#000000" />
             </div>
             <div>
-              <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#000000' }}>
+              <h2 style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '800', color: '#000000' }}>
                 Bagikan Laporan Aksesibilitas
               </h2>
-              <p style={{ fontSize: '12.5px', color: '#767676' }}>
-                AI Orchestrator akan menganalisis skor kerusakan & prioritas perbaikan
+              <p style={{ fontSize: '12px', color: '#64748B' }}>
+                AI Orchestrator menganalisis kelayakan & perbaikan
               </p>
             </div>
           </div>
@@ -154,10 +156,10 @@ export default function CreateActivityModal({
           <button
             onClick={onClose}
             style={{
-              background: 'transparent',
+              background: isMobile ? '#F1F5F9' : 'transparent',
               border: 'none',
               cursor: 'pointer',
-              padding: '6px',
+              padding: '8px',
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
@@ -169,7 +171,7 @@ export default function CreateActivityModal({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        <form onSubmit={handleSubmit} style={{ padding: isMobile ? '16px' : '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {errorMsg && (
             <div
               style={{
@@ -336,6 +338,7 @@ export default function CreateActivityModal({
                   onChange={(e: any) => setRampStatus(e.target.value)}
                   style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
                 >
+                  <option value="NOT_VISIBLE">Belum Teramati / Tidak Terlihat</option>
                   <option value="GOOD">Baik & Ramah Kursi Roda</option>
                   <option value="DAMAGED">Rusak / Curam / Tanpa Pegangan</option>
                   <option value="NONE">Tidak Ada Ramp</option>
@@ -350,6 +353,7 @@ export default function CreateActivityModal({
                   onChange={(e: any) => setGuidingBlockStatus(e.target.value)}
                   style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
                 >
+                  <option value="NOT_VISIBLE">Belum Teramati / Tidak Terlihat</option>
                   <option value="GOOD">Tersambung Baik</option>
                   <option value="DAMAGED">Terputus / Terhalang PKL</option>
                   <option value="NONE">Tidak Tersedia</option>
@@ -364,6 +368,7 @@ export default function CreateActivityModal({
                   onChange={(e: any) => setSidewalkCondition(e.target.value)}
                   style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
                 >
+                  <option value="NOT_VISIBLE">Belum Teramati / Tidak Terlihat</option>
                   <option value="GOOD">Lebar & Rata</option>
                   <option value="NARROW">Sempit (&lt;1.2m)</option>
                   <option value="DAMAGED">Paving Rusak / Berlubang</option>
@@ -379,6 +384,7 @@ export default function CreateActivityModal({
                   onChange={(e: any) => setLightingLevel(e.target.value)}
                   style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
                 >
+                  <option value="NOT_VISIBLE">Belum Teramati / Tidak Terlihat</option>
                   <option value="BRIGHT">Terang & Nyaman</option>
                   <option value="DIM">Redup / Kurang Lampu</option>
                   <option value="DARK">Gelap / Berbahaya</option>

@@ -16,6 +16,7 @@ const envSchema = z.object({
   MAPID_BASE_URL: z.string().url().default('https://api.mapid.io'),
   MAPID_BASEMAP_URL: z.string().url().default('https://basemap.mapid.io'),
   MAPID_GEOSERVER_URL: z.string().url().default('https://geoserver.mapid.io'),
+  MAPID_COMPETITION_URL: z.string().url().default('https://server.mapid.io/web/competition'),
   MAPID_PROJECT_ID: z.string().default('6a8bb9c9880d11c7bade0a62'),
 });
 

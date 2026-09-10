@@ -22,6 +22,7 @@ import {
   Eye
 } from 'lucide-react';
 import { difaMapApi } from '../../lib/api';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 export type SiniAiTab = 'CHAT' | 'SITE_SELECTION' | 'SITE_ANALYSIS';
 
@@ -31,6 +32,7 @@ interface AiChatbotDrawerProps {
   selectedLocationId?: string;
   onToggleSiniGrid?: (show: boolean, gridSize?: number) => void;
   onRunIsochroneAnalysis?: (lat: number, lng: number, mode?: 'walking' | 'wheelchair') => void;
+  onClearAnalysis?: () => void;
   onSelectCoordinateForAnalysis?: () => void;
   analysisTarget?: { lat: number; lng: number; name?: string } | null;
 }
@@ -41,9 +43,11 @@ export default function AiChatbotDrawer({
   selectedLocationId,
   onToggleSiniGrid,
   onRunIsochroneAnalysis,
+  onClearAnalysis,
   onSelectCoordinateForAnalysis,
   analysisTarget,
 }: AiChatbotDrawerProps) {
+  const isMobile = useIsMobile(768);
   // 1. Tab Navigation: Chat vs Site Selection vs Site Analysis
   const [activeTab, setActiveTab] = useState<SiniAiTab>('CHAT');
 
@@ -208,28 +212,34 @@ export default function AiChatbotDrawer({
 
   return (
     <aside
-      className="animate-slide-in"
+      className={isMobile ? 'animate-slide-up' : 'animate-slide-in'}
       style={{
         position: 'fixed',
-        right: '24px',
-        top: '24px',
-        bottom: '24px',
-        width: '460px',
-        maxWidth: 'calc(100vw - 48px)',
+        left: isMobile ? 0 : 'auto',
+        right: isMobile ? 0 : '24px',
+        top: isMobile ? 'auto' : '24px',
+        bottom: isMobile ? 0 : '24px',
+        width: isMobile ? '100%' : '460px',
+        maxWidth: isMobile ? '100vw' : 'calc(100vw - 48px)',
+        maxHeight: isMobile ? '86vh' : 'calc(100vh - 48px)',
         backgroundColor: '#FFFFFF',
-        borderRadius: '16px',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.18)',
+        borderRadius: isMobile ? '24px 24px 0 0' : '16px',
+        boxShadow: isMobile ? '0 -8px 36px rgba(0, 0, 0, 0.25)' : '0 8px 32px rgba(0, 0, 0, 0.18)',
         border: '1px solid rgba(0, 0, 0, 0.08)',
+        borderBottom: isMobile ? 'none' : undefined,
         zIndex: 50,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
       }}
     >
+      {/* Mobile Top Drag Handle Bar */}
+      {isMobile && <div className="bottom-sheet-drag-handle" />}
+
       {/* 1. Header with MAPID SINI AI Branding */}
       <div
         style={{
-          padding: '16px 20px',
+          padding: isMobile ? '12px 18px' : '16px 20px',
           borderBottom: '1px solid #EFEFEF',
           backgroundColor: '#FFFFFF',
           display: 'flex',
@@ -267,18 +277,30 @@ export default function AiChatbotDrawer({
           </div>
         </div>
 
+        {/* Elderly-friendly large Close Button */}
         <button
           onClick={onClose}
+          title="Tutup Panel"
           style={{
-            background: 'transparent',
+            background: isMobile ? '#F1F5F9' : 'transparent',
             border: 'none',
             cursor: 'pointer',
-            padding: '6px',
-            borderRadius: '50%',
-            color: '#000000',
+            padding: isMobile ? '6px 14px' : '6px',
+            borderRadius: isMobile ? '20px' : '50%',
+            color: '#0F172A',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            fontSize: isMobile ? '13.5px' : '13px',
+            fontWeight: '700',
+            minHeight: isMobile ? '38px' : undefined,
+            transition: 'background-color 0.15s ease',
           }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E2E8F0')}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = isMobile ? '#F1F5F9' : 'transparent')}
         >
-          <X size={20} />
+          <X size={isMobile ? 18 : 20} strokeWidth={2.5} />
+          {isMobile && <span>Tutup</span>}
         </button>
       </div>
 
@@ -461,14 +483,14 @@ export default function AiChatbotDrawer({
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Tanyakan rute aman atau fasilitas ramah difabel..."
+              placeholder="Tanyakan rute aman atau fasilitas difabel..."
               style={{
                 flex: 1,
-                padding: '9px 14px',
+                padding: isMobile ? '12px 16px' : '9px 14px',
                 borderRadius: '50px',
                 border: '1px solid #CBD5E1',
                 outline: 'none',
-                fontSize: '13px',
+                fontSize: '16px', // 16px prevents iOS Safari auto-zoom & enhances elderly readability
               }}
             />
 
@@ -476,8 +498,8 @@ export default function AiChatbotDrawer({
               type="submit"
               disabled={isSending || !inputText.trim()}
               style={{
-                width: '38px',
-                height: '38px',
+                width: isMobile ? '44px' : '38px',
+                height: isMobile ? '44px' : '38px',
                 borderRadius: '50%',
                 backgroundColor: '#539BA9',
                 border: 'none',
@@ -486,9 +508,10 @@ export default function AiChatbotDrawer({
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: isSending || !inputText.trim() ? 'not-allowed' : 'pointer',
+                flexShrink: 0,
               }}
             >
-              <Send size={16} />
+              <Send size={18} />
             </button>
           </form>
         </div>
@@ -691,6 +714,32 @@ export default function AiChatbotDrawer({
             >
               <span>Mulai SINI AI</span>
             </button>
+
+            {siteAnalysisData && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSiteAnalysisData(null);
+                  if (onClearAnalysis) onClearAnalysis();
+                }}
+                style={{
+                  padding: '0 12px',
+                  borderRadius: '10px',
+                  backgroundColor: '#FEE2E2',
+                  color: '#DC2626',
+                  border: '1px solid #FECACA',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+                title="Hapus lingkaran analisis dari peta"
+              >
+                <span>Hapus</span>
+              </button>
+            )}
           </div>
 
           {/* Isochrone Settings Card (Sesuai MAPID Screenshot 1) */}

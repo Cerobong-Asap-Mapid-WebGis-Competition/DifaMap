@@ -9,6 +9,11 @@ import {
   getSiniGridPriorityController,
   genericMapIdProxyController,
 } from '../controllers/mapid.controller.js';
+import {
+  getCompetitionActivitiesController,
+  getSurveyActivitiesController,
+  getCompetitionMissionsController,
+} from '../controllers/mapidCompetition.controller.js';
 
 const router = Router();
 
@@ -33,7 +38,16 @@ router.post('/analysis/elevation-slope', getElevationSlopeController);
 // 7. MAPID SINI AI - Multi-Criteria Accessibility Priority Grid
 router.get('/analysis/sini-grid', getSiniGridPriorityController);
 
-// 8. Wildcard passthrough proxy untuk endpoint MAPID lainnya
+// 8. MAPID Competition API - Community Maps (data survei aksesibilitas)
+router.post('/competition/activities', getCompetitionActivitiesController);
+
+// 8b. Data survei RESMI: disaring ke anggota tim Cerobong Asap
+router.post('/competition/survey', getSurveyActivitiesController);
+
+// 9. MAPID Competition API - Mission (menugo | propertigo | struckgo)
+router.post('/competition/missions/:missionType', getCompetitionMissionsController);
+
+// 10. Wildcard passthrough proxy untuk endpoint MAPID lainnya
 router.all('/proxy/*', genericMapIdProxyController);
 
 export default router;

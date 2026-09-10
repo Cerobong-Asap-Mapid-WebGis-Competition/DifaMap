@@ -236,6 +236,23 @@ const MISSION_PAGE_LIMIT = 100;
 /** Batas endpoint activities bila TIDAK mengirim rentang tanggal. */
 const ACTIVITIES_LIMIT_WITHOUT_DATE_RANGE = 60;
 
+/**
+ * Mengurutkan array media dari MAPID agar foto kamera lapangan asli
+ * selalu berada di urutan pertama (index 0), dan tangkapan layar peta
+ * (minimap / cuplikan lokasi GPS berakhiran .png atau mengandung _map_)
+ * berada di urutan berikutnya.
+ */
+export function prioritizeCameraPhotos(medias?: string[]): string[] {
+  if (!medias || medias.length <= 1) return medias ?? [];
+  return [...medias].sort((a, b) => {
+    const isMapA = a.includes('_map_') || a.toLowerCase().endsWith('.png');
+    const isMapB = b.includes('_map_') || b.toLowerCase().endsWith('.png');
+    if (isMapA && !isMapB) return 1;
+    if (!isMapA && isMapB) return -1;
+    return 0;
+  });
+}
+
 class MapIdCompetitionService {
   private client: AxiosInstance;
 
@@ -279,7 +296,11 @@ class MapIdCompetitionService {
 
     try {
       const { data } = await this.client.post('/activities', body);
-      const activities: CompetitionActivity[] = data?.data?.activities ?? [];
+      const rawActivities: CompetitionActivity[] = data?.data?.activities ?? [];
+      const activities = rawActivities.map((act) => ({
+        ...act,
+        medias: prioritizeCameraPhotos(act.medias),
+      }));
       const total: number = data?.meta?.total ?? activities.length;
 
       return {
