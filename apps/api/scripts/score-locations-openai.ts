@@ -6,7 +6,9 @@ const prisma = new PrismaClient();
 
 // Membaca argumen command line (contoh: --test atau --all atau --limit=5)
 const args = process.argv.slice(2);
-const isTestMode = args.includes('--test') || (!args.includes('--all') && !args.some(a => a.startsWith('--limit=')));
+const isMissingOnly = args.includes('--missing-only');
+const isAll = args.includes('--all');
+const isTestMode = args.includes('--test') || (!isAll && !isMissingOnly && !args.some(a => a.startsWith('--limit=')));
 const limitArg = args.find(a => a.startsWith('--limit='));
 const limit = limitArg ? parseInt(limitArg.split('=')[1], 10) : (isTestMode ? 3 : undefined);
 
@@ -14,15 +16,14 @@ async function runOpenAiScoring() {
   console.log('===============================================================');
   console.log('🤖 DIFAMAP AI ACCESSIBILITY SCORING (OPENAI GPT-4O-MINI)');
   console.log('   Berdasarkan Catatan Teknis Tim Cerobong Asap MAPID 2026');
-  console.log(`   Mode: ${isTestMode ? 'TEST RUN (3 Titik Lapangan)' : (limit ? `LIMIT (${limit} Titik)` : 'SEMUA TITIK')}`);
+  console.log(`   Mode: ${isMissingOnly ? 'TITIK BELUM DIEVALUASI (MISSING PARAMS)' : (isTestMode ? 'TEST RUN (3 Titik Lapangan)' : (limit ? `LIMIT (${limit} Titik)` : 'SEMUA TITIK'))}`);
   console.log('===============================================================\n');
 
-  // Ambil aktivitas dari database yang memiliki foto atau deskripsi
-  const activities = await prisma.activity.findMany({
+  // Ambil aktivitas dari database
+  let rawActivities = await prisma.activity.findMany({
     where: {
       status: 'PUBLIC',
     },
-    take: limit,
     orderBy: {
       createdAt: 'asc',
     },
@@ -31,8 +32,14 @@ async function runOpenAiScoring() {
     },
   });
 
+  if (isMissingOnly) {
+    rawActivities = rawActivities.filter(a => !a.observedParameters || typeof a.observedParameters !== 'object');
+  }
+
+  const activities = limit ? rawActivities.slice(0, limit) : rawActivities;
+
   if (activities.length === 0) {
-    console.log('⚠️ Tidak ditemukan activity di database.');
+    console.log('🎉 Semua activity sudah memiliki hasil evaluasi AI lengkap!');
     return;
   }
 
