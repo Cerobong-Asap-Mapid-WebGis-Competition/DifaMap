@@ -57,7 +57,7 @@ export default function MapCanvas({
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
-  const [styleId, setStyleId] = useState<string>(process.env.NEXT_PUBLIC_MAPID_STYLE_ID || 'basic');
+  const [styleId, setStyleId] = useState<string>(process.env.NEXT_PUBLIC_MAPID_STYLE_ID || 'satellite');
 
   const onMapClickRef = useRef(onMapClick);
   onMapClickRef.current = onMapClick;
@@ -191,6 +191,30 @@ export default function MapCanvas({
       ],
     };
 
+    const fallbackSatelliteStyle: any = {
+      version: 8,
+      name: 'DifaMap Satelit Fallback',
+      sources: {
+        satellite: {
+          type: 'raster',
+          tiles: [
+            'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+          ],
+          tileSize: 256,
+          attribution: '&copy; Esri World Imagery',
+        },
+      },
+      layers: [
+        {
+          id: 'satellite-layer',
+          type: 'raster',
+          source: 'satellite',
+          minzoom: 0,
+          maxzoom: 19,
+        },
+      ],
+    };
+
     const styleUrl = styleId === 'osm' ? fallbackStyle : difaMapApi.getMapStyleUrl(styleId);
 
     const map = new maplibregl.Map({
@@ -206,9 +230,9 @@ export default function MapCanvas({
     const triggerFallback = () => {
       if (hasFallenBack) return;
       hasFallenBack = true;
-      console.warn('[MapCanvas] MAPID basemap service slow or errored; gracefully falling back to OpenStreetMap standard tiles.');
+      console.warn('[MapCanvas] MAPID basemap service slow or errored; gracefully falling back to resilient tiles.');
       try {
-        map.setStyle(fallbackStyle);
+        map.setStyle(styleId === 'satellite' ? fallbackSatelliteStyle : fallbackStyle);
       } catch (err) {
         console.error('[MapCanvas] Failed to set fallback style:', err);
       }
@@ -290,10 +314,14 @@ export default function MapCanvas({
     }
   }, [selectedLocationId, selectedActivityId, isMapLoaded, locations, activities]);
 
-  // Reset map camera to default Makassar & Gowa overview
+  // Reset map camera and basemap style to default Makassar & Gowa overview & satellite mode
   useEffect(() => {
     if (!resetMapTrigger || !mapRef.current || !isMapLoaded) return;
     try {
+      if (styleId !== 'satellite') {
+        setStyleId('satellite');
+        mapRef.current.setStyle(difaMapApi.getMapStyleUrl('satellite'));
+      }
       mapRef.current.flyTo({
         center: [119.4500, -5.1700],
         zoom: 13,
@@ -305,7 +333,7 @@ export default function MapCanvas({
     } catch (err) {
       console.warn('[MapCanvas] flyTo reset failed:', err);
     }
-  }, [resetMapTrigger, isMapLoaded]);
+  }, [resetMapTrigger, isMapLoaded, styleId]);
 
   // 2. Render Markers Berdasarkan Mode (Aktivitas vs Tempat vs Urban Planner)
   useEffect(() => {
@@ -707,10 +735,10 @@ export default function MapCanvas({
             cursor: 'pointer',
           }}
         >
+          <option value="satellite">Satelit (Default)</option>
           <option value="basic">Street 3D / Basic (MAPID)</option>
           <option value="light">Street Light (MAPID)</option>
           <option value="dark">Dark Mode (MAPID)</option>
-          <option value="satellite">Satelit (MAPID)</option>
           <option value="osm">OpenStreetMap (Cepat)</option>
         </select>
       </div>
