@@ -234,23 +234,16 @@ export default function AppSidebar({
           e.currentTarget.style.transform = 'scale(1)';
         }}
       >
-        <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
-          <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#FDC323" />
-          <path
-            d="M2 17L12 22L22 17"
-            stroke="#539BA9"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M2 12L12 17L22 12"
-            stroke="#FDC323"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        <img
+          src="/difamap-icon.png"
+          alt="DifaMap"
+          style={{
+            width: '40px',
+            height: '40px',
+            objectFit: 'contain',
+            filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.06))',
+          }}
+        />
       </div>
 
       {/* 2. Main Navigation Rail with Animated Sliding Teal Circle (#539BA9) */}

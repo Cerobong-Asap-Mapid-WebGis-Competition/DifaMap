@@ -169,13 +169,30 @@ export default function InfoModal({ isOpen, onClose }: InfoModalProps) {
           </div>
 
           {/* Visi & Inovasi DifaMap */}
-          <div>
-            <h3 style={{ fontSize: '15px', fontWeight: '800', color: '#0F172A', marginBottom: '6px' }}>
-              Tentang DifaMap WebGIS
-            </h3>
-            <p>
-              <strong>DifaMap</strong> adalah platform WebGIS ramah inklusivitas yang memetakan aksesibilitas fasilitas pejalan kaki (ramp kursi roda, ubin pemandu tunanetra, penerangan, dan trotoar) di sekitar koridor transportasi massal <strong>Kota Makassar & Kabupaten Gowa</strong>.
-            </p>
+          <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+            <img
+              src="/difamap-icon.png"
+              alt="DifaMap"
+              style={{
+                width: '46px',
+                height: '46px',
+                objectFit: 'contain',
+                flexShrink: 0,
+                borderRadius: '8px',
+                padding: '2px',
+                background: '#FFFFFF',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+                border: '1px solid #F1F5F9',
+              }}
+            />
+            <div>
+              <h3 style={{ fontSize: '15px', fontWeight: '800', color: '#0F172A', marginBottom: '6px' }}>
+                Tentang DifaMap WebGIS
+              </h3>
+              <p style={{ margin: 0 }}>
+                <strong>DifaMap</strong> adalah platform WebGIS ramah inklusivitas yang memetakan aksesibilitas fasilitas pejalan kaki (ramp kursi roda, ubin pemandu tunanetra, penerangan, dan trotoar) di sekitar koridor transportasi massal <strong>Kota Makassar & Kabupaten Gowa</strong>.
+              </p>
+            </div>
           </div>
 
           {/* Arti Warna Status */}
