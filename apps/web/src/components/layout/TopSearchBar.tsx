@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { SidebarMode } from './AppSidebar';
 import { difaMapApi } from '../../lib/api';
+import { susunTempat } from '../../data/tempatPilihan';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
 /**
@@ -165,23 +166,68 @@ export default function TopSearchBar({
     };
   }, []);
 
-  // Filter dynamic suggestions based on user query
+  /**
+   * Saran pencarian dari data DifaMap sendiri.
+   *
+   * Tiga perbaikan atas versi sebelumnya:
+   *
+   * 1. Tempat pilihan tim ikut dicari. Sebelumnya mengetik "trans studio" hanya
+   *    memunculkan pengamatan di dalamnya, tidak pernah tempatnya - padahal
+   *    tempat itulah yang orang cari, dan panelnya yang paling lengkap.
+   *
+   * 2. Aktivitas yang sudah terwakili lokasinya dibuang. Setiap aktivitas
+   *    menunjuk balik ke sebuah lokasi dengan judul yang sama persis, sehingga
+   *    "mall pa" menghasilkan empat baris untuk dua tempat - dua sebagai
+   *    "Tempat", dua lagi sebagai "Aktivitas" dengan tulisan identik.
+   *
+   * 3. Deskripsi ikut dicari. Mengetik "ramp" sebelumnya menemukan 2 dari 94
+   *    titik karena hanya nama yang dicocokkan; dengan deskripsi ikut dicari
+   *    menjadi 33. Untuk aplikasi aksesibilitas, itu perbedaan antara berguna
+   *    dan tidak.
+   */
   const suggestions = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase().trim();
 
+    // Tempat pilihan tim lebih dulu: ia membawa panel radius yang paling utuh.
+    const matchedTempat = susunTempat(locations)
+      .filter((t) => t.nama.toLowerCase().includes(q) || t.kategori.toLowerCase().includes(q))
+      .slice(0, 4)
+      .map((t) => ({
+        type: 'TEMPAT_TIM' as const,
+        id: `tempat-${t.nama}`,
+        name: t.nama,
+        subtitle: `${t.anggota.length} pengamatan survei di sekitarnya`,
+        category: t.kategori,
+        score: t.skorRata ?? undefined,
+        entityType: 'PLACE',
+        coverImageUrl: undefined,
+        data: {
+          nama: t.nama,
+          kategori: t.kategori,
+          latitude: t.latitude,
+          longitude: t.longitude,
+        },
+      }));
+
     const matchedLocs = locations
-      .filter((loc) =>
-        loc.name?.toLowerCase().includes(q) ||
-        loc.specificLocation?.toLowerCase().includes(q) ||
-        loc.category?.toLowerCase().includes(q)
+      .filter(
+        (loc) =>
+          loc.name?.toLowerCase().includes(q) ||
+          loc.specificLocation?.toLowerCase().includes(q) ||
+          loc.category?.toLowerCase().includes(q) ||
+          // Deskripsi surveyor memuat kata yang tidak pernah ada di nama:
+          // "ramp", "guiding block", "terhalang parkir".
+          loc.description?.toLowerCase().includes(q)
       )
       .slice(0, 6)
       .map((loc) => ({
         type: 'LOCATION' as const,
         id: loc.id,
         name: loc.name,
-        subtitle: loc.specificLocation || 'Kota Makassar',
+        subtitle: loc.name?.toLowerCase().includes(q)
+          ? loc.specificLocation || 'Kota Makassar'
+          : 'Cocok di catatan surveyor',
         category: loc.category,
         score: loc.overallScore,
         entityType: loc.entityType,
@@ -189,25 +235,33 @@ export default function TopSearchBar({
         data: loc,
       }));
 
+    // Aktivitas hanya ditampilkan bila lokasinya TIDAK ikut muncul - kalau ikut,
+    // keduanya bertuliskan sama dan hanya membuat daftar terasa penuh.
+    const idLokasiTampil = new Set(matchedLocs.map((l) => l.id));
     const matchedActs = activities
-      .filter((act) =>
-        act.title?.toLowerCase().includes(q) ||
-        act.specificLocation?.toLowerCase().includes(q) ||
-        act.description?.toLowerCase().includes(q)
+      .filter(
+        (act) =>
+          !idLokasiTampil.has(act.locationId) &&
+          (act.title?.toLowerCase().includes(q) ||
+            act.specificLocation?.toLowerCase().includes(q) ||
+            act.description?.toLowerCase().includes(q))
       )
-      .slice(0, 4)
+      .slice(0, 3)
       .map((act) => ({
         type: 'ACTIVITY' as const,
         id: act.id,
         name: act.title,
-        subtitle: act.specificLocation || 'Laporan Lapangan',
-        category: 'Laporan Komunitas',
+        subtitle: act.title?.toLowerCase().includes(q)
+          ? act.specificLocation || 'Laporan lapangan'
+          : 'Cocok di catatan surveyor',
+        category: undefined,
         score: act.aiScore,
-        coverImageUrl: act.mediaUrls?.[0],
+        entityType: undefined,
+        coverImageUrl: undefined,
         data: act,
       }));
 
-    return [...matchedLocs, ...matchedActs];
+    return [...matchedTempat, ...matchedLocs, ...matchedActs];
   }, [searchQuery, locations, activities]);
 
   // Helper function to highlight matched character sequences
@@ -452,7 +506,12 @@ export default function TopSearchBar({
                     onClick={() => {
                       onSearchChange(item.name);
                       setIsInputFocused(false);
-                      if (onSelectSuggestion) {
+                      // Tempat pilihan tim membuka panel radius, bukan panel
+                      // detail satu baris - datanya memang bukan baris basis
+                      // data, melainkan nama dan koordinat.
+                      if (item.type === 'TEMPAT_TIM') {
+                        if (onSelectTempatLuar) onSelectTempatLuar(item.data as any);
+                      } else if (onSelectSuggestion) {
                         onSelectSuggestion({ type: item.type, data: item.data });
                       }
                     }}
