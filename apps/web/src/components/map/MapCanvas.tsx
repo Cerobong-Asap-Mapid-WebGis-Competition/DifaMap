@@ -41,6 +41,8 @@ interface MapCanvasProps {
    * di mana letaknya.
    */
   titikFokus?: { nama?: string; kategori?: string; latitude: number; longitude: number } | null;
+  /** Radius jangkauan yang sedang dipakai panel tempat, dalam meter. */
+  radiusTempat?: number;
   onSelectPoi?: (poi: { nama: string; kategori?: string; latitude: number; longitude: number }) => void;
   onSelectLocation?: (location: any) => void;
   onSelectActivity?: (activity: any) => void;
@@ -64,6 +66,7 @@ export default function MapCanvas({
   siniGridSize = 1000,
   isochroneGeoJSON = null,
   titikFokus = null,
+  radiusTempat = 500,
   onSelectPoi,
   onSelectLocation,
   onSelectActivity,
@@ -165,6 +168,60 @@ export default function MapCanvas({
         paint: {
           'line-color': '#334155',
           'line-width': 1,
+        },
+      });
+    }
+
+    // 4. Lingkaran jangkauan tempat yang sedang dibuka.
+    //
+    // Bukan sekadar hiasan: lingkaran ini menggambar radius yang SAMA dengan
+    // yang dipakai panel untuk menghitung skor dan mengumpulkan pengamatan.
+    // Orang jadi bisa melihat titik survei mana saja yang masuk hitungan,
+    // alih-alih memercayai angka tanpa tahu dari mana asalnya.
+    if (!map.getSource('radius-tempat-source')) {
+      map.addSource('radius-tempat-source', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      map.addLayer({
+        id: 'radius-tempat-fill',
+        type: 'fill',
+        source: 'radius-tempat-source',
+        paint: {
+          'fill-color': '#FDC323',
+          'fill-opacity': 0.14,
+        },
+      });
+
+      map.addLayer({
+        id: 'radius-tempat-line',
+        type: 'line',
+        source: 'radius-tempat-source',
+        paint: {
+          'line-color': '#FDC323',
+          'line-width': 2.5,
+          'line-opacity': 0.9,
+        },
+      });
+    }
+
+    // Cincin denyut - lingkaran kedua yang membesar berulang lalu memudar,
+    // memberi kesan jangkauan yang hidup tanpa menutupi peta.
+    if (!map.getSource('denyut-tempat-source')) {
+      map.addSource('denyut-tempat-source', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      map.addLayer({
+        id: 'denyut-tempat-line',
+        type: 'line',
+        source: 'denyut-tempat-source',
+        paint: {
+          'line-color': '#FDC323',
+          'line-width': 2,
+          'line-opacity': 0.5,
         },
       });
     }
@@ -444,6 +501,79 @@ export default function MapCanvas({
       console.warn('[MapCanvas] flyTo reset failed:', err);
     }
   }, [resetMapTrigger, isMapLoaded, styleId]);
+
+  /**
+   * Menggambar dan menganimasikan lingkaran jangkauan tempat yang sedang dibuka.
+   *
+   * Dua gerakan, keduanya punya alasan:
+   *
+   * - Lingkaran utama tumbuh dari titiknya sampai radius penuh dalam 700 ms.
+   *   Gerakan itu menjelaskan asal-usulnya - jangkauan ini berpusat DI SINI -
+   *   yang tidak tersampaikan bila lingkaran muncul begitu saja.
+   *
+   * - Cincin denyut membesar berulang tiap 2,4 detik lalu memudar, menandai
+   *   bahwa titik itu yang sedang aktif di antara puluhan pin lain.
+   *
+   * Keduanya berhenti dan dibersihkan saat panel ditutup.
+   */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapLoaded) return;
+
+    const sumberUtama = map.getSource('radius-tempat-source') as maplibregl.GeoJSONSource;
+    const sumberDenyut = map.getSource('denyut-tempat-source') as maplibregl.GeoJSONSource;
+    if (!sumberUtama || !sumberDenyut) return;
+
+    const kosong = { type: 'FeatureCollection' as const, features: [] };
+
+    if (!titikFokus || typeof titikFokus.latitude !== 'number') {
+      sumberUtama.setData(kosong);
+      sumberDenyut.setData(kosong);
+      return;
+    }
+
+    const pusat: [number, number] = [titikFokus.longitude, titikFokus.latitude];
+    const lingkaran = (meter: number) =>
+      turf.circle(pusat, Math.max(meter, 1) / 1000, { steps: 64, units: 'kilometers' });
+
+    let frame = 0;
+    const mulai = performance.now();
+    const DURASI_TUMBUH = 700;
+    const PERIODE_DENYUT = 2400;
+
+    const gambar = (sekarang: number) => {
+      const berlalu = sekarang - mulai;
+
+      // Melambat di akhir: gerakan terasa mendarat, bukan terpotong.
+      const majuTumbuh = Math.min(1, berlalu / DURASI_TUMBUH);
+      const pelan = 1 - Math.pow(1 - majuTumbuh, 3);
+      sumberUtama.setData(lingkaran(radiusTempat * pelan) as any);
+
+      if (berlalu > DURASI_TUMBUH) {
+        const fase = ((berlalu - DURASI_TUMBUH) % PERIODE_DENYUT) / PERIODE_DENYUT;
+        sumberDenyut.setData(lingkaran(radiusTempat * fase) as any);
+        try {
+          map.setPaintProperty('denyut-tempat-line', 'line-opacity', 0.55 * (1 - fase));
+        } catch {
+          // Gaya peta bisa sedang dimuat ulang; denyut boleh dilewati.
+        }
+      }
+
+      frame = requestAnimationFrame(gambar);
+    };
+
+    frame = requestAnimationFrame(gambar);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      try {
+        sumberUtama.setData(kosong);
+        sumberDenyut.setData(kosong);
+      } catch {
+        // Peta mungkin sudah dilepas.
+      }
+    };
+  }, [titikFokus?.latitude, titikFokus?.longitude, radiusTempat, isMapLoaded, styleId]);
 
   // 2. Render Markers Berdasarkan Mode (Aktivitas vs Tempat vs Urban Planner)
   useEffect(() => {

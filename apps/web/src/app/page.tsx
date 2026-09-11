@@ -63,6 +63,9 @@ export default function HomePage() {
    * Kosong berarti tidak menyaring apa pun.
    */
   const [filterAktif, setFilterAktif] = useState<string[]>([]);
+
+  /** Radius jangkauan yang sedang ditampilkan panel tempat, untuk digambar peta. */
+  const [radiusTempat, setRadiusTempat] = useState<number>(500);
   const [pickedCoordinate, setPickedCoordinate] = useState<{ latitude: number; longitude: number } | null>(null);
   const [analysisTarget, setAnalysisTarget] = useState<{ lat: number; lng: number; name?: string } | null>(null);
 
@@ -436,6 +439,7 @@ export default function HomePage() {
               }
             : null
         }
+        radiusTempat={radiusTempat}
         onSelectPoi={(poi) => setSelectedItem({ type: 'POI', data: poi })}
         onSelectLocation={handleSelectLocation}
         onSelectActivity={handleSelectActivity}
@@ -449,7 +453,11 @@ export default function HomePage() {
       {/* Panel tempat MAPID - dipakai saat yang diklik adalah POI basemap,
           bukan baris di basis data DifaMap. */}
       {selectedItem?.type === 'POI' && (
-        <PanelTempat poi={selectedItem.data} onClose={() => setSelectedItem(null)} />
+        <PanelTempat
+          poi={selectedItem.data}
+          onClose={() => setSelectedItem(null)}
+          onRadiusChange={setRadiusTempat}
+        />
       )}
 
       <DetailDrawer

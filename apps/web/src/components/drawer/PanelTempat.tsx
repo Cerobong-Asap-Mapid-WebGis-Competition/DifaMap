@@ -37,6 +37,12 @@ export interface PoiTerpilih {
 interface Props {
   poi: PoiTerpilih;
   onClose: () => void;
+  /**
+   * Memberitahu peta radius mana yang sedang dipakai, supaya lingkarannya
+   * digambar sama persis dengan jangkauan yang dihitung panel ini. Tanpa itu
+   * keduanya bisa berbeda, dan lingkaran di peta menjadi hiasan yang menyesatkan.
+   */
+  onRadiusChange?: (radiusMeter: number) => void;
 }
 
 const PILIHAN_RADIUS = [150, 300, 500, 800];
@@ -154,7 +160,7 @@ function parameterDari(item: any): Record<string, string> {
   return item.observedParameters ?? item;
 }
 
-export default function PanelTempat({ poi, onClose }: Props) {
+export default function PanelTempat({ poi, onClose, onRadiusChange }: Props) {
   const isMobile = useIsMobile(768);
   // 500 m, bukan 300. Diukur terhadap 15 tempat pada daftar: pada radius 300 m,
   // empat di antaranya tidak menangkap satu pun pengamatan - panelnya terbuka
@@ -248,6 +254,11 @@ export default function PanelTempat({ poi, onClose }: Props) {
    * berpindah induk begitu radius diubah atau pengamatan baru ditambahkan.
    * Kolom place_key ditambahkan lewat migrations_manual/02_komentar_tempat.sql.
    */
+  // Radius disampaikan ke peta setiap berubah, termasuk sekali saat panel dibuka.
+  useEffect(() => {
+    onRadiusChange?.(radius);
+  }, [radius, onRadiusChange]);
+
   const kunciTempat = useMemo(() => poi.kunci ?? slugTempat(poi.nama), [poi.kunci, poi.nama]);
 
   const muatKomentar = async () => {
