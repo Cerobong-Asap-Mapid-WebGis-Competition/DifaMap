@@ -86,6 +86,75 @@ function kataKunci(pertanyaan: string): string[] {
     .filter((k) => k.length >= 4 && !KATA_UMUM.has(k));
 }
 
+/** Memecah teks menjadi kata yang cukup panjang untuk berarti. */
+function pecahKata(teks: string): string[] {
+  return teks
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((k) => k.length >= 4);
+}
+
+/**
+ * Jarak sunting antara dua kata, berhenti begitu melewati batas.
+ *
+ * Untuk memaafkan salah ketik. Pengujian menemukan "jalan ratulangee" dijawab
+ * "belum pernah disurvei" padahal ada dua titik di Jl. Ratulangi - satu huruf
+ * kelebihan sudah cukup membuat seluruh datanya seolah lenyap. Juri mengetik
+ * cepat, dan kesalahan seperti itu tidak boleh berakhir sebagai "tidak ada data".
+ */
+function jarakEja(a: string, b: string, batas: number): number {
+  if (Math.abs(a.length - b.length) > batas) return batas + 1;
+
+  let sebelum = Array.from({ length: b.length + 1 }, (_, i) => i);
+
+  for (let i = 1; i <= a.length; i++) {
+    const kini = [i];
+    let terkecil = i;
+
+    for (let j = 1; j <= b.length; j++) {
+      const biaya = a[i - 1] === b[j - 1] ? 0 : 1;
+      const nilai = Math.min(kini[j - 1] + 1, sebelum[j] + 1, sebelum[j - 1] + biaya);
+      kini.push(nilai);
+      if (nilai < terkecil) terkecil = nilai;
+    }
+
+    // Seluruh baris sudah melewati batas - tidak mungkin membaik lagi.
+    if (terkecil > batas) return batas + 1;
+    sebelum = kini;
+  }
+
+  return sebelum[b.length];
+}
+
+/**
+ * Apakah pertanyaannya meminta peringkat - "yang paling", "terbaik", "terburuk".
+ *
+ * Pertanyaan semacam ini tidak boleh dijawab dari titik yang mirip kata dengan
+ * pertanyaannya, melainkan dari seluruh data yang diurutkan menurut skor.
+ * Pengujian menemukan "halte mana yang paling ramah kursi roda" dijawab
+ * "Halte Mall Panakkukang, skor 4" padahal Halte Pintu 0 Unhas berskor 4,5 -
+ * halte itu sekadar tidak ikut terpilih sebagai titik yang mirip kata.
+ */
+function bacaPeringkat(pertanyaan: string): 'terbaik' | 'terburuk' | null {
+  const t = pertanyaan.toLowerCase();
+  if (/(terburuk|terparah|terendah|paling\s+(buruk|parah|rusak|jelek|sulit|tidak))/.test(t))
+    return 'terburuk';
+  if (/(terbaik|tertinggi|terlayak|paling\s+(baik|ramah|bagus|aksesibel|layak|mudah|nyaman))/.test(t))
+    return 'terbaik';
+  if (/(urutkan|peringkat|ranking|daftar\s+teratas)/.test(t)) return 'terbaik';
+  return null;
+}
+
+/** Jenis titik yang sedang ditanyakan, bila pertanyaannya menyebutkannya. */
+function bacaJenis(pertanyaan: string): string | null {
+  const t = pertanyaan.toLowerCase();
+  if (/(halte|shelter|transit|bus\b)/.test(t)) return 'TRANSIT_HUB';
+  if (/(trotoar|pedestrian|jalur pejalan|sidewalk)/.test(t)) return 'SIDEWALK';
+  if (/(tempat|gedung|mall|mal\b|kampus|rumah sakit|masjid|hotel|kantor)/.test(t)) return 'PLACE';
+  return null;
+}
+
 /**
  * Jarak sebuah titik ke ruas garis A-B, dalam meter.
  *
@@ -187,6 +256,15 @@ export interface KonteksDifaAI {
   fotoUntukDilihat: Array<{ nama: string; url: string }>;
   /** Gambaran seberapa luas wilayah studi yang sudah tersentuh survei. */
   cakupan: string;
+  /**
+   * Seluruh titik yang diurutkan menurut skor, hanya bila pertanyaannya
+   * meminta peringkat. Dipisahkan dari daftar titik relevan karena keduanya
+   * menjawab hal yang berbeda: yang satu "mana yang mirip pertanyaan ini",
+   * yang lain "mana yang paling tinggi skornya".
+   */
+  peringkat: string | null;
+  /** Salah ketik yang dibetulkan, untuk disebutkan kepada pengguna. */
+  catatanEjaan: string[];
   /** Hambatan sepanjang koridor, bila pertanyaannya berbentuk "dari A ke B". */
   koridor: string | null;
   /**
@@ -302,11 +380,83 @@ export async function susunKonteks(
     .join('\n');
 
   // ----------------------------------------------------------- yang relevan
-  const kunci = kataKunci(pertanyaan);
+  //
+  // Bobot tiap kata dihitung DARI DATA, bukan dari daftar kata umum yang
+  // ditulis tangan. Kata yang muncul di banyak nama titik - "jalan",
+  // "trotoar", "guiding" - hampir tidak membedakan apa pun; kata yang hanya
+  // muncul di segelintir nama - "hertasning", "karebosi" - justru menunjuk
+  // dengan tepat.
+  //
+  // Versi sebelumnya memberi bobot sama kepada keduanya, dan akibatnya nyata:
+  // "guiding block di Jalan Hertasning" menarik tiga trotoar ber-guiding-block
+  // di jalan yang sama sekali lain, lalu Difa AI menjawab "belum teramati"
+  // padahal ada tiga titik Hertasning di dalam konteksnya sendiri.
+  const teksLokasi = (l: any) =>
+    `${l.name} ${l.specificLocation ?? ''} ${l.description ?? ''}`.toLowerCase();
+
+  const frekuensi = new Map<string, number>();
+  for (const l of semua) {
+    const unik = Array.from(new Set(pecahKata(teksLokasi(l))));
+    for (const k of unik) frekuensi.set(k, (frekuensi.get(k) ?? 0) + 1);
+  }
+
+  // Kata yang muncul di sedikit titik bernilai jauh lebih tinggi daripada kata
+  // yang muncul di mana-mana. Tambahan 0,3 menjaga kata paling umum sekalipun
+  // tetap bernilai sedikit, bukan nol.
+  const bobot = (k: string) =>
+    Math.log(semua.length / (1 + (frekuensi.get(k) ?? 0))) + 0.3;
+
+  const kosakata = Array.from(frekuensi.keys());
+
+  const perbaikiEja = (k: string): string | null => {
+    if (frekuensi.has(k)) return null;
+
+    const batas = k.length >= 7 ? 2 : 1;
+    let terbaik: string | null = null;
+    let terdekat = batas + 1;
+
+    for (const v of kosakata) {
+      const d = jarakEja(k, v, batas);
+      if (d < terdekat) {
+        terdekat = d;
+        terbaik = v;
+      }
+    }
+
+    return terdekat <= batas ? terbaik : null;
+  };
+
+  const catatanEjaan: string[] = [];
+  const kunci = kataKunci(pertanyaan).map((k) => {
+    const benar = perbaikiEja(k);
+    if (!benar) return k;
+    catatanEjaan.push(`"${k}" dibaca sebagai "${benar}"`);
+    return benar;
+  });
+
+  // Kata khas: muncul di paling banyak seperduabelas titik. Bila pertanyaannya
+  // memuat kata semacam ini, titik yang tidak memuatnya sama sekali bukan
+  // jawabannya - sebanyak apa pun kata umum yang kebetulan cocok.
+  const AMBANG_KHAS = Math.max(4, Math.round(semua.length / 12));
+  const kataKhas = kunci.filter((k) => {
+    const f = frekuensi.get(k) ?? 0;
+    return f > 0 && f <= AMBANG_KHAS;
+  });
 
   const bernilai = semua.map((l) => {
-    const teks = `${l.name} ${l.specificLocation ?? ''} ${l.description ?? ''}`.toLowerCase();
-    let nilai = kunci.reduce((n, k) => n + (teks.includes(k) ? (l.name.toLowerCase().includes(k) ? 3 : 1) : 0), 0);
+    const teks = teksLokasi(l);
+    const nama = l.name.toLowerCase();
+
+    let nilai = 0;
+    let cocokKhas = 0;
+
+    for (const k of kunci) {
+      if (!teks.includes(k)) continue;
+      nilai += bobot(k) * (nama.includes(k) ? 3 : 1);
+      if (kataKhas.includes(k)) cocokKhas++;
+    }
+
+    if (kataKhas.length > 0 && cocokKhas === 0) return { l, nilai: 0 };
 
     // Kedekatan ikut dihitung bila pengguna membagikan posisinya, supaya
     // pertanyaan seperti "halte terdekat" punya dasar.
@@ -315,6 +465,7 @@ export async function susunKonteks(
       if (jarak <= 1000) nilai += 2;
       else if (jarak <= 2500) nilai += 1;
     }
+
     return { l, nilai };
   });
 
@@ -323,6 +474,49 @@ export async function susunKonteks(
     .sort((a, b) => b.nilai - a.nilai)
     .slice(0, 8)
     .map((x) => x.l);
+
+  // ------------------------------------------------------------- peringkat
+  const arahPeringkat = bacaPeringkat(pertanyaan);
+  let peringkat: string | null = null;
+
+  if (arahPeringkat) {
+    const jenis = bacaJenis(pertanyaan);
+    const kandidat = semua.filter(
+      (l) => typeof l.overallScore === 'number' && (!jenis || l.entityType === jenis)
+    );
+
+    const urut = [...kandidat].sort((a, b) =>
+      arahPeringkat === 'terbaik'
+        ? (b.overallScore ?? 0) - (a.overallScore ?? 0)
+        : (a.overallScore ?? 0) - (b.overallScore ?? 0)
+    );
+
+    const puncak = urut.slice(0, 10);
+    const nilaiPuncak = puncak[0]?.overallScore;
+    const jumlahSeri = kandidat.filter((l) => l.overallScore === nilaiPuncak).length;
+
+    // Keterangan seri ditaruh PALING ATAS, bukan sebagai catatan kaki.
+    // Ditaruh di bawah daftar, ia terlewat: pertanyaan "tempat paling ramah
+    // difabel" dijawab dengan satu nama padahal delapan titik sama-sama
+    // berskor 4,5 - semuanya di kampus yang sama.
+    peringkat = [
+      jumlahSeri > 1
+        ? `PERHATIAN: skor tertinggi ${nilaiPuncak} dicapai oleh ${jumlahSeri} titik sekaligus, jadi TIDAK ADA pemenang tunggal. Sebutkan bahwa nilainya seri beserta jumlahnya, lalu sebut beberapa contohnya - jangan menyebut satu nama saja seolah ia sendirian di puncak.`
+        : '',
+      `Urutan ${arahPeringkat === 'terbaik' ? 'TERBAIK' : 'TERBURUK'}${
+        jenis ? ` khusus jenis ${jenis}` : ''
+      }, dihitung dari SELURUH ${kandidat.length} titik survei - bukan dari sebagian:`,
+      ...puncak.map(
+        (l, i) =>
+          `  ${i + 1}. ${l.name} - skor ${l.overallScore} | ramp ${p(l.rampStatus)} | ubin ${p(
+            l.guidingBlockStatus
+          )} | trotoar ${p(l.sidewalkCondition)}`
+      ),
+      `Untuk pertanyaan "paling/ter-", pakai urutan ini dan BUKAN daftar titik relevan: daftar relevan dipilih menurut kemiripan kata, bukan menurut skor.`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
 
   const rincianRelevan = relevan.length
     ? relevan
@@ -633,32 +827,82 @@ export async function susunKonteks(
 
   let petakBerdata = 0;
   let petakTotal = 0;
-  const kosongTerpadat: Array<{ lat: number; lng: number; tetanggaJauh: number }> = [];
+
+  /**
+   * Petak kosong yang bersebelahan dengan wilayah yang sudah tersurvei.
+   *
+   * Ini sasaran survei paling masuk akal berikutnya: kawasannya terbukti aktif
+   * karena sudah ada titik di dekatnya, tetapi petak ini sendiri masih kosong.
+   * Sebelumnya pertanyaan "di mana survei berikutnya" dijawab dengan anjuran
+   * umum - "kawasan perbelanjaan, taman, jalan utama" - yang bisa ditulis siapa
+   * saja tanpa melihat data sama sekali.
+   */
+  const kosongTerpadat: Array<{
+    lat: number;
+    lng: number;
+    tetangga: number;
+    nama: string;
+    jarak: number;
+  }> = [];
 
   for (let lat = KOTAK.minLat; lat < KOTAK.maksLat; lat += LANGKAH) {
     for (let lng = KOTAK.minLng; lng < KOTAK.maksLng; lng += LANGKAH) {
       petakTotal++;
-      const adaDekat = semua.some(
-        (l) =>
-          typeof l.latitude === 'number' &&
-          jarakMeter(lat, lng, l.latitude, l.longitude) <= 500
-      );
-      if (adaDekat) petakBerdata++;
+
+      let terdekat: { nama: string; jarak: number } | null = null;
+      let tetangga = 0;
+
+      for (const l of semua) {
+        if (typeof l.latitude !== 'number') continue;
+        const d = jarakMeter(lat, lng, l.latitude, l.longitude);
+        if (d <= 1500) tetangga++;
+        if (!terdekat || d < terdekat.jarak) terdekat = { nama: l.name, jarak: d };
+      }
+
+      if (terdekat && terdekat.jarak <= 500) {
+        petakBerdata++;
+        continue;
+      }
+
+      // Kosong, tetapi masih dalam bayang-bayang cakupan yang ada.
+      if (terdekat && terdekat.jarak <= 1200) {
+        kosongTerpadat.push({
+          lat,
+          lng,
+          tetangga,
+          nama: terdekat.nama,
+          jarak: Math.round(terdekat.jarak),
+        });
+      }
     }
   }
 
+  kosongTerpadat.sort((a, b) => b.tetangga - a.tetangga);
+
   const persen = petakTotal > 0 ? ((petakBerdata / petakTotal) * 100).toFixed(1) : '0';
 
-  // Tempat yang sudah ditetapkan tim tetapi belum punya survei di sekitarnya
-  // adalah sasaran paling jelas: namanya sudah dikenal, tinggal didatangi.
-  const cakupan = [
-    `Survei DifaMap baru menyentuh ${petakBerdata} dari ${petakTotal} petak 500 meter di wilayah studi (${persen}%).`,
-    `Artinya sebagian besar Makassar dan Gowa BELUM punya data aksesibilitas sama sekali.`,
-    `Bila ditanya tempat yang tidak ada di daftar, itu bukan berarti tempatnya buruk atau baik - melainkan belum pernah didatangi surveyor.`,
-    `Bila ditanya di mana survei berikutnya sebaiknya dilakukan, jawab dari kekosongan ini: kawasan ramai yang belum punya satu pun titik dalam radius 500 meter.`,
-  ].join('\n');
+  const persenKosong = (100 - Number(persen)).toFixed(1);
 
-  void kosongTerpadat;
+  // Dua angka yang gampang tertukar, jadi keduanya ditulis eksplisit beserta
+  // artinya. Pengujian menemukan jawaban "hanya 6,4% yang BELUM disurvei" -
+  // persis kebalikan dari yang benar, pada pertanyaan yang hampir pasti
+  // ditanyakan siapa pun yang menilai kelengkapan data.
+  const cakupan = [
+    `Cakupan survei DifaMap: ${persen}% wilayah studi SUDAH punya data, dan ${persenKosong}% BELUM punya data.`,
+    `Angka mentahnya: ${petakBerdata} petak sudah berdata dari ${petakTotal} petak berukuran 500 meter.`,
+    `JANGAN membalik kedua angka itu. ${persen}% adalah bagian yang SUDAH disurvei - bagian yang masih kosong justru jauh lebih besar, yaitu ${persenKosong}%.`,
+    `Bila ditanya tempat yang tidak ada di daftar, itu bukan berarti tempatnya buruk atau baik - melainkan belum pernah didatangi surveyor.`,
+    kosongTerpadat.length > 0
+      ? [
+          `Bila ditanya di mana survei berikutnya sebaiknya dilakukan, sebutkan petak kosong berikut. Semuanya bersebelahan dengan wilayah yang sudah tersurvei, jadi paling murah dijangkau tim, dan urutannya menurut keramaian titik di sekitarnya:`,
+          ...kosongTerpadat.slice(0, 5).map(
+            (k) =>
+              `  - koordinat ${k.lat.toFixed(4)},${k.lng.toFixed(4)} - sekitar ${k.jarak} m dari "${k.nama}", ada ${k.tetangga} titik survei dalam radius 1,5 km tetapi petak ini sendiri masih kosong`
+          ),
+          `Sebutkan koordinat dan titik acuannya, jangan hanya menganjurkan jenis kawasan secara umum.`,
+        ].join('\n')
+      : `Bila ditanya di mana survei berikutnya sebaiknya dilakukan, jawab dari kekosongan ini: kawasan ramai yang belum punya satu pun titik dalam radius 500 meter.`,
+  ].join('\n');
 
   // ------------------------------------------------------------------ foto
   //
@@ -691,6 +935,8 @@ export async function susunKonteks(
     namaRelevan: relevan.map((l) => l.name),
     fotoUntukDilihat,
     cakupan,
+    peringkat,
+    catatanEjaan,
     koridor,
     ruteDigambar,
   };
