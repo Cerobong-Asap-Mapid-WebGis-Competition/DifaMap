@@ -593,13 +593,20 @@ export default function MapCanvas({
         ? susunTempat(locations.filter(adalahTempat))
         : { tempat: [], idTerpakai: new Set<string>() };
 
+    // Mode bawaan - kedua tombol mati - menampilkan SELURUH titik lokasi: tempat,
+    // simpul transit, dan ruas trotoar. Itulah gambaran utuh hasil survei.
+    //
+    // Aktivitas sengaja tidak ikut digambar. Seluruh 94 aktivitas menunjuk balik
+    // ke sebuah lokasi lewat locationId, dengan judul yang sama persis, jadi
+    // menggambar keduanya berarti menumpuk dua pin di titik yang sama.
+    //
+    // Tombol Tempat karena itu bukan penambah, melainkan PENYARING: ia menyisakan
+    // tujuan saja, dan menampilkannya bernama supaya bisa dibaca sekilas.
     const locsToRender =
       currentMode === 'TEMPAT'
         ? locations.filter((l) => adalahTempat(l) && !idTerpakai.has(l.id))
         : currentMode === 'NONE'
-          ? locations.filter(
-              (l) => adalahTrotoar(l) || (selectedLocationId ? l.id === selectedLocationId : false)
-            )
+          ? locations
           : [];
 
     // Satu pin per tempat, membawa nama, lambang kategori, jumlah pengamatan,
@@ -656,7 +663,9 @@ export default function MapCanvas({
         const warna = warnaSkor(loc);
         const belumDinilai = loc.aiConfidence == null;
         // Trotoar tampil lebih kecil: ia lapisan dasar, bukan tujuan yang dicari.
-        const ukuran = adalahTrotoar(loc) ? 0.78 : 1;
+        // Di mode bawaan seluruh pin dikecilkan - bukan hanya trotoar - karena
+        // 108 titik pada satu layar akan saling menutupi bila seukuran penuh.
+        const ukuran = currentMode === 'NONE' ? (adalahTrotoar(loc) ? 0.7 : 0.82) : 1;
 
         el.innerHTML = isSelected ? `
           <div style="
@@ -968,7 +977,7 @@ export default function MapCanvas({
             zIndex: 5,
           }}
         >
-          Perbesar peta untuk memilih tempat seperti mall, masjid, atau rumah sakit
+          Perbesar peta untuk memilih tempat lain dari basemap MAPID
         </div>
       )}
 
