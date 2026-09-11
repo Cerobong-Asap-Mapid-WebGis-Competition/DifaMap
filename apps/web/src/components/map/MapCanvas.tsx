@@ -25,6 +25,8 @@ interface MapCanvasProps {
   selectedActivityId?: string;
   isSiniGridVisible?: boolean;
   siniGridSize?: number;
+  /** Sudut pandang penilaian grid: AKSESIBILITAS, HUNIAN, atau KOMERSIAL. */
+  siniGridModa?: string;
   isochroneGeoJSON?: any;
   /**
    * Dipanggil saat pengguna mengklik label POI milik basemap MAPID - misalnya
@@ -80,6 +82,7 @@ export default function MapCanvas({
   selectedActivityId,
   isSiniGridVisible = false,
   siniGridSize = 1000,
+  siniGridModa = 'AKSESIBILITAS',
   isochroneGeoJSON = null,
   titikFokus = null,
   radiusTempat = 500,
@@ -1385,16 +1388,17 @@ export default function MapCanvas({
     const siniSource = mapRef.current?.getSource('sini-grid-source') as maplibregl.GeoJSONSource;
     if (siniSource) {
       if (isSiniGridVisible) {
-        difaMapApi.getSiniGridPriority(siniGridSize).then((res) => {
+        difaMapApi.getSiniGridPriority(siniGridSize, siniGridModa).then((res) => {
           if (res.data) {
-            // Sel tanpa satu pun titik survei di bawahnya selalu bernilai 25,
-            // hasil dari skor bawaan 3.0 yang dipakai server saat tidak ada data.
-            // Sel seperti itu tidak digambar sama sekali: mewarnainya hijau
-            // "Baik" membuat wilayah yang belum pernah disurvei terbaca sudah
-            // ramah disabilitas, dan jumlahnya mayoritas mutlak di peta.
-            const NILAI_SEL_KOSONG = 25;
+            // Sel tanpa titik survei kini bernilai null dari server, bukan 25.
+            //
+            // Dulu server memberi sel kosong skor tengah 3,0 sehingga nilainya
+            // selalu jatuh tepat di 25, dan sisi web menebaknya dari angka itu -
+            // tebakan yang akan salah begitu ada sel berdata yang kebetulan
+            // bernilai 25 juga. Sekarang tidak ada yang perlu ditebak.
             const berdata = (res.data.features ?? []).filter(
-              (f: any) => (f.properties?.priorityIndex ?? NILAI_SEL_KOSONG) !== NILAI_SEL_KOSONG
+              (f: any) => f.properties?.priorityIndex !== null &&
+                          f.properties?.priorityIndex !== undefined
             );
             siniSource.setData({ type: 'FeatureCollection', features: berdata });
           }
@@ -1433,6 +1437,7 @@ export default function MapCanvas({
     selectedActivityId,
     isSiniGridVisible,
     siniGridSize,
+    siniGridModa,
     isochroneGeoJSON,
     isMapLoaded,
     onSelectActivity,

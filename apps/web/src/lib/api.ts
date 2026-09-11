@@ -223,9 +223,26 @@ export const difaMapApi = {
   /**
    * Difa AI: mengambil grid prioritas wilayah Makassar & Gowa
    */
-  async getSiniGridPriority(gridSize = 1000) {
-    const res = await fetch(`${API_BASE_URL}/api/mapid/analysis/sini-grid?gridSize=${gridSize}`);
+  async getSiniGridPriority(gridSize = 1000, moda = 'AKSESIBILITAS') {
+    const res = await fetch(
+      `${API_BASE_URL}/api/mapid/analysis/sini-grid?gridSize=${gridSize}&moda=${moda}`
+    );
     if (!res.ok) throw new Error('Failed to fetch SINI grid');
+    return res.json();
+  },
+
+  /**
+   * Penjelasan naratif atas grid, diminta terpisah dari perhitungannya.
+   *
+   * Gridnya sendiri selesai seketika dan langsung mewarnai peta; penjelasannya
+   * menyusul. Bila panggilan ini gagal, yang hilang hanya paragrafnya - bukan
+   * seluruh analisisnya.
+   */
+  async getSiniGridInsight(gridSize = 1000, moda = 'AKSESIBILITAS') {
+    const res = await fetch(
+      `${API_BASE_URL}/api/mapid/analysis/sini-grid/wawasan?gridSize=${gridSize}&moda=${moda}`
+    );
+    if (!res.ok) throw new Error('Failed to fetch grid insight');
     return res.json();
   },
 

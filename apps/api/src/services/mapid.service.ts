@@ -26,16 +26,52 @@ export interface ElevationPoint {
   isWheelchairAccessible: boolean; // True jika slope <= 8%
 }
 
+/**
+ * Sudut pandang penilaian sel grid.
+ *
+ * Grid yang sama dibaca tiga cara, karena yang disebut "prioritas" bergantung
+ * pada apa yang sedang dicari. Namanya sengaja memakai parameter yang dihitung,
+ * bukan nama pemakainya - satu orang bisa memerlukan ketiganya dalam satu duduk,
+ * dan menyebut "dinas" atau "developer" justru mempersempitnya tanpa alasan.
+ */
+export type ModaPenilaian = 'AKSESIBILITAS' | 'HUNIAN' | 'KOMERSIAL';
+
 export interface SiniGridCell {
   type: 'Feature';
   properties: {
     gridId: string;
     center: [number, number]; // [lng, lat]
-    transportScore: number;
-    healthScore: number;
-    commercialScore: number;
-    accessibilityScore: number;
-    priorityIndex: number; // 0 - 100 (Semakin tinggi semakin butuh intervensi trotoar & ramp)
+    moda: ModaPenilaian;
+
+    /**
+     * null bila sel belum punya satu pun titik survei.
+     *
+     * Sebelumnya sel kosong diberi skor tengah 3,0 lalu tetap mendapat angka
+     * prioritas dan rekomendasi - padahal tidak ada yang pernah mendatanginya.
+     * Dengan cakupan survei 6,4%, itu berarti ribuan sel dinilai dari tebakan.
+     */
+    priorityIndex: number | null;
+    accessibilityScore: number | null;
+    jumlahTitik: number;
+
+    /** Rincian pembentuk angka, supaya bisa dijelaskan alih-alih dipercaya. */
+    faktor: {
+      kerentananAkses: number;
+      kepadatan: number;
+      keterangan: string;
+    };
+
+    transportCount: number;
+    healthCount: number;
+    commercialCount: number;
+    hunianCount: number;
+    kulinerCount: number;
+    kulinerRamai: number;
+
+    /** Bahan mentah untuk penjelasan: nama titik dan hambatan yang tercatat. */
+    namaTitik: string[];
+    hambatan: string[];
+
     recommendedIntervention: string;
   };
   geometry: {
@@ -394,17 +430,44 @@ class MapIdService {
    * Menghasilkan grid sel analisis kesesuaian & prioritas intervensi fasilitas trotoar/ramp.
    * Mencakup 7 zona: Tamalate, Tamalanrea, Mariso, Ujung Pandang, Rappocini (Makassar), Bontomarannu, Somba Opu (Gowa).
    */
+  /**
+   * Grid prioritas: wilayah studi dibagi sel, tiap sel dinilai dari data nyata.
+   *
+   * Tiga hal diperbaiki dari versi sebelumnya, ketiganya soal kejujuran angka:
+   *
+   *   - Baris seed ikut terhitung. Empat belas baris karangan yang sudah
+   *     disaring dari peta dan chatbot masih masuk ke sini, dan justru
+   *     merekalah yang berskor tinggi.
+   *
+   *   - Sel tanpa titik survei diberi skor tengah 3,0, lalu tetap mendapat
+   *     angka prioritas dan kalimat rekomendasi. Sekarang nilainya null, dan
+   *     sisi web menggambarnya sebagai "belum disurvei" - bukan sebagai kabar
+   *     baik maupun buruk.
+   *
+   *   - Rekomendasinya tiga kalimat mati yang dipilih dari ambang angka,
+   *     sehingga sel tanpa satu pun data ramp tetap disuruh "revitalisasi ramp
+   *     curam". Kini kalimatnya disusun dari apa yang benar-benar tercatat di
+   *     sel itu, dan penjelasan naratifnya dikerjakan lapisan AI terpisah.
+   */
   async calculateSiniPriorityGrid(
     gridSizeMeters: number = 1000,
-    bbox: [number, number, number, number] = [119.38, -5.26, 119.56, -5.10] // Bounding box 7 Zona Makassar & Gowa
-  ): Promise<{ type: 'FeatureCollection'; features: SiniGridCell[]; summary: string }> {
+    moda: ModaPenilaian = 'AKSESIBILITAS',
+    bbox: [number, number, number, number] = [119.38, -5.26, 119.56, -5.10]
+  ): Promise<{
+    type: 'FeatureCollection';
+    features: SiniGridCell[];
+    summary: string;
+    moda: ModaPenilaian;
+  }> {
     const [minLng, minLat, maxLng, maxLat] = bbox;
     const gridStepLng = (gridSizeMeters / 111320) / Math.cos((-5.14 * Math.PI) / 180);
     const gridStepLat = gridSizeMeters / 111320;
 
-    // Ambil data lokasi & aktivitas tersimpan di database
+    // Hanya hasil survei sungguhan. Baris tanpa aiConfidence adalah data seed.
     const locations = await prisma.location.findMany({
+      where: { aiConfidence: { not: null } },
       select: {
+        name: true,
         latitude: true,
         longitude: true,
         entityType: true,
@@ -412,7 +475,12 @@ class MapIdService {
         overallScore: true,
         rampStatus: true,
         guidingBlockStatus: true,
+        sidewalkCondition: true,
       },
+    });
+
+    const titikEkonomi = await prisma.economicPoint.findMany({
+      select: { type: true, latitude: true, longitude: true, metadata: true },
     });
 
     const features: SiniGridCell[] = [];
@@ -427,17 +495,20 @@ class MapIdService {
         const centerLng = parseFloat(((cellMinLng + cellMaxLng) / 2).toFixed(6));
         const centerLat = parseFloat(((cellMinLat + cellMaxLat) / 2).toFixed(6));
 
-        // Filter lokasi di dalam sel grid
-        const cellLocations = locations.filter(
-          (loc) =>
-            loc.longitude >= cellMinLng &&
-            loc.longitude < cellMaxLng &&
-            loc.latitude >= cellMinLat &&
-            loc.latitude < cellMaxLat
-        );
+        const didalam = (o: { latitude: number; longitude: number }) =>
+          o.longitude >= cellMinLng &&
+          o.longitude < cellMaxLng &&
+          o.latitude >= cellMinLat &&
+          o.latitude < cellMaxLat;
+
+        const cellLocations = locations.filter(didalam);
+        const cellEkonomi = titikEkonomi.filter(didalam);
 
         const transportCount = cellLocations.filter(
-          (l) => l.entityType === 'TRANSIT_HUB' || l.category === 'BUS_STOP' || l.category === 'TRANSIT_STATION'
+          (l) =>
+            l.entityType === 'TRANSIT_HUB' ||
+            l.category === 'BUS_STOP' ||
+            l.category === 'TRANSIT_STATION'
         ).length;
 
         const healthCount = cellLocations.filter((l) => l.category === 'HEALTHCARE').length;
@@ -445,32 +516,138 @@ class MapIdService {
           (l) => l.category === 'MALL' || l.category === 'RESTAURANT' || l.entityType === 'PLACE'
         ).length;
 
-        const validScores = cellLocations.map((l) => l.overallScore).filter((s) => s > 0);
-        const avgScore = validScores.length > 0 ? validScores.reduce((a, b) => a + b, 0) / validScores.length : 3.0;
+        const hunianCount = cellEkonomi.filter((e) => e.type === 'PROPERTI_GO').length;
+        const kuliner = cellEkonomi.filter((e) => e.type === 'MENU_GO');
+        const kulinerCount = kuliner.length + cellEkonomi.filter((e) => e.type === 'COMMERCIAL').length;
+        const kulinerRamai = kuliner.filter((e) => {
+          const kondisi = String((e.metadata as any)?.kondisi_tempat ?? '');
+          return kondisi.toLowerCase().startsWith('ramai');
+        }).length;
 
-        // Formula MAPID SINI: Priority Index (0 - 100)
-        // Kepadatan aktivitas tinggi + skor aksesibilitas rendah = Prioritas intervensi TINGGI
-        const activityDensityWeight = Math.min(50, (transportCount * 12) + (healthCount * 15) + (commercialCount * 5));
-        const accessibilityVulnerability = ((5.0 - avgScore) / 4.0) * 50; // Semakin buruk skor, nilai makin tinggi
-        const priorityIndex = Math.min(100, Math.max(10, Math.round(activityDensityWeight + accessibilityVulnerability)));
+        const validScores = cellLocations
+          .map((l) => l.overallScore)
+          .filter((x): x is number => typeof x === 'number' && x > 0);
 
-        let recommendedIntervention = 'Pemeliharaan rutin trotoar';
-        if (priorityIndex >= 70) {
-          recommendedIntervention = 'Prioritas Mendesak: Revitalisasi ramp curam dan ubin pengarah guiding block di koridor transit';
-        } else if (priorityIndex >= 45) {
-          recommendedIntervention = 'Prioritas Menengah: Perbaikan permukaan trotoar & penambahan lampu jalan';
+        // Sel tanpa titik survei tidak dinilai sama sekali.
+        if (validScores.length === 0) {
+          features.push({
+            type: 'Feature',
+            properties: {
+              gridId: `MKSR-SINI-${gridIndex++}`,
+              center: [centerLng, centerLat],
+              moda,
+              priorityIndex: null,
+              accessibilityScore: null,
+              jumlahTitik: cellLocations.length,
+              faktor: {
+                kerentananAkses: 0,
+                kepadatan: 0,
+                keterangan: 'Belum ada titik survei di sel ini, jadi belum bisa dinilai.',
+              },
+              transportCount,
+              healthCount,
+              commercialCount,
+              hunianCount,
+              kulinerCount,
+              kulinerRamai,
+              namaTitik: [],
+              hambatan: [],
+              recommendedIntervention: 'Belum disurvei - kirim surveyor sebelum menyimpulkan apa pun.',
+            },
+            geometry: {
+              type: 'Polygon',
+              coordinates: [
+                [
+                  [cellMinLng, cellMinLat],
+                  [cellMaxLng, cellMinLat],
+                  [cellMaxLng, cellMaxLat],
+                  [cellMinLng, cellMaxLat],
+                  [cellMinLng, cellMinLat],
+                ],
+              ],
+            },
+          });
+          continue;
         }
+
+        const avgScore = validScores.reduce((a, b) => a + b, 0) / validScores.length;
+
+        // Semakin buruk skornya, semakin besar kerentanannya. Sama untuk ketiga
+        // moda: yang membedakan hanya kegiatan apa yang dianggap membuat sebuah
+        // sel layak didahulukan.
+        const kerentananAkses = ((5.0 - avgScore) / 4.0) * 50;
+
+        let kepadatan: number;
+        let keterangan: string;
+
+        if (moda === 'HUNIAN') {
+          // Hunian ada tetapi jalan menuju transit buruk - penghuni yang memakai
+          // kursi roda praktis terkurung di rumahnya sendiri.
+          // Tambahan "tidak ada transit" hanya berlaku bila ada hunian di sel
+          // ini. Tanpa syarat itu, sel kosong dari hunian pun ikut naik
+          // peringkat hanya karena sama-sama tidak punya halte - padahal tidak
+          // ada seorang pun di sana yang dirugikan.
+          const tanpaTransit = hunianCount > 0 && transportCount === 0 ? 15 : 0;
+          kepadatan = Math.min(50, hunianCount * 18 + tanpaTransit);
+          keterangan =
+            `${hunianCount} titik hunian, ${transportCount} titik transit` +
+            (tanpaTransit > 0 ? ' - ada hunian tetapi tidak ada transit terdata' : '');
+        } else if (moda === 'KOMERSIAL') {
+          // Tempat usaha ramai tetapi lingkungannya belum ramah difabel: pasar
+          // yang sudah terbukti ada, tetapi belum terlayani.
+          kepadatan = Math.min(50, kulinerCount * 12 + kulinerRamai * 10 + commercialCount * 4);
+          keterangan = `${kulinerCount} titik usaha (${kulinerRamai} tercatat ramai), ${commercialCount} tempat umum`;
+        } else {
+          kepadatan = Math.min(50, transportCount * 12 + healthCount * 15 + commercialCount * 5);
+          keterangan = `${transportCount} transit, ${healthCount} fasilitas kesehatan, ${commercialCount} tempat umum`;
+        }
+
+        const priorityIndex = Math.min(100, Math.max(10, Math.round(kerentananAkses + kepadatan)));
+
+        // Hambatan yang BENAR-BENAR tercatat di sel ini - bukan kalimat umum.
+        const hambatan: string[] = [];
+        const hitung = (syarat: (l: (typeof cellLocations)[number]) => boolean) =>
+          cellLocations.filter(syarat).length;
+
+        const rampTiada = hitung((l) => l.rampStatus === 'NONE' || l.rampStatus === 'DAMAGED');
+        const ubinTiada = hitung(
+          (l) => l.guidingBlockStatus === 'NONE' || l.guidingBlockStatus === 'DAMAGED'
+        );
+        const trotoarBuruk = hitung((l) =>
+          ['DAMAGED', 'BLOCKED', 'NARROW'].includes(String(l.sidewalkCondition))
+        );
+
+        if (rampTiada > 0) hambatan.push(`${rampTiada} titik tanpa ramp layak`);
+        if (ubinTiada > 0) hambatan.push(`${ubinTiada} titik ubin pemandu rusak atau tidak ada`);
+        if (trotoarBuruk > 0) hambatan.push(`${trotoarBuruk} titik trotoar rusak, sempit, atau terhalang`);
+
+        const recommendedIntervention =
+          hambatan.length > 0
+            ? `Yang tercatat di sel ini: ${hambatan.join('; ')}.`
+            : `Tidak ada hambatan tercatat pada ${cellLocations.length} titik di sel ini.`;
 
         features.push({
           type: 'Feature',
           properties: {
             gridId: `MKSR-SINI-${gridIndex++}`,
             center: [centerLng, centerLat],
-            transportScore: transportCount * 20,
-            healthScore: healthCount * 25,
-            commercialScore: commercialCount * 10,
-            accessibilityScore: parseFloat(avgScore.toFixed(1)),
+            moda,
             priorityIndex,
+            accessibilityScore: parseFloat(avgScore.toFixed(1)),
+            jumlahTitik: cellLocations.length,
+            faktor: {
+              kerentananAkses: Math.round(kerentananAkses),
+              kepadatan: Math.round(kepadatan),
+              keterangan,
+            },
+            transportCount,
+            healthCount,
+            commercialCount,
+            hunianCount,
+            kulinerCount,
+            kulinerRamai,
+            namaTitik: cellLocations.slice(0, 4).map((l) => l.name),
+            hambatan,
             recommendedIntervention,
           },
           geometry: {
@@ -489,16 +666,18 @@ class MapIdService {
       }
     }
 
+    const berdata = features.filter((f) => f.properties.priorityIndex !== null).length;
+
     return {
       type: 'FeatureCollection',
       features,
-      summary: `Analisis grid prioritas Difa AI untuk ${features.length} sel di Kota Makassar & Kabupaten Gowa (7 Zona Kecamatan) dengan formula multi-kriteria aksesibilitas & kepadatan fasilitas publik.`,
+      moda,
+      summary:
+        `${berdata} dari ${features.length} sel punya titik survei dan bisa dinilai; ` +
+        `sisanya belum pernah didatangi surveyor.`,
     };
   }
 
-  /**
-   * Generic passthrough proxy untuk endpoint MAPID lainnya
-   */
   async proxyRequest(path: string, params: Record<string, any> = {}, method: 'GET' | 'POST' = 'GET', data?: any) {
     try {
       const response = await this.apiClient.request({

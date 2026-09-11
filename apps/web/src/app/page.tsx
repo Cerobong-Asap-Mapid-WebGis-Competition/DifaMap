@@ -76,6 +76,7 @@ export default function HomePage() {
   // 6. Lapisan Site Selection & Site Analysis Difa AI
   const [isSiniGridVisible, setIsSiniGridVisible] = useState(false);
   const [siniGridSize, setSiniGridSize] = useState<number>(1000);
+  const [siniGridModa, setSiniGridModa] = useState<string>('AKSESIBILITAS');
   const [isochroneGeoJSON, setIsochroneGeoJSON] = useState<any>(null);
 
   // 7. Reset map camera trigger
@@ -449,6 +450,7 @@ export default function HomePage() {
         selectedActivityId={selectedItem?.type === 'ACTIVITY' ? selectedItem.data?.id : undefined}
         isSiniGridVisible={isSiniGridVisible}
         siniGridSize={siniGridSize}
+        siniGridModa={siniGridModa}
         isochroneGeoJSON={isochroneGeoJSON}
         titikFokus={
           selectedItem?.type === 'POI'
@@ -501,9 +503,10 @@ export default function HomePage() {
           setAnalysisTarget(null);
         }}
         selectedLocationId={selectedItem?.type === 'LOCATION' ? selectedItem.data?.id : undefined}
-        onToggleSiniGrid={(show, size) => {
+        onToggleSiniGrid={(show, size, moda) => {
           setIsSiniGridVisible(show);
           if (size) setSiniGridSize(size);
+          if (moda) setSiniGridModa(moda);
         }}
         onRunIsochroneAnalysis={handleRunIsochrone}
         onClearAnalysis={() => {

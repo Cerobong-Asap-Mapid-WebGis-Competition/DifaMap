@@ -35,6 +35,38 @@ import { useIsMobile } from '../../hooks/useIsMobile';
  */
 export type TampilanPanel = 'CHAT' | 'PERENCANA';
 
+/**
+ * Parameter yang dipakai menilai sel grid.
+ *
+ * Dinamai menurut yang dihitung, bukan menurut siapa yang memakainya. Satu
+ * orang bisa memerlukan ketiganya dalam satu duduk, dan menyebutnya "dinas"
+ * atau "developer" justru mempersempitnya tanpa alasan.
+ */
+export type ModaGrid = 'AKSESIBILITAS' | 'HUNIAN' | 'KOMERSIAL';
+
+const MODA_GRID: Array<{ kunci: ModaGrid; label: string; jelas: string }> = [
+  {
+    kunci: 'AKSESIBILITAS',
+    label: 'Aksesibilitas & Keramaian',
+    jelas: 'Sel bernilai tinggi: banyak orang melewatinya, tetapi kondisinya buruk.',
+  },
+  {
+    kunci: 'HUNIAN',
+    label: 'Hunian & Akses Transit',
+    jelas: 'Sel bernilai tinggi: ada tempat tinggal terdata, tetapi jalan menuju transit buruk atau transitnya belum terdata.',
+  },
+  {
+    kunci: 'KOMERSIAL',
+    label: 'Komersial & Fasilitas Difabel',
+    jelas: 'Sel bernilai tinggi: ada usaha yang terbukti ramai, tetapi lingkungannya belum ramah difabel.',
+  },
+];
+
+interface WawasanGrid {
+  ringkasan: string;
+  sel: Array<{ gridId: string; judul: string; alasan: string; tindakan: string }>;
+}
+
 /** Alat mana yang sedang dibuka di panel Urban Planner. */
 export type AlatPerencana = 'SELECTION' | 'ANALYSIS';
 
@@ -120,7 +152,7 @@ interface AiChatbotDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   selectedLocationId?: string;
-  onToggleSiniGrid?: (show: boolean, gridSize?: number) => void;
+  onToggleSiniGrid?: (show: boolean, gridSize?: number, moda?: string) => void;
   onRunIsochroneAnalysis?: (lat: number, lng: number, mode?: 'walking' | 'wheelchair') => void;
   onClearAnalysis?: () => void;
   onSelectCoordinateForAnalysis?: () => void;
@@ -188,6 +220,9 @@ export default function AiChatbotDrawer({
   // State: Tab 2 (Site Selection - grid prioritas Difa AI)
   // ----------------------------------------------------
   const [gridSize, setGridSize] = useState<number>(1000);
+  const [gridModa, setGridModa] = useState<ModaGrid>('AKSESIBILITAS');
+  const [wawasanGrid, setWawasanGrid] = useState<WawasanGrid | null>(null);
+  const [sedangMenyusunWawasan, setSedangMenyusunWawasan] = useState(false);
   const [isComputingGrid, setIsComputingGrid] = useState(false);
   const [gridResultSummary, setGridResultSummary] = useState<any>(null);
   const [isGridVisibleOnMap, setIsGridVisibleOnMap] = useState(false);
@@ -288,21 +323,19 @@ export default function AiChatbotDrawer({
   const handleComputeSiniGrid = async () => {
     try {
       setIsComputingGrid(true);
-      const res = await difaMapApi.getSiniGridPriority(gridSize);
+      const res = await difaMapApi.getSiniGridPriority(gridSize, gridModa);
       const features: any[] = res.data?.features ?? [];
 
-      // Nilai 25 adalah keluaran bawaan server untuk sel yang tidak punya satu pun
-      // titik survei maupun titik ekonomi di bawahnya. Sel seperti itu bukan
-      // "prioritas rendah" - melainkan belum terjangkau data, dan tidak layak
-      // muncul sebagai temuan.
-      const NILAI_SEL_KOSONG = 25;
+      // Sel tanpa titik survei bernilai null dari server, bukan angka tengah
+      // hasil tebakan. Sel seperti itu bukan "prioritas rendah" - melainkan
+      // belum terjangkau data, dan tidak layak muncul sebagai temuan.
       const selBerdata = features.filter(
-        (f) => (f.properties?.priorityIndex ?? NILAI_SEL_KOSONG) !== NILAI_SEL_KOSONG
+        (f) => f.properties?.priorityIndex !== null && f.properties?.priorityIndex !== undefined
       );
 
       const tigaTeratas = [...selBerdata]
         .sort((a, b) => (b.properties?.priorityIndex ?? 0) - (a.properties?.priorityIndex ?? 0))
-        .slice(0, 3)
+        .slice(0, 5)
         .map((f) => {
           const p = f.properties ?? {};
           const [lng, lat] = p.center ?? [];
@@ -320,13 +353,22 @@ export default function AiChatbotDrawer({
       setGridResultSummary({
         totalCells: features.length,
         selBerdata: selBerdata.length,
-        formulaApplied: `0.6 × Bobot_Kerusakan + 0.4 × Kepadatan_POIs`,
+        formulaApplied: MODA_GRID.find((m) => m.kunci === gridModa)?.label ?? gridModa,
         topPriorityZones: tigaTeratas,
       });
 
+      // Penjelasan naratif diminta terpisah supaya peta tidak menunggu AI.
+      setWawasanGrid(null);
+      setSedangMenyusunWawasan(true);
+      difaMapApi
+        .getSiniGridInsight(gridSize, gridModa)
+        .then((w) => setWawasanGrid(w?.data ?? null))
+        .catch(() => setWawasanGrid(null))
+        .finally(() => setSedangMenyusunWawasan(false));
+
       setIsGridVisibleOnMap(true);
       if (onToggleSiniGrid) {
-        onToggleSiniGrid(true, gridSize);
+        onToggleSiniGrid(true, gridSize, gridModa);
       }
     } catch (err) {
       console.error('Gagal menghitung grid prioritas Difa AI:', err);
@@ -797,6 +839,37 @@ export default function AiChatbotDrawer({
                 membuat sel kotak untuk seluruh wilayah studi, dan penyaringan
                 per kecamatan butuh batas administrasi yang belum kita punya.
                 Kontrol yang tidak mengubah apa pun lebih buruk daripada tidak ada. */}
+            {/* Parameter penilaian.
+                Grid yang sama dibaca tiga cara, karena yang disebut "prioritas"
+                bergantung pada apa yang sedang dicari. Labelnya menyebut
+                parameter yang dihitung, bukan siapa yang memakainya. */}
+            <div>
+              <label style={{ fontSize: '11.5px', color: '#64748B', display: 'block', marginBottom: '6px' }}>
+                Parameter Penilaian:
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                {MODA_GRID.map((m) => (
+                  <button
+                    key={m.kunci}
+                    onClick={() => setGridModa(m.kunci)}
+                    style={{
+                      textAlign: 'left',
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      border: gridModa === m.kunci ? '2px solid #539BA9' : '1px solid #E2E8F0',
+                      backgroundColor: gridModa === m.kunci ? '#F0F9FB' : '#FFFFFF',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>{m.label}</div>
+                    <div style={{ fontSize: '10.5px', color: '#64748B', lineHeight: '14px', marginTop: '2px' }}>
+                      {m.jelas}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div>
               <label style={{ fontSize: '11.5px', color: '#64748B', display: 'block', marginBottom: '4px' }}>Ukuran Sel Grid:</label>
               <select
@@ -824,8 +897,13 @@ export default function AiChatbotDrawer({
 
             <div style={{ fontSize: '11.5px', color: '#64748B', lineHeight: '17px' }}>
               Setiap sel dinilai dari dua hal: seberapa buruk kondisi aksesibilitas titik
-              survei di dalamnya, dan seberapa ramai kegiatan di sekitarnya. Sel dengan
-              kondisi buruk sekaligus ramai mendapat prioritas tertinggi.
+              survei di dalamnya, dan {gridModa === 'HUNIAN'
+                ? 'ada tidaknya hunian yang terkurung tanpa transit layak'
+                : gridModa === 'KOMERSIAL'
+                  ? 'seberapa banyak tempat usaha ramai di sekitarnya'
+                  : 'seberapa ramai kegiatan di sekitarnya'}. Sel yang buruk sekaligus{' '}
+              {gridModa === 'HUNIAN' ? 'berpenghuni' : 'ramai'} mendapat prioritas tertinggi.
+              Sel tanpa satu pun titik survei tidak dinilai sama sekali.
             </div>
 
             <button
@@ -887,12 +965,53 @@ export default function AiChatbotDrawer({
                 ))
               )}
 
+              {/* Wawasan Difa AI.
+                  Menggantikan tiga kalimat mati yang dulu dipilih dari ambang
+                  angka - kalimat yang sama muncul di tiap sel, dan menyuruh
+                  memperbaiki ramp bahkan di sel yang tidak punya data ramp. */}
+              {sedangMenyusunWawasan && (
+                <div style={{ backgroundColor: '#FFFFFF', padding: '10px', borderRadius: '8px', border: '1px dashed #CBD5E1', fontSize: '11.5px', color: '#64748B', marginTop: '6px' }}>
+                  Difa AI sedang membaca pola antar sel...
+                </div>
+              )}
+
+              {wawasanGrid && (
+                <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '8px', padding: '11px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '5px' }}>
+                      <Sparkles size={14} color="#D97706" />
+                      <span style={{ fontSize: '12px', fontWeight: 800, color: '#000000' }}>Wawasan Difa AI</span>
+                    </div>
+                    <div style={{ fontSize: '11.5px', color: '#475569', lineHeight: '17px' }}>
+                      {wawasanGrid.ringkasan}
+                    </div>
+                  </div>
+
+                  {wawasanGrid.sel.slice(0, 5).map((w) => (
+                    <div key={w.gridId} style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '10px' }}>
+                      <div style={{ fontSize: '11.5px', fontWeight: 800, color: '#0F172A' }}>
+                        {w.judul}
+                      </div>
+                      <div style={{ fontSize: '10px', color: '#94A3B8', fontFamily: 'var(--font-mono)', marginTop: '1px' }}>
+                        {w.gridId}
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: '#475569', lineHeight: '17px', marginTop: '5px' }}>
+                        {w.alasan}
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: '#0F172A', lineHeight: '17px', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #F1F5F9' }}>
+                        <strong>Tindakan:</strong> {w.tindakan}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
                 <button
                   onClick={() => {
                     const next = !isGridVisibleOnMap;
                     setIsGridVisibleOnMap(next);
-                    if (onToggleSiniGrid) onToggleSiniGrid(next, gridSize);
+                    if (onToggleSiniGrid) onToggleSiniGrid(next, gridSize, gridModa);
                   }}
                   style={{
                     width: '100%',

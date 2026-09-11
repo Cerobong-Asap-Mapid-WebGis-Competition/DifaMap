@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { mapIdService } from '../services/mapid.service.js';
 import { hitungIsokron } from '../services/rute.service.js';
+import { susunWawasanGrid } from '../services/gridInsight.service.js';
+import type { ModaPenilaian } from '../services/mapid.service.js';
 
 export async function getMapStyleController(req: Request, res: Response): Promise<void> {
   try {
@@ -164,10 +166,17 @@ export async function getElevationSlopeController(req: Request, res: Response): 
 /**
  * Difa AI: grid analisis kesesuaian & prioritas aksesibilitas Makassar
  */
+const MODA_SAH: ModaPenilaian[] = ['AKSESIBILITAS', 'HUNIAN', 'KOMERSIAL'];
+
+function bacaModa(nilai: unknown): ModaPenilaian {
+  const t = String(nilai ?? '').toUpperCase() as ModaPenilaian;
+  return MODA_SAH.includes(t) ? t : 'AKSESIBILITAS';
+}
+
 export async function getSiniGridPriorityController(req: Request, res: Response): Promise<void> {
   try {
     const gridSize = parseInt(req.query.gridSize as string, 10) || 1000;
-    const gridData = await mapIdService.calculateSiniPriorityGrid(gridSize);
+    const gridData = await mapIdService.calculateSiniPriorityGrid(gridSize, bacaModa(req.query.moda));
 
     res.json({
       success: true,
@@ -175,6 +184,31 @@ export async function getSiniGridPriorityController(req: Request, res: Response)
     });
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to compute SINI grid analysis', message: error.message });
+  }
+}
+
+/**
+ * Penjelasan naratif atas grid, dipisah dari perhitungannya.
+ *
+ * Gridnya sendiri tidak memanggil AI sama sekali dan selesai dalam sekejap,
+ * jadi peta bisa langsung terwarnai. Penjelasannya menyusul lewat permintaan
+ * kedua - kalau ia gagal atau lambat, yang hilang hanya paragrafnya, bukan
+ * seluruh analisisnya.
+ */
+export async function getSiniGridInsightController(req: Request, res: Response): Promise<void> {
+  try {
+    const gridSize = parseInt(req.query.gridSize as string, 10) || 1000;
+    const moda = bacaModa(req.query.moda);
+
+    const gridData = await mapIdService.calculateSiniPriorityGrid(gridSize, moda);
+    const wawasan = await susunWawasanGrid(gridData.features, moda, gridData.summary);
+
+    res.json({
+      success: true,
+      data: wawasan,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to compose grid insight', message: error.message });
   }
 }
 
