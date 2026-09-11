@@ -225,6 +225,23 @@ export const difaMapApi = {
     if (!res.ok) throw new Error('Failed to fetch SINI grid');
     return res.json();
   },
+
+  /**
+   * Mengambil lokasi survei dalam radius tertentu dari sebuah titik.
+   * Jaraknya dihitung PostGIS di server, jadi angkanya meter sesungguhnya
+   * di permukaan bumi - bukan selisih derajat lintang/bujur.
+   */
+  async getNearbyLocations(lat: number, lng: number, radiusMeters = 600, limit = 100) {
+    const query = new URLSearchParams({
+      lat: String(lat),
+      lng: String(lng),
+      radius: String(radiusMeters),
+      limit: String(limit),
+    });
+    const res = await fetch(`${API_BASE_URL}/api/locations/nearby?${query.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch nearby locations');
+    return res.json();
+  },
 };
 
 /**

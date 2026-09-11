@@ -26,6 +26,84 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 
 export type SiniAiTab = 'CHAT' | 'SITE_SELECTION' | 'SITE_ANALYSIS';
 
+/**
+ * Jarak dua koordinat dalam meter (haversine).
+ *
+ * Dipakai hanya untuk menyaring titik ekonomi, yang jumlahnya puluhan dan sudah
+ * ada di memori browser. Untuk lokasi survei, jarak tetap dihitung PostGIS di
+ * server lewat /locations/nearby.
+ */
+function jarakMeter(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6_371_000;
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const dLat = rad(lat2 - lat1);
+  const dLng = rad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+/** Satu masalah aksesibilitas yang dicari di lokasi sekitar titik analisis. */
+const MASALAH_DIPANTAU: Array<{ kolom: string; nilaiBermasalah: string[]; sebutan: string }> = [
+  { kolom: 'rampStatus', nilaiBermasalah: ['NONE', 'DAMAGED'], sebutan: 'ramp tidak ada atau rusak' },
+  { kolom: 'guidingBlockStatus', nilaiBermasalah: ['NONE', 'DAMAGED'], sebutan: 'ubin pemandu terputus' },
+  { kolom: 'sidewalkCondition', nilaiBermasalah: ['DAMAGED', 'BLOCKED', 'NARROW'], sebutan: 'trotoar rusak, sempit, atau terhalang' },
+  { kolom: 'lightingLevel', nilaiBermasalah: ['DARK', 'DIM'], sebutan: 'penerangan jalan kurang' },
+];
+
+/**
+ * Menyusun rekomendasi aksesibilitas dari lokasi survei di sekitar titik.
+ *
+ * Semua angka berasal dari baris yang benar-benar ada di radius tersebut. Kalau
+ * tidak ada satu pun lokasi, fungsi ini mengatakannya - tidak mengarang skor.
+ */
+function ringkasAksesibilitas(lokasi: any[], radiusMeter: number) {
+  if (lokasi.length === 0) {
+    return {
+      jumlahLokasi: 0,
+      skorRata: null,
+      action: `Belum ada titik survei dalam radius ${radiusMeter} m dari titik ini, jadi kondisi aksesibilitasnya belum bisa dinilai.`,
+      temuan: [] as string[],
+    };
+  }
+
+  const berskor = lokasi.filter((l) => typeof l.overallScore === 'number');
+  const skorRata = berskor.length
+    ? berskor.reduce((jml, l) => jml + l.overallScore, 0) / berskor.length
+    : null;
+
+  const temuan = MASALAH_DIPANTAU
+    .map((m) => {
+      const jml = lokasi.filter((l) => m.nilaiBermasalah.includes(l[m.kolom])).length;
+      return { sebutan: m.sebutan, jml };
+    })
+    .filter((t) => t.jml > 0)
+    .sort((a, b) => b.jml - a.jml)
+    .map((t) => `${t.sebutan} (${t.jml} titik)`);
+
+  // Parameter NOT_VISIBLE berarti tidak terlihat di foto survei, bukan tidak ada.
+  // Jumlahnya disebut supaya pembaca tahu seberapa lengkap dasar kesimpulan ini.
+  const belumTeramati = lokasi.reduce(
+    (jml, l) => jml + MASALAH_DIPANTAU.filter((m) => l[m.kolom] === 'NOT_VISIBLE').length,
+    0
+  );
+
+  const action =
+    temuan.length > 0
+      ? `Dari ${lokasi.length} titik survei dalam radius ${radiusMeter} m, masalah terbanyak: ${temuan.join('; ')}.`
+      : `Dari ${lokasi.length} titik survei dalam radius ${radiusMeter} m, tidak ada hambatan yang tercatat bermasalah.`;
+
+  return {
+    jumlahLokasi: lokasi.length,
+    skorRata,
+    action,
+    temuan,
+    belumTeramati,
+    totalParameterDiperiksa: lokasi.length * MASALAH_DIPANTAU.length,
+  };
+}
+
 interface AiChatbotDrawerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -83,6 +161,7 @@ export default function AiChatbotDrawer({
   const [isochroneMinutes, setIsochroneMinutes] = useState<number>(10);
   const [isAnalyzingSite, setIsAnalyzingSite] = useState(false);
   const [siteAnalysisData, setSiteAnalysisData] = useState<any>(null);
+  const [gagalAnalisis, setGagalAnalisis] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -155,14 +234,39 @@ export default function AiChatbotDrawer({
     try {
       setIsComputingGrid(true);
       const res = await difaMapApi.getSiniGridPriority(gridSize);
+      const features: any[] = res.data?.features ?? [];
+
+      // Nilai 25 adalah keluaran bawaan server untuk sel yang tidak punya satu pun
+      // titik survei maupun titik ekonomi di bawahnya. Sel seperti itu bukan
+      // "prioritas rendah" - melainkan belum terjangkau data, dan tidak layak
+      // muncul sebagai temuan.
+      const NILAI_SEL_KOSONG = 25;
+      const selBerdata = features.filter(
+        (f) => (f.properties?.priorityIndex ?? NILAI_SEL_KOSONG) !== NILAI_SEL_KOSONG
+      );
+
+      const tigaTeratas = [...selBerdata]
+        .sort((a, b) => (b.properties?.priorityIndex ?? 0) - (a.properties?.priorityIndex ?? 0))
+        .slice(0, 3)
+        .map((f) => {
+          const p = f.properties ?? {};
+          const [lng, lat] = p.center ?? [];
+          return {
+            zone: p.gridId ?? 'Sel tanpa nama',
+            koordinat:
+              typeof lat === 'number' && typeof lng === 'number'
+                ? `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+                : null,
+            score: Math.round(p.priorityIndex ?? 0),
+            issue: p.recommendedIntervention ?? 'Belum ada rekomendasi',
+          };
+        });
+
       setGridResultSummary({
-        totalCells: res.data?.features?.length || 360,
+        totalCells: features.length,
+        selBerdata: selBerdata.length,
         formulaApplied: `0.6 × Bobot_Kerusakan + 0.4 × Kepadatan_POIs`,
-        topPriorityZones: [
-          { zone: 'Koridor Jl. Hertasning (Panakkukang)', score: 88, issue: 'Guiding block terputus & ramp curam' },
-          { zone: 'Kawasan Transit Halte Karebosi (Ujung Pandang)', score: 82, issue: 'Trotoar sempit & paving rusak' },
-          { zone: 'Area Perintis Kemerdekaan (Tamalanrea)', score: 76, issue: 'Kurang penerangan malam & tanpa ramp' },
-        ],
+        topPriorityZones: tigaTeratas,
       });
 
       setIsGridVisibleOnMap(true);
@@ -178,51 +282,70 @@ export default function AiChatbotDrawer({
 
   // Handler: Execute Site Analysis
   const handleRunSiteAnalysis = async (lat: number = -5.1700, lng: number = 119.4500, locName?: string) => {
+    // Kecepatan yang dipakai server untuk isokron: kursi roda 60 m/menit,
+    // jalan kaki 80 m/menit. Disamakan di sini agar radius penyaring titik
+    // ekonomi persis sama dengan lingkaran yang digambar di peta.
+    const radiusJangkauan = isochroneMinutes * (isochroneMode === 'wheelchair' ? 60 : 80);
+
     try {
       setIsAnalyzingSite(true);
+      setGagalAnalisis(null);
       if (onRunIsochroneAnalysis) {
         onRunIsochroneAnalysis(lat, lng, isochroneMode);
       }
 
-      // Synthesize Site Analysis Output (Demografi, Isokron, POI Catchment)
-      setTimeout(() => {
-        setSiteAnalysisData({
-          name: locName || 'Titik Analisis Terpilih',
-          coordinates: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
-          demography: {
-            subdistrict: 'TAMALANREA INDAH, KEC. TAMALANREA',
-            city: 'KOTA MAKASSAR, SULAWESI SELATAN',
-            estimatedPopulation: '30.232 Jiwa',
-          },
-          isochrone: {
-            mode: isochroneMode === 'wheelchair' ? 'Kursi Roda' : 'Jalan Kaki',
-            radiusMeters: isochroneMinutes * (isochroneMode === 'wheelchair' ? 60 : 80),
-            areaSqKm: '1.13 km²',
-          },
-          landAndDisaster: {
-            estimatedLandValue: 'Rp 1.425.000 / m²',
-            landUse: 'Jasa & Fasilitas Umum / Permukiman',
-            floodRisk: 'RENDAH - SEDANG',
-          },
-          poiCatchment: {
-            total: 1082,
-            categories: [
-              { name: 'Perdagangan & Retail', count: 397, color: '#38bdf8' },
-              { name: 'Layanan atau Jasa', count: 231, color: '#ec4899' },
-              { name: 'Kesehatan & Pengobatan', count: 136, color: '#10b981' },
-              { name: 'Makanan & Minuman (Menu Go)', count: 77, color: '#FDC323' },
-            ],
-          },
-          accessibilityRecommendation: {
-            score: 3.8,
-            priorityIndex: 78.5,
-            action: 'Prioritas Tinggi: Modifikasi kelandaian ramp akses masuk (<8%) dan penyambungan ubin pemandu tunanetra di radius 300m.',
-          },
-        });
-        setIsAnalyzingSite(false);
-      }, 500);
+      // Tiga sumber data nyata, diminta bersamaan supaya tidak menunggu berantai.
+      const [isokron, sekitar, ekonomi] = await Promise.all([
+        difaMapApi.getIsochrone(lat, lng, [isochroneMinutes], isochroneMode),
+        difaMapApi.getNearbyLocations(lat, lng, radiusJangkauan, 100),
+        difaMapApi.getEconomicPoints('ALL'),
+      ]);
+
+      const sifatIsokron = isokron?.data?.features?.[0]?.properties ?? {};
+      const radiusMeter: number = sifatIsokron.radiusMeters ?? radiusJangkauan;
+      const lokasiSekitar: any[] = sekitar?.data ?? [];
+
+      // Titik ekonomi belum punya penyaring radius di server, jadi disaring di sini.
+      const titikEkonomiDekat: any[] = (ekonomi?.data ?? []).filter(
+        (p: any) => jarakMeter(lat, lng, p.latitude, p.longitude) <= radiusMeter
+      );
+
+      const hitungJenis = (jenis: string) =>
+        titikEkonomiDekat.filter((p) => p.type === jenis).length;
+
+      const kategoriPoi = [
+        { name: 'Titik Survei Aksesibilitas', count: lokasiSekitar.length, color: '#10b981' },
+        { name: 'Makanan & Minuman (Menu Go)', count: hitungJenis('MENU_GO'), color: '#FDC323' },
+        { name: 'Properti (Properti Go)', count: hitungJenis('PROPERTI_GO'), color: '#38bdf8' },
+        { name: 'Komersial Lainnya', count: hitungJenis('COMMERCIAL'), color: '#ec4899' },
+      ];
+
+      setSiteAnalysisData({
+        name: locName || 'Titik Analisis Terpilih',
+        coordinates: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+
+        // Demografi dan nilai tanah sengaja null: DifaMap belum punya sumbernya.
+        // Menampilkan angka tebakan di sini pernah membuat panel melaporkan
+        // kecamatan yang berbeda belasan kilometer dari titik yang diklik.
+        demography: null,
+        landAndDisaster: null,
+
+        isochrone: {
+          mode: isochroneMode === 'wheelchair' ? 'Kursi Roda' : 'Jalan Kaki',
+          radiusMeters: radiusMeter,
+          areaSqKm: sifatIsokron.areaSqKm ?? null,
+        },
+        poiCatchment: {
+          total: kategoriPoi.reduce((jml, k) => jml + k.count, 0),
+          categories: kategoriPoi,
+        },
+        accessibilityRecommendation: ringkasAksesibilitas(lokasiSekitar, radiusMeter),
+      });
+      setIsAnalyzingSite(false);
     } catch (err) {
       console.error('Site analysis error:', err);
+      setSiteAnalysisData(null);
+      setGagalAnalisis('Data analisis gagal diambil dari server. Coba ulangi.');
       setIsAnalyzingSite(false);
     }
   };
@@ -651,16 +774,33 @@ export default function AiChatbotDrawer({
                 Formula: {gridResultSummary.formulaApplied}
               </div>
 
+              {/* Cakupan data disebut di muka. Tanpa ini, peta yang hampir seluruhnya
+                  bernilai sama terbaca sebagai fitur rusak, padahal apa adanya. */}
+              <div style={{ fontSize: '11px', color: '#64748B', backgroundColor: '#FFFFFF', padding: '6px 10px', borderRadius: '6px', border: '1px solid #E2E8F0' }}>
+                <strong style={{ color: '#000000' }}>{gridResultSummary.selBerdata}</strong> dari{' '}
+                <strong style={{ color: '#000000' }}>{gridResultSummary.totalCells}</strong> sel punya titik survei
+                atau titik ekonomi di bawahnya. Sisanya belum terjangkau data, bukan berprioritas rendah.
+              </div>
+
               <div style={{ fontSize: '12px', fontWeight: '600', color: '#000000', marginTop: '4px' }}>Zona Prioritas Teratas:</div>
-              {gridResultSummary.topPriorityZones.map((z: any, idx: number) => (
-                <div key={idx} style={{ backgroundColor: '#FFFFFF', padding: '8px 10px', borderRadius: '6px', border: '1px solid #E2E8F0', fontSize: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700' }}>
-                    <span>{idx + 1}. {z.zone}</span>
-                    <span style={{ color: '#EF0004' }}>{z.score}/100</span>
-                  </div>
-                  <div style={{ color: '#64748B', fontSize: '11px', marginTop: '2px' }}>{z.issue}</div>
+              {gridResultSummary.topPriorityZones.length === 0 ? (
+                <div style={{ backgroundColor: '#FFFFFF', padding: '10px', borderRadius: '6px', border: '1px dashed #CBD5E1', fontSize: '11.5px', color: '#64748B' }}>
+                  Belum ada sel yang punya data pendukung, jadi belum ada zona prioritas yang bisa diurutkan.
                 </div>
-              ))}
+              ) : (
+                gridResultSummary.topPriorityZones.map((z: any, idx: number) => (
+                  <div key={idx} style={{ backgroundColor: '#FFFFFF', padding: '8px 10px', borderRadius: '6px', border: '1px solid #E2E8F0', fontSize: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700' }}>
+                      <span>{idx + 1}. {z.zone}</span>
+                      <span style={{ color: '#EF0004' }}>{z.score}/100</span>
+                    </div>
+                    {z.koordinat && (
+                      <div style={{ color: '#94A3B8', fontSize: '10.5px', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>{z.koordinat}</div>
+                    )}
+                    <div style={{ color: '#64748B', fontSize: '11px', marginTop: '2px' }}>{z.issue}</div>
+                  </div>
+                ))
+              )}
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
                 <button
@@ -800,32 +940,37 @@ export default function AiChatbotDrawer({
               <div className="skeleton" style={{ height: '80px', width: '100%' }} />
               <div className="skeleton" style={{ height: '120px', width: '100%' }} />
             </div>
+          ) : gagalAnalisis ? (
+            <div role="alert" style={{ backgroundColor: '#FEE2E2', border: '1px solid #FECACA', color: '#991B1B', borderRadius: '10px', padding: '12px', fontSize: '12px' }}>
+              {gagalAnalisis}
+            </div>
           ) : siteAnalysisData ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {/* Card 1: Demografi & Lokasi (Screenshot 1) */}
+              {/* Card 1: Jangkauan tempuh - satu-satunya angka geometris yang dihitung server */}
               <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px' }}>
                 <div style={{ fontSize: '12px', fontWeight: '700', color: '#539BA9', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                  <Users size={15} />
-                  <span>Demografi & Administrasi</span>
+                  <Clock size={15} />
+                  <span>Jangkauan {siteAnalysisData.isochrone.mode}</span>
                 </div>
                 <div style={{ fontSize: '13px', fontWeight: '800', color: '#000000' }}>
-                  Jumlah Penduduk: {siteAnalysisData.demography.estimatedPopulation}
+                  Radius {siteAnalysisData.isochrone.radiusMeters} m
+                  {siteAnalysisData.isochrone.areaSqKm != null && ` · ${siteAnalysisData.isochrone.areaSqKm} km²`}
                 </div>
                 <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px' }}>
-                  {siteAnalysisData.demography.subdistrict}, {siteAnalysisData.demography.city}
+                  Lingkaran radius, bukan isokron jaringan jalan · titik {siteAnalysisData.coordinates}
                 </div>
               </div>
 
-              {/* Card 2: Guna & Nilai Tanah (Screenshot 3) */}
-              <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px' }}>
-                <div style={{ fontSize: '12px', fontWeight: '700', color: '#000000', marginBottom: '4px' }}>
-                  Guna & Perkiraan Nilai Tanah
+              {/* Card 2: Data yang DifaMap belum punya sumbernya.
+                  Dikosongkan dengan terang-terangan, bukan diisi perkiraan. */}
+              <div style={{ backgroundColor: '#F8FAFC', border: '1px dashed #CBD5E1', borderRadius: '10px', padding: '12px' }}>
+                <div style={{ fontSize: '12px', fontWeight: '700', color: '#64748B', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                  <Users size={15} />
+                  <span>Demografi &amp; Nilai Tanah</span>
                 </div>
-                <div style={{ fontSize: '13px', fontWeight: '800', color: '#10b981' }}>
-                  {siteAnalysisData.landAndDisaster.estimatedLandValue}
-                </div>
-                <div style={{ fontSize: '11.5px', color: '#64748B' }}>
-                  Perkiraan Guna Lahan: {siteAnalysisData.landAndDisaster.landUse}
+                <div style={{ fontSize: '11.5px', color: '#64748B', lineHeight: '17px' }}>
+                  Belum tersedia. DifaMap belum punya sumber data jumlah penduduk, batas kecamatan,
+                  maupun nilai tanah untuk titik ini.
                 </div>
               </div>
 
@@ -834,41 +979,67 @@ export default function AiChatbotDrawer({
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <span style={{ fontSize: '13px', fontWeight: '700', color: '#000000' }}>Point of Interest</span>
                   <span style={{ fontSize: '12px', fontWeight: '800', color: '#539BA9' }}>
-                    {siteAnalysisData.poiCatchment.total} Total POIs
+                    {siteAnalysisData.poiCatchment.total} titik dalam radius
                   </span>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {siteAnalysisData.poiCatchment.categories.map((c: any, i: number) => (
-                    <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', fontWeight: '600' }}>
-                        <span>{c.name}</span>
-                        <span>{c.count}</span>
+                  {(() => {
+                    // Skala batang mengikuti kategori terbanyak pada radius ini.
+                    // Pembagi tetap membuat seluruh batang tak terlihat ketika
+                    // angkanya kecil - dan angka kecil memang yang sebenarnya.
+                    const tertinggi = Math.max(
+                      1,
+                      ...siteAnalysisData.poiCatchment.categories.map((c: any) => c.count)
+                    );
+                    return siteAnalysisData.poiCatchment.categories.map((c: any, i: number) => (
+                      <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', fontWeight: '600' }}>
+                          <span>{c.name}</span>
+                          <span>{c.count}</span>
+                        </div>
+                        <div style={{ height: '6px', width: '100%', backgroundColor: '#E2E8F0', borderRadius: '4px', overflow: 'hidden' }}>
+                          <div
+                            style={{
+                              height: '100%',
+                              width: `${(c.count / tertinggi) * 100}%`,
+                              backgroundColor: c.color,
+                              borderRadius: '4px',
+                            }}
+                          />
+                        </div>
                       </div>
-                      <div style={{ height: '6px', width: '100%', backgroundColor: '#E2E8F0', borderRadius: '4px', overflow: 'hidden' }}>
-                        <div
-                          style={{
-                            height: '100%',
-                            width: `${(c.count / 400) * 100}%`,
-                            backgroundColor: c.color,
-                            borderRadius: '4px',
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
+                    ));
+                  })()}
+                </div>
+
+                <div style={{ fontSize: '10.5px', color: '#94A3B8', marginTop: '8px' }}>
+                  Dihitung dari basis data DifaMap sendiri: titik survei dan titik ekonomi
+                  Menu Go / Properti Go, bukan seluruh POI komersial Makassar.
                 </div>
               </div>
 
-              {/* Card 4: Rekomendasi Aksesibilitas AI */}
+              {/* Card 4: Rekomendasi Aksesibilitas - disusun dari lokasi survei di radius ini */}
               <div style={{ backgroundColor: 'rgba(253, 195, 35, 0.12)', border: '1px solid #FDC323', borderRadius: '10px', padding: '12px' }}>
                 <div style={{ fontSize: '12px', fontWeight: '700', color: '#000000', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                   <Accessibility size={16} />
                   <span>Indeks Prioritas Aksesibilitas DifaMap</span>
                 </div>
+                {siteAnalysisData.accessibilityRecommendation.skorRata != null && (
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: '#000000', marginBottom: '4px' }}>
+                    Skor aksesibilitas rata-rata: {siteAnalysisData.accessibilityRecommendation.skorRata.toFixed(2)} / 5
+                  </div>
+                )}
                 <div style={{ fontSize: '12px', color: '#334155', lineHeight: '18px' }}>
                   {siteAnalysisData.accessibilityRecommendation.action}
                 </div>
+                {siteAnalysisData.accessibilityRecommendation.belumTeramati > 0 && (
+                  <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: '6px' }}>
+                    {siteAnalysisData.accessibilityRecommendation.belumTeramati} dari{' '}
+                    {siteAnalysisData.accessibilityRecommendation.totalParameterDiperiksa} parameter belum
+                    teramati di foto survei, jadi hambatan sebenarnya bisa lebih banyak daripada yang tercatat.
+                  </div>
+                )}
               </div>
             </div>
           ) : (
