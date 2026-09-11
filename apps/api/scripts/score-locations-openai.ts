@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { analyzeAccessibilityActivity } from '../src/services/aiOrchestrator.service.js';
 import { prioritizeCameraPhotos } from '../src/services/mapidCompetition.service.js';
+import { ringkasanPemakaian, resetPemakaian } from '../src/lib/aiUsage.js';
 
 const prisma = new PrismaClient();
 
@@ -18,6 +19,10 @@ async function runOpenAiScoring() {
   console.log('   Berdasarkan Catatan Teknis Tim Cerobong Asap MAPID 2026');
   console.log(`   Mode: ${isMissingOnly ? 'TITIK BELUM DIEVALUASI (MISSING PARAMS)' : (isTestMode ? 'TEST RUN (3 Titik Lapangan)' : (limit ? `LIMIT (${limit} Titik)` : 'SEMUA TITIK'))}`);
   console.log('===============================================================\n');
+
+  // Hitungan token dimulai dari nol supaya ringkasan di akhir hanya mencakup
+  // jalannya skrip ini, bukan sisa pemakaian dari proses lain.
+  resetPemakaian();
 
   // Ambil aktivitas dari database
   let rawActivities = await prisma.activity.findMany({
@@ -157,7 +162,10 @@ async function runOpenAiScoring() {
   if (processedCount > 0) {
     console.log(`⭐ Rata-rata Skor Bintang: ${(totalOverallScore / processedCount).toFixed(2)} / 5.0`);
     console.log(`🎯 Rata-rata Keyakinan AI: ${((totalConfidence / processedCount) * 100).toFixed(1)}%`);
-    console.log(`💰 Perkiraan Biaya API   : ~$${(processedCount * 0.0012).toFixed(4)} USD`);
+    // Angka di bawah berasal dari kolom usage pada setiap respons OpenAI, bukan
+    // perkalian tarif per titik. Biaya sebenarnya naik-turun mengikuti jumlah
+    // dan ukuran foto tiap aktivitas, jadi perkiraan tetap bisa meleset jauh.
+    console.log(`💰 ${ringkasanPemakaian(processedCount)}`);
   }
   console.log('===============================================================\n');
 }

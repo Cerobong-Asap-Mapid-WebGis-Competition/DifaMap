@@ -1,5 +1,6 @@
 import { openai } from '../lib/openai.js';
 import { prisma } from '../lib/prisma.js';
+import { catatPemakaian } from '../lib/aiUsage.js';
 import {
   RampStatus,
   GuidingBlockStatus,
@@ -230,6 +231,8 @@ Jumlah Foto Dilampirkan: ${mediaUrls.length}`;
       temperature: 0.2,
     });
 
+    catatPemakaian('analisis-aktivitas', response.usage);
+
     const rawContent = response.choices[0]?.message?.content;
     if (!rawContent) {
       throw new Error('OpenAI returned empty response');
@@ -386,6 +389,8 @@ PENTING: field "communityObserved" adalah CATATAN LAPORAN PENGGUNA, bukan status
       ],
       temperature: 0.2,
     });
+
+    catatPemakaian('sintesis-lokasi', response.usage);
 
     const raw = response.choices[0]?.message?.content;
     if (raw) {
