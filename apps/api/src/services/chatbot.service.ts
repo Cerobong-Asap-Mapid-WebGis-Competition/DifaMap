@@ -24,6 +24,8 @@ export interface ChatResponse {
   rute?: {
     awal: string;
     tujuan: string;
+    awalSebenarnya: string;
+    tujuanSebenarnya: string;
     jarakMeter: number;
     durasiDetik: number;
     jalur: Array<[number, number]>;

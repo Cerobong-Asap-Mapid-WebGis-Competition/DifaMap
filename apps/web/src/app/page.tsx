@@ -444,6 +444,7 @@ export default function HomePage() {
         }
         radiusTempat={radiusTempat}
         rute={rute}
+        onTutupRute={() => setRute(null)}
         onSelectPoi={(poi) => setSelectedItem({ type: 'POI', data: poi })}
         onSelectLocation={handleSelectLocation}
         onSelectActivity={handleSelectActivity}

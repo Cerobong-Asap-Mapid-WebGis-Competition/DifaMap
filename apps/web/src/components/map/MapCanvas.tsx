@@ -51,6 +51,8 @@ interface MapCanvasProps {
    * Membaca "1,7 kilometer" tidak sama dengan melihat jalan mana yang dilewati.
    */
   rute?: { awal: string; tujuan: string; jalur: Array<[number, number]> } | null;
+  /** Menutup jalur rute yang sedang tergambar. */
+  onTutupRute?: () => void;
   onSelectPoi?: (poi: { nama: string; kategori?: string; latitude: number; longitude: number }) => void;
   onSelectLocation?: (location: any) => void;
   onSelectActivity?: (activity: any) => void;
@@ -76,6 +78,7 @@ export default function MapCanvas({
   titikFokus = null,
   radiusTempat = 500,
   rute = null,
+  onTutupRute,
   onSelectPoi,
   onSelectLocation,
   onSelectActivity,
@@ -1356,6 +1359,64 @@ export default function MapCanvas({
             }}
           >
             Coba lagi
+          </button>
+        </div>
+      )}
+
+      {/* Pita rute dengan tombol tutup.
+          Jalur rute bertahan sampai pertanyaan berganti, dan itu memang
+          disengaja - tetapi saat pengguna pindah ke fitur lain, garis biru yang
+          masih membentang jadi mengganggu tanpa ada cara jelas membuangnya. */}
+      {rute?.jalur && rute.jalur.length > 1 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '96px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            backgroundColor: '#FFFFFF',
+            border: '1px solid #E2E8F0',
+            borderRadius: '22px',
+            padding: '7px 8px 7px 14px',
+            boxShadow: '0 6px 20px rgba(0,0,0,0.16)',
+            zIndex: 25,
+            maxWidth: 'min(92vw, 520px)',
+          }}
+        >
+          <span style={{ width: '9px', height: '9px', borderRadius: '50%', backgroundColor: '#2563EB', flexShrink: 0 }} />
+          <span
+            style={{
+              fontSize: '12px',
+              fontWeight: 700,
+              color: '#0F172A',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {rute.awal} &rarr; {rute.tujuan}
+          </span>
+          <button
+            onClick={() => onTutupRute?.()}
+            title="Tutup jalur rute"
+            style={{
+              border: 'none',
+              background: '#F1F5F9',
+              borderRadius: '50%',
+              width: '24px',
+              height: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              flexShrink: 0,
+              color: '#334155',
+            }}
+          >
+            &times;
           </button>
         </div>
       )}

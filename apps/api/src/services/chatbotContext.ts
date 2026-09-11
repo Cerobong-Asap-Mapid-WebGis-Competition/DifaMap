@@ -158,6 +158,8 @@ export interface KonteksDifaAI {
   ruteDigambar: {
     awal: string;
     tujuan: string;
+    awalSebenarnya: string;
+    tujuanSebenarnya: string;
     jarakMeter: number;
     durasiDetik: number;
     jalur: Array<[number, number]>;
@@ -180,7 +182,7 @@ function butuhMelihat(pertanyaan: string): boolean {
   // pertanyaan "Seberapa lengkap data DifaMap untuk Makassar?" ikut melampirkan
   // foto, lalu jawabannya melenceng menjadi deskripsi sebuah trotoar alih-alih
   // menjawab soal cakupan. Kini "seberapa" hanya memicu bila diikuti sifat fisik.
-  return /(foto|gambar|seperti apa|bagaimana rupa|kelihatan|terlihat|tampak|kondisi fisik|seberapa\s+(parah|rusak|buruk|lebar|sempit|curam|tinggi))/i.test(
+  return /(\bfoto\b|\bgambar\b|seperti apa|bagaimana rupa|kelihatan|terlihat|tampak|kondisi fisik|seberapa\s+(parah|rusak|buruk|lebar|sempit|curam|tinggi))/i.test(
     pertanyaan
   );
 }
@@ -348,6 +350,14 @@ export async function susunKonteks(
      * satu ujungnya adalah tempat yang belum ada di data kita - padahal justru
      * perjalanan ke sanalah yang paling perlu diperingatkan.
      */
+    /** Membuang kata tanya yang ikut terbawa pola "dari A ke B". */
+    const bersihkan = (frasa: string) =>
+      frasa
+        .replace(/,.*$/, '')
+        .replace(/\b(bagaimana|apa|apakah|untuk|kursi roda|tunanetra|hambatannya|kondisinya|berapa jauh|aksesnya|rutenya)\b/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
     const cariUjung = async (frasa: string) => {
       const dariSurvei = cariTitik(frasa);
       if (dariSurvei) {
@@ -356,16 +366,11 @@ export async function susunKonteks(
           latitude: dariSurvei.latitude,
           longitude: dariSurvei.longitude,
           asal: 'survei' as const,
-          diminta: frasa,
+          diminta: bersihkan(frasa) || frasa,
         };
       }
 
-      // Buang kata tanya yang ikut terbawa regex, misalnya "bagaimana untuk
-      // kursi roda" yang menempel di belakang nama tempat.
-      const bersih = frasa
-        .replace(/,.*$/, '')
-        .replace(/(bagaimana|apa|apakah|untuk|kursi roda|tunanetra|hambatannya|kondisinya|berapa jauh)/gi, '')
-        .trim();
+      const bersih = bersihkan(frasa);
 
       try {
         const hasil = await cariTempat(bersih || frasa, 1);
@@ -411,8 +416,16 @@ export async function susunKonteks(
 
       if (rutaNyata && rutaNyata.jalur.length > 1) {
         ruteDigambar = {
-          awal: a.nama,
-          tujuan: b.nama,
+          // Nama yang DITANYAKAN, bukan nama titik survei yang kebetulan
+          // terpilih sebagai pangkalnya. Pengguna bertanya "dari Mall Ratu
+          // Indah", dan melihat penanda bertuliskan "Tingkat Keramaian dan
+          // Aksesibilitas Area Atrium Mall Ratu Indah" hanya membingungkan -
+          // itu nama pengamatan survei, bukan nama tempat.
+          awal: a.diminta || a.nama,
+          tujuan: b.diminta || b.nama,
+          // Nama titik yang sebenarnya dipakai tetap dibawa, untuk keterangan.
+          awalSebenarnya: a.nama,
+          tujuanSebenarnya: b.nama,
           jarakMeter: rutaNyata.jarakMeter,
           durasiDetik: rutaNyata.durasiDetik,
           jalur: rutaNyata.jalur,
