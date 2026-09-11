@@ -30,6 +30,7 @@
  */
 
 import { prisma } from '../lib/prisma.js';
+import { hitungRute } from './rute.service.js';
 
 /** Nilai yang berarti parameter tidak pernah teramati. */
 const BELUM = ['NOT_VISIBLE', 'NOT_APPLICABLE'];
@@ -333,8 +334,22 @@ export async function susunKonteks(
         jarakMeter(a.latitude, a.longitude, b.latitude, b.longitude)
       );
 
+      // Rute jalan sungguhan bila layanannya tersedia. Profil kursi roda
+      // memperhitungkan kemiringan dan lebar jalur - bukan rute mobil yang
+      // menyamar, yang akan melewati jalan tanpa trotoar.
+      const rutaNyata = await hitungRute(
+        { latitude: a.latitude, longitude: a.longitude },
+        { latitude: b.latitude, longitude: b.longitude },
+        'wheelchair'
+      );
+
+      const barisJarak = rutaNyata
+        ? `Jarak tempuh nyata mengikuti jalan: ${rutaNyata.jarakMeter} meter, sekitar ${Math.round(rutaNyata.durasiDetik / 60)} menit dengan kursi roda (garis lurus hanya ${jarakLurus} meter).`
+        : `Jarak lurus sekitar ${jarakLurus} meter. Rute jalan sebenarnya tidak tersedia saat ini, jadi angka ini pasti lebih pendek daripada perjalanan yang sesungguhnya.`;
+
       koridor = [
-        `Perjalanan dari "${a.name}" ke "${b.name}" berjarak lurus sekitar ${jarakLurus} meter.`,
+        `Perjalanan dari "${a.name}" ke "${b.name}".`,
+        barisJarak,
         `Titik survei dalam ${LEBAR_KORIDOR} meter dari garis penghubung, diurutkan dari awal ke tujuan:`,
         ...sepanjang.map(
           (x) =>
@@ -342,7 +357,9 @@ export async function susunKonteks(
         ),
         sepanjang.length === 0
           ? '  (tidak ada titik survei di sepanjang koridor ini - jalurnya belum pernah didatangi)'
-          : `Perhatian: ini garis lurus, bukan rute jalan sebenarnya. Titik di atas hanya yang kebetulan berada di dekat garis itu, dan ruas jalan di antaranya bisa saja belum disurvei sama sekali.`,
+          : rutaNyata
+            ? `Perhatian: titik di atas hanya yang berada di dekat garis penghubung kedua ujung. Ruas jalan di antaranya bisa saja belum disurvei sama sekali - jarak tempuh sudah nyata, tetapi kondisi sepanjangnya belum tentu terdata.`
+            : `Perhatian: ini garis lurus, bukan rute jalan sebenarnya. Titik di atas hanya yang kebetulan berada di dekat garis itu, dan ruas jalan di antaranya bisa saja belum disurvei sama sekali.`,
       ].join('\n');
     }
   }

@@ -311,6 +311,10 @@ export default function AiChatbotDrawer({
       ]);
 
       const sifatIsokron = isokron?.data?.features?.[0]?.properties ?? {};
+      // Server mengembalikan isokron sungguhan bila OpenRouteService tersedia,
+      // dan jatuh ke lingkaran radius bila tidak. Keduanya sah, tetapi artinya
+      // berbeda - jadi asalnya ikut dibawa dan disebutkan ke pengguna.
+      const isokronNyata = isokron?.sumber === 'openrouteservice';
       const radiusMeter: number = sifatIsokron.radiusMeters ?? radiusJangkauan;
       const lokasiSekitar: any[] = sekitar?.data ?? [];
 
@@ -343,6 +347,8 @@ export default function AiChatbotDrawer({
           mode: isochroneMode === 'wheelchair' ? 'Kursi Roda' : 'Jalan Kaki',
           radiusMeters: radiusMeter,
           areaSqKm: sifatIsokron.areaSqKm ?? null,
+          nyata: isokronNyata,
+          menit: isochroneMinutes,
         },
         poiCatchment: {
           total: kategoriPoi.reduce((jml, k) => jml + k.count, 0),
@@ -995,11 +1001,15 @@ export default function AiChatbotDrawer({
                   <span>Jangkauan {siteAnalysisData.isochrone.mode}</span>
                 </div>
                 <div style={{ fontSize: '13px', fontWeight: '800', color: '#000000' }}>
-                  Radius {siteAnalysisData.isochrone.radiusMeters} m
+                  {siteAnalysisData.isochrone.nyata
+                    ? `Jangkauan ${siteAnalysisData.isochrone.menit} menit`
+                    : `Radius ${siteAnalysisData.isochrone.radiusMeters} m`}
                   {siteAnalysisData.isochrone.areaSqKm != null && ` · ${siteAnalysisData.isochrone.areaSqKm} km²`}
                 </div>
                 <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px' }}>
-                  Lingkaran radius, bukan isokron jaringan jalan · titik {siteAnalysisData.coordinates}
+                  {siteAnalysisData.isochrone.nyata
+                    ? `Isokron jaringan jalan, profil ${siteAnalysisData.isochrone.mode.toLowerCase()} · titik ${siteAnalysisData.coordinates}`
+                    : `Lingkaran radius - layanan isokron tidak tersedia · titik ${siteAnalysisData.coordinates}`}
                 </div>
               </div>
 

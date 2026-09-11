@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { mapIdService } from '../services/mapid.service.js';
+import { hitungIsokron } from '../services/rute.service.js';
 
 export async function getMapStyleController(req: Request, res: Response): Promise<void> {
   try {
@@ -93,11 +94,42 @@ export async function getIsochroneCatchmentController(req: Request, res: Respons
       ? intervalsQuery.split(',').map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n))
       : [5, 10, 15];
 
+    // Isokron sungguhan lebih dulu: poligon yang mengikuti jalan, bukan
+    // lingkaran. Selama ini yang dikirim adalah lingkaran berjari-jari
+    // menit x 60 meter - menyeberangi sungai, menembus blok bangunan, dan
+    // melebih-lebihkan jangkauan. Pada pengujian di Mall Ratu Indah, jangkauan
+    // 10 menit kursi roda sesungguhnya berentang sekitar 940 meter, sedangkan
+    // lingkaran kita menggambarkannya 1.200 meter.
+    const nyata = await hitungIsokron(
+      { latitude: lat, longitude: lng },
+      intervals,
+      mode === 'walking' ? 'walking' : 'wheelchair'
+    );
+
+    if (nyata) {
+      // Ditandai supaya antarmuka bisa menyebut asalnya dengan jujur.
+      for (const f of nyata.features ?? []) {
+        f.properties = {
+          ...f.properties,
+          sumber: 'openrouteservice',
+          moda: mode === 'walking' ? 'Jalan Kaki' : 'Kursi Roda',
+          menit: Math.round((f.properties?.value ?? 0) / 60),
+        };
+      }
+
+      res.json({ success: true, data: nyata, sumber: 'openrouteservice' });
+      return;
+    }
+
+    // Cadangan: lingkaran radius. Dipakai bila kunci OpenRouteService belum
+    // dipasang atau jatah hariannya habis. Fitur yang mati total lebih buruk
+    // daripada fitur yang turun kualitasnya dengan keterangan yang jujur.
     const isochroneData = mapIdService.calculateIsochroneCatchment(lat, lng, intervals, mode);
 
     res.json({
       success: true,
       data: isochroneData,
+      sumber: 'lingkaran-radius',
     });
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to compute isochrone', message: error.message });

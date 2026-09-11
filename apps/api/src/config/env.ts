@@ -18,6 +18,12 @@ const envSchema = z.object({
   MAPID_GEOSERVER_URL: z.string().url().default('https://geoserver.mapid.io'),
   MAPID_COMPETITION_URL: z.string().url().default('https://server.mapid.io/web/competition'),
   MAPID_PROJECT_ID: z.string().default('6a8bb9c9880d11c7bade0a62'),
+
+  // OpenRouteService - rute & isokron profil kursi roda. Opsional: bila kosong,
+  // panel jangkauan kembali memakai lingkaran radius dan Difa AI memakai garis
+  // lurus, keduanya dengan keterangan yang jujur.
+  ORS_API_KEY: z.string().optional(),
+  ORS_BASE_URL: z.string().url().default('https://api.openrouteservice.org'),
 });
 
 const parsed = envSchema.safeParse(process.env);
