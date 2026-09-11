@@ -347,6 +347,7 @@ export default function AiChatbotDrawer({
           const [lng, lat] = p.center ?? [];
           return {
             zone: p.gridId ?? 'Sel tanpa nama',
+            wilayah: p.namaWilayah ?? null,
             koordinat:
               typeof lat === 'number' && typeof lng === 'number'
                 ? `${lat.toFixed(5)}, ${lng.toFixed(5)}`
@@ -408,11 +409,12 @@ export default function AiChatbotDrawer({
     const aman = (nilai: unknown) => `"${String(nilai ?? '').replace(/"/g, '""')}"`;
 
     const baris = [
-      ['No', 'Sel', 'Lintang', 'Bujur', 'Nilai Prioritas', 'Skor Aksesibilitas', 'Jumlah Titik Survei', 'Hambatan Tercatat', 'Tindakan'],
+      ['No', 'Daerah', 'Kode Sel', 'Lintang', 'Bujur', 'Nilai Prioritas', 'Skor Aksesibilitas', 'Jumlah Titik Survei', 'Hambatan Tercatat', 'Tindakan'],
       ...zona.map((z: any, i: number) => {
         const w = wawasanGrid?.sel.find((x) => x.gridId === z.zone);
         return [
           i + 1,
+          z.wilayah ?? '',
           z.zone,
           typeof z.lat === 'number' ? z.lat.toFixed(6) : '',
           typeof z.lng === 'number' ? z.lng.toFixed(6) : '',
@@ -1001,7 +1003,7 @@ export default function AiChatbotDrawer({
               <div style={{ fontSize: '11px', color: '#64748B', backgroundColor: '#FFFFFF', padding: '6px 10px', borderRadius: '6px', border: '1px solid #E2E8F0' }}>
                 <strong style={{ color: '#000000' }}>{gridResultSummary.selBerdata}</strong> dari{' '}
                 <strong style={{ color: '#000000' }}>{gridResultSummary.totalCells}</strong> sel punya titik survei
-                atau titik ekonomi di bawahnya. Sisanya belum terjangkau data, bukan berprioritas rendah.
+                di dalamnya. Sisanya belum terjangkau data, bukan berprioritas rendah.
               </div>
 
               <div style={{ fontSize: '12px', fontWeight: '600', color: '#000000', marginTop: '4px' }}>Zona Prioritas Teratas:</div>
@@ -1018,12 +1020,12 @@ export default function AiChatbotDrawer({
                     style={{ textAlign: 'left', width: '100%', cursor: 'pointer', backgroundColor: '#FFFFFF', padding: '8px 10px', borderRadius: '6px', border: '1px solid #E2E8F0', fontSize: '12px' }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700' }}>
-                      <span>{idx + 1}. {z.zone}</span>
+                      <span>{idx + 1}. {z.wilayah ?? z.zone}</span>
                       <span style={{ color: '#EF0004' }}>{z.score}/100</span>
                     </div>
-                    {z.koordinat && (
-                      <div style={{ color: '#94A3B8', fontSize: '10.5px', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>{z.koordinat}</div>
-                    )}
+                    <div style={{ color: '#94A3B8', fontSize: '10.5px', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
+                      {z.wilayah ? `${z.zone} · ` : ''}{z.koordinat ?? ''}
+                    </div>
                     <div style={{ color: '#64748B', fontSize: '11px', marginTop: '2px' }}>{z.issue}</div>
                   </button>
                 ))
@@ -1112,8 +1114,11 @@ export default function AiChatbotDrawer({
                           return (
                             <tr key={z.zone} style={{ borderTop: '1px solid #F1F5F9', color: '#334155' }}>
                               <td style={{ padding: '5px 6px 5px 0', fontWeight: 700 }}>{idx + 1}</td>
-                              <td style={{ padding: '5px 6px', fontFamily: 'var(--font-mono)', fontSize: '9.5px' }}>
-                                {z.koordinat ?? z.zone}
+                              <td style={{ padding: '5px 6px', fontSize: '10px' }}>
+                                <div style={{ fontWeight: 700 }}>{z.wilayah ?? z.zone}</div>
+                                <div style={{ color: '#94A3B8', fontFamily: 'var(--font-mono)', fontSize: '9px' }}>
+                                  {z.koordinat ?? ''}
+                                </div>
                               </td>
                               <td style={{ padding: '5px 6px', fontWeight: 700, color: '#EF0004' }}>{z.score}</td>
                               <td style={{ padding: '5px 6px' }}>{z.jumlahTitik}</td>

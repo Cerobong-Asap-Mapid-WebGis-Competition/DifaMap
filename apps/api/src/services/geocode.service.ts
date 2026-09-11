@@ -195,3 +195,52 @@ export async function cariTempat(kueri: string, batas = 5): Promise<TempatDitemu
   simpanan.set(q, { waktu: Date.now(), hasil });
   return hasil;
 }
+
+/**
+ * Nama daerah untuk sebuah koordinat.
+ *
+ * Sel grid sebelumnya hanya bernomor - "MKSR-SINI-137" - dan nomor itu tidak
+ * memberi tahu siapa pun di mana letaknya. Yang dicari di sini bukan alamat
+ * lengkap melainkan nama daerahnya: kelurahan bila ada, jalan bila tidak, dan
+ * kota sebagai jaring terakhir.
+ *
+ * Hasilnya disimpan tanpa kedaluwarsa. Nama kelurahan tidak berubah dari menit
+ * ke menit, sementara tiap panggilan berbiaya seperempat detik antrean - dan
+ * grid yang sama diminta berulang kali setiap pengguna mengganti parameternya.
+ */
+const simpananBalik = new Map<string, string | null>();
+
+export async function namaiKoordinat(
+  latitude: number,
+  longitude: number
+): Promise<string | null> {
+  const kunci = `${latitude.toFixed(4)},${longitude.toFixed(4)}`;
+  if (simpananBalik.has(kunci)) return simpananBalik.get(kunci) ?? null;
+
+  try {
+    await tungguGiliran();
+
+    const res = await fetch(
+      `https://photon.komoot.io/reverse?lat=${latitude}&lon=${longitude}&limit=1`,
+      { headers: { 'User-Agent': 'DifaMap/1.0 (WebGIS aksesibilitas Makassar)' } }
+    );
+
+    if (!res.ok) {
+      simpananBalik.set(kunci, null);
+      return null;
+    }
+
+    const data: any = await res.json();
+    const p = data?.features?.[0]?.properties ?? {};
+
+    // Urutan dari yang paling menunjuk tempat ke yang paling umum.
+    const nama: string | null =
+      p.district || p.locality || p.suburb || p.street || p.city || p.county || null;
+
+    simpananBalik.set(kunci, nama);
+    return nama;
+  } catch {
+    simpananBalik.set(kunci, null);
+    return null;
+  }
+}

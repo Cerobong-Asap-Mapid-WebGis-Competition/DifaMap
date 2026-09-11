@@ -112,6 +112,14 @@ ATURAN YANG TIDAK BOLEH DILANGGAR
    terlihat dari membaca sel satu per satu.
 
 5. Bahasa Indonesia, lugas, tanpa jargon. Sebutkan angka apa adanya.
+
+6. Sebut sel dengan NAMA DAERAHNYA bila tersedia, bukan kodenya. "Sel di
+   Banta-Bantaeng" jauh lebih berguna daripada "MKSR-SINI-137" bagi orang yang
+   harus mendatanginya. Kode selnya cukup ditaruh di kolom gridId.
+
+7. Titik yang disebutkan di data adalah titik BERSKOR TERBURUK di sel itu,
+   diurutkan dari yang paling buruk. Pakai itu sebagai bukti - jangan menyebut
+   sebuah titik sebagai contoh masalah bila skornya justru tinggi.
 `.trim();
 
 export async function susunWawasanGrid(
@@ -130,11 +138,11 @@ export async function susunWawasanGrid(
   const baris = teratas.map((f) => {
     const p = f.properties;
     return [
-      `${p.gridId} - prioritas ${p.priorityIndex}`,
+      `${p.gridId}${p.namaWilayah ? ` (daerah ${p.namaWilayah})` : ''} - prioritas ${p.priorityIndex}`,
       `  skor aksesibilitas rata-rata ${p.accessibilityScore} dari skala 5, dihitung dari ${p.jumlahTitik} titik survei`,
       `  pembentuk nilai: kerentanan ${p.faktor.kerentananAkses} + kepadatan ${p.faktor.kepadatan} (${p.faktor.keterangan})`,
       `  hambatan tercatat: ${p.hambatan.length > 0 ? p.hambatan.join('; ') : 'tidak ada yang tercatat'}`,
-      `  titik di dalamnya: ${p.namaTitik.length > 0 ? p.namaTitik.join('; ') : '-'}`,
+      `  titik terburuk di dalamnya: ${p.namaTitik.length > 0 ? p.namaTitik.join('; ') : '-'}`,
       `  koordinat tengah: ${p.center[1].toFixed(4)},${p.center[0].toFixed(4)}`,
     ].join('\n');
   });

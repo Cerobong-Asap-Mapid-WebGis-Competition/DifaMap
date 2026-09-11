@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 import { env } from '../config/env.js';
 import { prisma } from '../lib/prisma.js';
+import { namaiKoordinat } from './geocode.service.js';
 
 export interface IsochroneFeature {
   type: 'Feature';
@@ -67,6 +68,9 @@ export interface SiniGridCell {
     hunianCount: number;
     kulinerCount: number;
     kulinerRamai: number;
+
+    /** Nama daerah dari geocoder, dipakai menggantikan kode sel. */
+    namaWilayah: string | null;
 
     /** Bahan mentah untuk penjelasan: nama titik dan hambatan yang tercatat. */
     namaTitik: string[];
@@ -504,16 +508,33 @@ class MapIdService {
         const cellLocations = locations.filter(didalam);
         const cellEkonomi = titikEkonomi.filter(didalam);
 
-        const transportCount = cellLocations.filter(
-          (l) =>
+        /**
+         * Tiap titik dihitung SEKALI saja, menurut urutan kepentingan.
+         *
+         * Sebelumnya sebuah titik bisa masuk dua golongan sekaligus: rumah
+         * sakit yang bertipe PLACE terhitung di healthCount (bobot 15) sekaligus
+         * commercialCount (bobot 5), jadi menyumbang 20. Audit menemukan itu
+         * terjadi di empat dari lima sel teratas - angka prioritasnya menggelembung
+         * tanpa ada yang bertambah di lapangan.
+         */
+        const golongan = (l: (typeof cellLocations)[number]): 'transit' | 'kesehatan' | 'umum' => {
+          if (
             l.entityType === 'TRANSIT_HUB' ||
             l.category === 'BUS_STOP' ||
             l.category === 'TRANSIT_STATION'
-        ).length;
+          ) {
+            return 'transit';
+          }
+          if (l.category === 'HEALTHCARE') return 'kesehatan';
+          return 'umum';
+        };
 
-        const healthCount = cellLocations.filter((l) => l.category === 'HEALTHCARE').length;
+        const transportCount = cellLocations.filter((l) => golongan(l) === 'transit').length;
+        const healthCount = cellLocations.filter((l) => golongan(l) === 'kesehatan').length;
         const commercialCount = cellLocations.filter(
-          (l) => l.category === 'MALL' || l.category === 'RESTAURANT' || l.entityType === 'PLACE'
+          (l) =>
+            golongan(l) === 'umum' &&
+            (l.category === 'MALL' || l.category === 'RESTAURANT' || l.entityType === 'PLACE')
         ).length;
 
         const hunianCount = cellEkonomi.filter((e) => e.type === 'PROPERTI_GO').length;
@@ -550,6 +571,7 @@ class MapIdService {
               hunianCount,
               kulinerCount,
               kulinerRamai,
+              namaWilayah: null,
               namaTitik: [],
               hambatan: [],
               recommendedIntervention: 'Belum disurvei - kirim surveyor sebelum menyimpulkan apa pun.',
@@ -602,7 +624,9 @@ class MapIdService {
           keterangan = `${transportCount} transit, ${healthCount} fasilitas kesehatan, ${commercialCount} tempat umum`;
         }
 
-        const priorityIndex = Math.min(100, Math.max(10, Math.round(kerentananAkses + kepadatan)));
+        // Tanpa lantai buatan. Sebelumnya nilai terendah dipaksa 10, sehingga
+        // sel yang benar-benar baik dan sepi pun tampak masih punya masalah.
+        const priorityIndex = Math.min(100, Math.round(kerentananAkses + kepadatan));
 
         // Hambatan yang BENAR-BENAR tercatat di sel ini - bukan kalimat umum.
         const hambatan: string[] = [];
@@ -620,6 +644,20 @@ class MapIdService {
         if (rampTiada > 0) hambatan.push(`${rampTiada} titik tanpa ramp layak`);
         if (ubinTiada > 0) hambatan.push(`${ubinTiada} titik ubin pemandu rusak atau tidak ada`);
         if (trotoarBuruk > 0) hambatan.push(`${trotoarBuruk} titik trotoar rusak, sempit, atau terhalang`);
+
+        /**
+         * Nama titik yang disebutkan haruslah BUKTI, bukan sekadar penghuni sel.
+         *
+         * Sebelumnya empat titik pertama menurut urutan basis data yang dikirim,
+         * dan akibatnya Difa AI menyebut "Halte Bus RS Grestelina" sebagai
+         * contoh pada sel yang masalahnya trotoar rusak - padahal halte itu
+         * justru salah satu yang kondisinya baik. Yang dikirim sekarang adalah
+         * titik berskor terburuk lebih dulu.
+         */
+        const namaTitik = [...cellLocations]
+          .sort((a, b) => (a.overallScore ?? 5) - (b.overallScore ?? 5))
+          .slice(0, 4)
+          .map((l) => `${l.name} (skor ${l.overallScore ?? '-'})`);
 
         const recommendedIntervention =
           hambatan.length > 0
@@ -646,7 +684,8 @@ class MapIdService {
             hunianCount,
             kulinerCount,
             kulinerRamai,
-            namaTitik: cellLocations.slice(0, 4).map((l) => l.name),
+            namaWilayah: null,
+            namaTitik,
             hambatan,
             recommendedIntervention,
           },
@@ -664,6 +703,24 @@ class MapIdService {
           },
         });
       }
+    }
+
+    /**
+     * Nama daerah hanya dicari untuk sel yang akan ditampilkan.
+     *
+     * Menamai seluruh 360 sel berarti 360 panggilan geocoder berjeda seperempat
+     * detik - satu setengah menit menunggu untuk nama yang tidak pernah dibaca
+     * siapa pun. Yang muncul di panel hanya belasan sel teratas, dan hasilnya
+     * disimpan sehingga permintaan berikutnya tidak membayar lagi.
+     */
+    const teratas = features
+      .filter((f) => f.properties.priorityIndex !== null)
+      .sort((a, b) => (b.properties.priorityIndex ?? 0) - (a.properties.priorityIndex ?? 0))
+      .slice(0, 12);
+
+    for (const f of teratas) {
+      const [lng, lat] = f.properties.center;
+      f.properties.namaWilayah = await namaiKoordinat(lat, lng);
     }
 
     const berdata = features.filter((f) => f.properties.priorityIndex !== null).length;
