@@ -614,7 +614,16 @@ export default function MapCanvas({
       if (isSiniGridVisible) {
         difaMapApi.getSiniGridPriority(siniGridSize).then((res) => {
           if (res.data) {
-            siniSource.setData(res.data);
+            // Sel tanpa satu pun titik survei di bawahnya selalu bernilai 25,
+            // hasil dari skor bawaan 3.0 yang dipakai server saat tidak ada data.
+            // Sel seperti itu tidak digambar sama sekali: mewarnainya hijau
+            // "Baik" membuat wilayah yang belum pernah disurvei terbaca sudah
+            // ramah disabilitas, dan jumlahnya mayoritas mutlak di peta.
+            const NILAI_SEL_KOSONG = 25;
+            const berdata = (res.data.features ?? []).filter(
+              (f: any) => (f.properties?.priorityIndex ?? NILAI_SEL_KOSONG) !== NILAI_SEL_KOSONG
+            );
+            siniSource.setData({ type: 'FeatureCollection', features: berdata });
           }
         }).catch(console.error);
       } else {

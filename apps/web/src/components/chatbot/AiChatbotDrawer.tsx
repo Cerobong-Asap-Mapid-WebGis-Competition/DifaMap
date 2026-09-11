@@ -146,10 +146,7 @@ export default function AiChatbotDrawer({
   // ----------------------------------------------------
   // State: Tab 2 (Site Selection - MAPID SINI Grid & Formula)
   // ----------------------------------------------------
-  const [targetZone, setTargetZone] = useState('Semua 7 Zona Kecamatan');
   const [gridSize, setGridSize] = useState<number>(1000);
-  const [gridShape, setGridShape] = useState<'square' | 'hexagon'>('square');
-  const [formulaPrompt, setFormulaPrompt] = useState('Cari zona dengan halte transit dan faskes ramai yang membutuhkan perbaikan guiding block & ramp');
   const [isComputingGrid, setIsComputingGrid] = useState(false);
   const [gridResultSummary, setGridResultSummary] = useState<any>(null);
   const [isGridVisibleOnMap, setIsGridVisibleOnMap] = useState(false);
@@ -674,73 +671,40 @@ export default function AiChatbotDrawer({
               <span>Atur Grid & Wilayah</span>
             </h4>
 
-            {/* Wilayah Administrasi */}
+            {/* Ukuran Grid - satu-satunya parameter yang benar-benar dikirim ke
+                server. Pemilih kecamatan dan bentuk grid dihapus: server hanya
+                membuat sel kotak untuk seluruh wilayah studi, dan penyaringan
+                per kecamatan butuh batas administrasi yang belum kita punya.
+                Kontrol yang tidak mengubah apa pun lebih buruk daripada tidak ada. */}
             <div>
-              <label style={{ fontSize: '11.5px', color: '#64748B', display: 'block', marginBottom: '4px' }}>Cari Level Administrasi:</label>
+              <label style={{ fontSize: '11.5px', color: '#64748B', display: 'block', marginBottom: '4px' }}>Ukuran Sel Grid:</label>
               <select
-                value={targetZone}
-                onChange={(e) => setTargetZone(e.target.value)}
+                value={gridSize}
+                onChange={(e) => setGridSize(Number(e.target.value))}
                 style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
               >
-                <option value="Semua 7 Zona Kecamatan">Semua 7 Zona (Makassar & Gowa)</option>
-                <option value="Kecamatan Panakkukang">Kecamatan Panakkukang</option>
-                <option value="Kecamatan Tamalanrea">Kecamatan Tamalanrea</option>
-                <option value="Kecamatan Ujung Pandang">Kecamatan Ujung Pandang</option>
-                <option value="Kecamatan Rappocini">Kecamatan Rappocini</option>
-                <option value="Kecamatan Somba Opu (Gowa)">Kecamatan Somba Opu (Gowa)</option>
+                <option value={250}>250 meter (paling rinci)</option>
+                <option value={500}>500 meter</option>
+                <option value={1000}>1000 meter (cakupan terbaik)</option>
               </select>
-            </div>
-
-            {/* Bentuk & Ukuran Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div>
-                <label style={{ fontSize: '11.5px', color: '#64748B', display: 'block', marginBottom: '4px' }}>Bentuk Grid:</label>
-                <input
-                  type="text"
-                  readOnly
-                  value="square"
-                  style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #E2E8F0', backgroundColor: '#F8FAFC', fontSize: '12px' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '11.5px', color: '#64748B', display: 'block', marginBottom: '4px' }}>Ukuran Grid (meter):</label>
-                <select
-                  value={gridSize}
-                  onChange={(e) => setGridSize(Number(e.target.value))}
-                  style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
-                >
-                  <option value={500}>500 meter</option>
-                  <option value={1000}>1000 meter</option>
-                </select>
+              <div style={{ fontSize: '10.5px', color: '#94A3B8', marginTop: '4px', lineHeight: '15px' }}>
+                Sel kotak untuk seluruh wilayah studi 7 kecamatan Makassar &amp; Gowa.
+                Sel yang lebih kecil lebih rinci, tetapi lebih sedikit yang punya data survei.
               </div>
             </div>
           </div>
 
-          {/* Buat Formula AI (Sesuai MAPID Screenshot 2) */}
+          {/* Formula penilaian - tetap, dan disebutkan apa adanya */}
           <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <h4 style={{ fontSize: '13px', fontWeight: '700', color: '#000000', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Sparkles size={16} color="#FDC323" />
-              <span>Buat Formula SINI AI</span>
+              <span>Hitung Prioritas Perbaikan</span>
             </h4>
 
-            <div>
-              <label style={{ fontSize: '11.5px', color: '#64748B', display: 'block', marginBottom: '4px' }}>Ketik Kebutuhan / Prompt Spasial Anda:</label>
-              <textarea
-                rows={3}
-                value={formulaPrompt}
-                onChange={(e) => setFormulaPrompt(e.target.value)}
-                placeholder="Ketik kebutuhan analisis lokasi Anda..."
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid #CBD5E1',
-                  fontSize: '12.5px',
-                  fontFamily: 'inherit',
-                  resize: 'none',
-                }}
-              />
+            <div style={{ fontSize: '11.5px', color: '#64748B', lineHeight: '17px' }}>
+              Setiap sel dinilai dari dua hal: seberapa buruk kondisi aksesibilitas titik
+              survei di dalamnya, dan seberapa ramai kegiatan di sekitarnya. Sel dengan
+              kondisi buruk sekaligus ramai mendapat prioritas tertinggi.
             </div>
 
             <button
@@ -756,7 +720,7 @@ export default function AiChatbotDrawer({
               }}
             >
               <Sparkles size={16} />
-              <span>{isComputingGrid ? 'Menghitung Grid SINI AI...' : 'Buat Formula & Tampilkan Grid'}</span>
+              <span>{isComputingGrid ? 'Menghitung prioritas...' : 'Hitung & Tampilkan Grid'}</span>
             </button>
           </div>
 
