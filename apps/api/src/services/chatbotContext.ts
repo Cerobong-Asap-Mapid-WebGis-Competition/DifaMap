@@ -84,6 +84,56 @@ function kataKunci(pertanyaan: string): string[] {
     .filter((k) => k.length >= 4 && !KATA_UMUM.has(k));
 }
 
+/**
+ * Jarak sebuah titik ke ruas garis A-B, dalam meter.
+ *
+ * Dipakai untuk menemukan pengamatan yang berada DI SEPANJANG perjalanan, bukan
+ * sekadar dekat salah satu ujungnya. Perhitungannya memakai proyeksi datar -
+ * cukup akurat untuk jarak beberapa kilometer di lintang Makassar, dan jauh
+ * lebih sederhana daripada geodesi penuh yang ketelitiannya tidak dibutuhkan di
+ * sini.
+ */
+function jarakKeRuas(
+  tLat: number, tLng: number,
+  aLat: number, aLng: number,
+  bLat: number, bLng: number
+): { jarak: number; maju: number } {
+  const skalaLng = Math.cos((aLat * Math.PI) / 180);
+  const x = (n: number) => n * skalaLng * 111320;
+  const y = (n: number) => n * 110540;
+
+  const ax = x(aLng), ay = y(aLat);
+  const bx = x(bLng), by = y(bLat);
+  const tx = x(tLng), ty = y(tLat);
+
+  const dx = bx - ax, dy = by - ay;
+  const panjangKuadrat = dx * dx + dy * dy;
+
+  // Titik awal dan tujuan berimpit: tidak ada ruas untuk diukur.
+  if (panjangKuadrat === 0) {
+    return { jarak: Math.hypot(tx - ax, ty - ay), maju: 0 };
+  }
+
+  const t = Math.max(0, Math.min(1, ((tx - ax) * dx + (ty - ay) * dy) / panjangKuadrat));
+  const px = ax + t * dx, py = ay + t * dy;
+
+  return { jarak: Math.hypot(tx - px, ty - py), maju: t };
+}
+
+/**
+ * Menangkap pertanyaan berbentuk perjalanan: "dari Halte Karebosi ke Balai Kota".
+ *
+ * Pertanyaan seperti ini paling dekat dengan kebutuhan nyata pengguna kursi
+ * roda - yang menentukan bukan kondisi tujuannya saja, melainkan seluruh rantai
+ * yang harus dilalui. Satu trotoar terputus di tengah membuat tujuan yang bagus
+ * tetap tak tercapai.
+ */
+function bacaRute(pertanyaan: string): { awal: string; tujuan: string } | null {
+  const cocok = pertanyaan.match(/\bdari\s+(.{3,60}?)\s+(?:ke|menuju|sampai)\s+(.{3,60}?)\s*[?.,]?$/i);
+  if (!cocok) return null;
+  return { awal: cocok[1].trim(), tujuan: cocok[2].trim() };
+}
+
 export interface KonteksDifaAI {
   ringkasan: string;
   daftarPadat: string;
@@ -94,6 +144,8 @@ export interface KonteksDifaAI {
   fotoUntukDilihat: Array<{ nama: string; url: string }>;
   /** Gambaran seberapa luas wilayah studi yang sudah tersentuh survei. */
   cakupan: string;
+  /** Hambatan sepanjang koridor, bila pertanyaannya berbentuk "dari A ke B". */
+  koridor: string | null;
 }
 
 /**
@@ -219,6 +271,82 @@ export async function susunKonteks(
         .join('\n\n')
     : '(tidak ada titik survei yang cocok dengan pertanyaan ini)';
 
+  // -------------------------------------------------------------- koridor
+  let koridor: string | null = null;
+  const rute = bacaRute(pertanyaan);
+
+  if (rute) {
+    // Kata jenis tempat tidak boleh menjadi satu-satunya dasar kecocokan.
+    //
+    // Tanpa aturan ini, "Halte Karebosi" - yang titik surveinya memang tidak ada
+    // karena baris itu data seed yang sudah disaring - tetap dianggap cocok
+    // dengan "Halte Bus Mall Panakkukang", hanya karena sama-sama mengandung
+    // kata "halte". Koridor lalu dihitung antara dua tempat yang salah, dan
+    // jawabannya membahas perjalanan yang tidak pernah ditanyakan.
+    const KATA_JENIS = new Set([
+      'halte', 'trotoar', 'jalan', 'mall', 'gedung', 'kawasan', 'kampus',
+      'pasar', 'masjid', 'rumah', 'sakit', 'hotel', 'terminal', 'stop', 'bus',
+      'depan', 'area', 'koridor', 'jalur', 'pintu',
+    ]);
+
+    const cariTitik = (frasa: string) => {
+      const kataFrasa = frasa.toLowerCase().split(/\s+/).filter((k) => k.length >= 4);
+      const kataKhas = kataFrasa.filter((k) => !KATA_JENIS.has(k));
+
+      // Frasa yang seluruhnya kata jenis - misalnya "halte bus" - tidak cukup
+      // menunjuk satu tempat tertentu.
+      if (kataKhas.length === 0) return null;
+
+      let terbaik: (typeof semua)[number] | null = null;
+      let nilaiTerbaik = 0;
+
+      for (const l of semua) {
+        const nama = l.name.toLowerCase();
+        const cocokKhas = kataKhas.filter((k) => nama.includes(k)).length;
+
+        // Wajib ada minimal satu kata khas yang cocok. Kata jenis hanya
+        // menambah nilai, tidak pernah menjadi dasar.
+        if (cocokKhas === 0) continue;
+
+        const nilai = cocokKhas * 3 + kataFrasa.filter((k) => KATA_JENIS.has(k) && nama.includes(k)).length;
+        if (nilai > nilaiTerbaik) {
+          nilaiTerbaik = nilai;
+          terbaik = l;
+        }
+      }
+
+      return terbaik;
+    };
+
+    const a = cariTitik(rute.awal);
+    const b = cariTitik(rute.tujuan);
+
+    if (a && b && a.id !== b.id) {
+      const LEBAR_KORIDOR = 400; // meter dari garis lurus penghubung
+
+      const sepanjang = semua
+        .map((l) => ({ l, ...jarakKeRuas(l.latitude, l.longitude, a.latitude, a.longitude, b.latitude, b.longitude) }))
+        .filter((x) => x.jarak <= LEBAR_KORIDOR)
+        .sort((x, y) => x.maju - y.maju);
+
+      const jarakLurus = Math.round(
+        jarakMeter(a.latitude, a.longitude, b.latitude, b.longitude)
+      );
+
+      koridor = [
+        `Perjalanan dari "${a.name}" ke "${b.name}" berjarak lurus sekitar ${jarakLurus} meter.`,
+        `Titik survei dalam ${LEBAR_KORIDOR} meter dari garis penghubung, diurutkan dari awal ke tujuan:`,
+        ...sepanjang.map(
+          (x) =>
+            `  ${Math.round(x.maju * 100)}% perjalanan - ${x.l.name} (skor ${x.l.overallScore ?? '-'}) | ramp ${p(x.l.rampStatus)} | ubin ${p(x.l.guidingBlockStatus)} | trotoar ${p(x.l.sidewalkCondition)}`
+        ),
+        sepanjang.length === 0
+          ? '  (tidak ada titik survei di sepanjang koridor ini - jalurnya belum pernah didatangi)'
+          : `Perhatian: ini garis lurus, bukan rute jalan sebenarnya. Titik di atas hanya yang kebetulan berada di dekat garis itu, dan ruas jalan di antaranya bisa saja belum disurvei sama sekali.`,
+      ].join('\n');
+    }
+  }
+
   // -------------------------------------------------------------- cakupan
   //
   // Difa AI perlu tahu batas pengetahuannya sendiri. Tanpa ini ia bisa terdengar
@@ -291,5 +419,6 @@ export async function susunKonteks(
     namaRelevan: relevan.map((l) => l.name),
     fotoUntukDilihat,
     cakupan,
+    koridor,
   };
 }
