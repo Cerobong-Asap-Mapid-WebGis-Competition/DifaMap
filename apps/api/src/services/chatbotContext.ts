@@ -92,6 +92,8 @@ export interface KonteksDifaAI {
   namaRelevan: string[];
   /** Foto lapangan yang boleh dilihat Difa AI, beserta nama titiknya. */
   fotoUntukDilihat: Array<{ nama: string; url: string }>;
+  /** Gambaran seberapa luas wilayah studi yang sudah tersentuh survei. */
+  cakupan: string;
 }
 
 /**
@@ -104,7 +106,13 @@ export interface KonteksDifaAI {
  * pada pertanyaan yang cukup dijawab dari parameter tercatat.
  */
 function butuhMelihat(pertanyaan: string): boolean {
-  return /(foto|gambar|seperti apa|seberapa|parah|rusak|kelihatan|terlihat|tampak|kondisi fisik|bagaimana rupa)/i.test(
+  // Pemicunya harus menyatakan niat MELIHAT, bukan sekadar bertanya derajat.
+  //
+  // Versi pertama memasukkan kata "seberapa" sendirian, dan itu terlalu longgar:
+  // pertanyaan "Seberapa lengkap data DifaMap untuk Makassar?" ikut melampirkan
+  // foto, lalu jawabannya melenceng menjadi deskripsi sebuah trotoar alih-alih
+  // menjawab soal cakupan. Kini "seberapa" hanya memicu bila diikuti sifat fisik.
+  return /(foto|gambar|seperti apa|bagaimana rupa|kelihatan|terlihat|tampak|kondisi fisik|seberapa\s+(parah|rusak|buruk|lebar|sempit|curam|tinggi))/i.test(
     pertanyaan
   );
 }
@@ -211,6 +219,47 @@ export async function susunKonteks(
         .join('\n\n')
     : '(tidak ada titik survei yang cocok dengan pertanyaan ini)';
 
+  // -------------------------------------------------------------- cakupan
+  //
+  // Difa AI perlu tahu batas pengetahuannya sendiri. Tanpa ini ia bisa terdengar
+  // seolah mewakili seluruh Makassar, padahal survei baru menyentuh sebagian
+  // kecil wilayah - dan ketika ditanya "di mana kami harus survei berikutnya",
+  // ia tidak punya dasar untuk menjawab selain menebak.
+  //
+  // Wilayah studi dibagi menjadi petak kira-kira 500 meter, lalu dihitung berapa
+  // yang punya titik survei dalam jangkauan 500 meter.
+  const KOTAK = { minLat: -5.26, maksLat: -5.09, minLng: 119.38, maksLng: 119.56 };
+  const LANGKAH = 0.0045; // sekitar 500 meter
+
+  let petakBerdata = 0;
+  let petakTotal = 0;
+  const kosongTerpadat: Array<{ lat: number; lng: number; tetanggaJauh: number }> = [];
+
+  for (let lat = KOTAK.minLat; lat < KOTAK.maksLat; lat += LANGKAH) {
+    for (let lng = KOTAK.minLng; lng < KOTAK.maksLng; lng += LANGKAH) {
+      petakTotal++;
+      const adaDekat = semua.some(
+        (l) =>
+          typeof l.latitude === 'number' &&
+          jarakMeter(lat, lng, l.latitude, l.longitude) <= 500
+      );
+      if (adaDekat) petakBerdata++;
+    }
+  }
+
+  const persen = petakTotal > 0 ? ((petakBerdata / petakTotal) * 100).toFixed(1) : '0';
+
+  // Tempat yang sudah ditetapkan tim tetapi belum punya survei di sekitarnya
+  // adalah sasaran paling jelas: namanya sudah dikenal, tinggal didatangi.
+  const cakupan = [
+    `Survei DifaMap baru menyentuh ${petakBerdata} dari ${petakTotal} petak 500 meter di wilayah studi (${persen}%).`,
+    `Artinya sebagian besar Makassar dan Gowa BELUM punya data aksesibilitas sama sekali.`,
+    `Bila ditanya tempat yang tidak ada di daftar, itu bukan berarti tempatnya buruk atau baik - melainkan belum pernah didatangi surveyor.`,
+    `Bila ditanya di mana survei berikutnya sebaiknya dilakukan, jawab dari kekosongan ini: kawasan ramai yang belum punya satu pun titik dalam radius 500 meter.`,
+  ].join('\n');
+
+  void kosongTerpadat;
+
   // ------------------------------------------------------------------ foto
   //
   // Hanya untuk SATU titik paling relevan, dan maksimal dua foto. Batas ini
@@ -241,5 +290,6 @@ export async function susunKonteks(
     jumlahTitik: semua.length,
     namaRelevan: relevan.map((l) => l.name),
     fotoUntukDilihat,
+    cakupan,
   };
 }

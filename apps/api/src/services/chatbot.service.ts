@@ -92,6 +92,9 @@ Bahasa Indonesia yang ramah dan ringkas. Langsung ke jawabannya di kalimat perta
 ## RINGKASAN SELURUH DATA SURVEI DIFAMAP
 ${konteks.ringkasan}
 
+## SEBERAPA LUAS WILAYAH YANG SUDAH DISURVEI
+${konteks.cakupan}
+
 ## TITIK SURVEI YANG PALING COCOK DENGAN PERTANYAAN INI
 ${konteks.rincianRelevan}
 
