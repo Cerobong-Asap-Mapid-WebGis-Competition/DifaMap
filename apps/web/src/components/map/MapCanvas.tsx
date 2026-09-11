@@ -70,6 +70,8 @@ export default function MapCanvas({
   // mulai zoom 14, jadi di bawah itu tidak ada tempat yang bisa diklik sama
   // sekali - dan tanpa penjelasan, keadaan itu terbaca sebagai fitur rusak.
   const [zoomSekarang, setZoomSekarang] = useState<number>(13);
+  // Dinaikkan setiap peta selesai bergeser, sebagai pemicu hitung ulang penanda.
+  const [petaBergeser, setPetaBergeser] = useState(0);
 
   const onMapClickRef = useRef(onMapClick);
   onMapClickRef.current = onMapClick;
@@ -283,7 +285,10 @@ export default function MapCanvas({
       setupCustomLayers(map);
     });
 
-    map.on('moveend', () => setZoomSekarang(map.getZoom()));
+    map.on('moveend', () => {
+      setZoomSekarang(map.getZoom());
+      setPetaBergeser((n) => n + 1);
+    });
 
     // Setiap kali basemap style di-load ulang (misal ganti Street ke Dark Mode), pasang kembali layer custom
     map.on('style.load', () => {
@@ -394,24 +399,39 @@ export default function MapCanvas({
 
   // 2. Render Markers Berdasarkan Mode (Aktivitas vs Tempat vs Urban Planner)
   useEffect(() => {
-    // Lambang per kategori tempat. Semua lokasi sebelumnya digambar sebagai
-    // penanda hitam yang sama, sehingga mall, puskesmas, halte, dan ruas trotoar
-    // tidak bisa dibedakan sebelum diklik satu per satu.
-    const LAMBANG_KATEGORI: Record<string, string> = {
-      MALL: '🛍️',
-      HEALTHCARE: '🏥',
-      EDUCATION: '🎓',
-      TOURISM: '🏖️',
-      BUS_STOP: '🚏',
-      PEDESTRIAN_PATH: '🚶',
-      OTHER: '📍',
+    // Lambang per kategori tempat, digambar sebagai garis putih di dalam pin.
+    //
+    // Sebelumnya dipakai emoji. Pada ukuran penanda peta, emoji tampil kecil,
+    // berwarna-warni, dan bentuknya berbeda antar sistem operasi - justru sulit
+    // dikenali sekilas. Bentuk garis satu warna jauh lebih terbaca di atas peta.
+    const JALUR_IKON: Record<string, string> = {
+      // Tas belanja
+      MALL: 'M6 8h12l-1 12H7L6 8zm3 0V6a3 3 0 0 1 6 0v2',
+      // Palang rumah sakit
+      HEALTHCARE: 'M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6V4z',
+      // Topi wisuda
+      EDUCATION: 'M12 4 2 9l10 5 10-5-10-5zM6 12v4c0 1.7 2.7 3 6 3s6-1.3 6-3v-4',
+      // Payung pantai
+      TOURISM: 'M12 3c5 0 9 4 9 8H3c0-4 4-8 9-8zm0 8v10',
+      // Ranjang hotel
+      HOTEL: 'M3 8v11m0-5h18m0 5v-7a3 3 0 0 0-3-3h-7v5M7 9.5a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2z',
+      // Gedung kantor berjendela
+      OFFICE: 'M5 21V4h9v17M14 10h5v11M8 8h3M8 12h3M8 16h3M17 14h1',
+      // Rambu halte
+      BUS_STOP: 'M6 5h12v9H6V5zm0 9v4m12-4v4M9 18v2m6-2v2M8.5 9.5h.01M15.5 9.5h.01',
+      // Pejalan kaki
+      PEDESTRIAN_PATH: 'M12 3.4a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM12 8v6m0 0-2.5 6m2.5-6 2.5 6M8 11l4-2 4 2',
+      OTHER: 'M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z',
     };
 
-    const lambangUntuk = (loc: any): string => {
-      if (loc.entityType === 'TRANSIT_HUB') return LAMBANG_KATEGORI.BUS_STOP;
-      if (loc.entityType === 'SIDEWALK') return LAMBANG_KATEGORI.PEDESTRIAN_PATH;
-      return LAMBANG_KATEGORI[loc.category] ?? LAMBANG_KATEGORI.OTHER;
+    const kunciIkon = (loc: any): string => {
+      if (loc.entityType === 'TRANSIT_HUB') return 'BUS_STOP';
+      if (loc.entityType === 'SIDEWALK') return 'PEDESTRIAN_PATH';
+      return JALUR_IKON[loc.category] ? loc.category : 'OTHER';
     };
+
+    const ikonSvg = (kunci: string, px: number, warna: string): string =>
+      `<svg width="${px}" height="${px}" viewBox="0 0 24 24" fill="none" stroke="${warna}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="${JALUR_IKON[kunci] ?? JALUR_IKON.OTHER}"/></svg>`;
 
     // Warna mengikuti skor aksesibilitas resmi. Lokasi yang belum pernah dinilai
     // AI (aiConfidence kosong) diberi abu-abu, bukan hijau: skornya ada di basis
@@ -544,14 +564,128 @@ export default function MapCanvas({
     const adalahTempat = (l: any) => l.entityType === 'PLACE' || l.entityType === 'TRANSIT_HUB';
     const adalahTrotoar = (l: any) => l.entityType === 'SIDEWALK';
 
+    // Pengamatan yang sudah terwakili sebuah POI MAPID tidak digambar sendiri.
+    //
+    // Di Trans Studio Mall ada dua pengamatan - "Toilet Cinema XXI" dan "Lobby
+    // Selatan" - dan keduanya dulu muncul sebagai pin terpisah, sehingga yang
+    // terlihat lebih dulu justru bagian dari tempat, bukan tempatnya. Sekarang
+    // keduanya diwakili satu pin di POI "Trans Studio Mall", dan isinya baru
+    // terbuka setelah pin itu ditekan.
+    //
+    // Menyimpulkan nama tempat dari nama pengamatan sudah dicoba dan gagal:
+    // penggalan kata yang sama antar pengamatan menghasilkan "Unhas Dilengkapi"
+    // dan "Teknik", serta menggabungkan halte yang tidak berhubungan. Nama
+    // kanonik hanya bisa datang dari POI MAPID.
+    const RADIUS_INDUK_METER = 200;
+
+    const jarakMeterPeta = (aLat: number, aLng: number, bLat: number, bLng: number) => {
+      const R = 6_371_000;
+      const rad = (d: number) => (d * Math.PI) / 180;
+      const dLat = rad(bLat - aLat);
+      const dLng = rad(bLng - aLng);
+      const t =
+        Math.sin(dLat / 2) ** 2 + Math.cos(rad(aLat)) * Math.cos(rad(bLat)) * Math.sin(dLng / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(t));
+    };
+
+    const poiTampak = (() => {
+      const map = mapRef.current;
+      if (!map || currentMode !== 'TEMPAT') return [];
+      const tersedia = ['poi_z16', 'poi_z15', 'poi_z14'].filter((id) => map.getLayer(id));
+      if (tersedia.length === 0) return [];
+      const unik = new Map<string, { nama: string; lat: number; lng: number; kategori?: string }>();
+      for (const f of map.queryRenderedFeatures({ layers: tersedia } as any)) {
+        const nama = (f.properties as any)?.name;
+        const geom: any = f.geometry;
+        if (!nama || geom?.type !== 'Point') continue;
+        const [lng, lat] = geom.coordinates;
+        if (!unik.has(nama)) {
+          unik.set(nama, { nama, lat, lng, kategori: (f.properties as any)?.class });
+        }
+      }
+      return [...unik.values()];
+    })();
+
+    const indukDari = (l: any) => {
+      let terdekat: any = null;
+      let jarakTerdekat = RADIUS_INDUK_METER;
+      for (const p of poiTampak) {
+        const d = jarakMeterPeta(l.latitude, l.longitude, p.lat, p.lng);
+        if (d <= jarakTerdekat) {
+          jarakTerdekat = d;
+          terdekat = p;
+        }
+      }
+      return terdekat;
+    };
+
+    const tempatMentah = currentMode === 'TEMPAT' ? locations.filter(adalahTempat) : [];
+    const berinduk = new Map<string, { poi: any; anggota: any[] }>();
+    const tanpaInduk: any[] = [];
+
+    for (const l of tempatMentah) {
+      const induk = indukDari(l);
+      if (induk) {
+        const kunci = induk.nama;
+        if (!berinduk.has(kunci)) berinduk.set(kunci, { poi: induk, anggota: [] });
+        berinduk.get(kunci)!.anggota.push(l);
+      } else {
+        tanpaInduk.push(l);
+      }
+    }
+
     const locsToRender =
       currentMode === 'TEMPAT'
-        ? locations.filter(adalahTempat)
+        ? tanpaInduk
         : currentMode === 'NONE'
           ? locations.filter(
               (l) => adalahTrotoar(l) || (selectedLocationId ? l.id === selectedLocationId : false)
             )
           : [];
+
+    // Satu pin DifaMap per POI yang punya hasil survei di sekitarnya. Warnanya
+    // rata-rata skor anggotanya, sehingga tempat terbaca sebelum diklik.
+    berinduk.forEach(({ poi, anggota }) => {
+      const el = document.createElement('div');
+      const berskor = anggota
+        .map((a) => a.overallScore)
+        .filter((x: any) => typeof x === 'number') as number[];
+      const rata = berskor.length ? berskor.reduce((x, y) => x + y, 0) / berskor.length : null;
+      const warna =
+        rata == null ? '#94A3B8' : rata < 2.5 ? '#EF4444' : rata < 3.5 ? '#F59E0B' : '#16A34A';
+      const kunci = JALUR_IKON[String(poi.kategori ?? '').toUpperCase()]
+        ? String(poi.kategori).toUpperCase()
+        : kunciIkon(anggota[0]);
+
+      el.innerHTML = `
+        <div style="cursor:pointer;display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.35));"
+             title="${String(poi.nama).replace(/"/g, '&quot;')} — ${anggota.length} pengamatan survei">
+          <div style="display:flex;align-items:center;gap:6px;background:${warna};color:#FFFFFF;border:2px solid #FFFFFF;border-radius:20px;padding:5px 10px;font-size:12px;font-weight:800;white-space:nowrap;">
+            ${ikonSvg(kunci, 15, '#FFFFFF')}
+            <span>${poi.nama}</span>
+            <span style="background:rgba(255,255,255,0.28);border-radius:10px;padding:1px 6px;">${anggota.length}</span>
+          </div>
+          <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid ${warna};margin-top:-1px;"></div>
+        </div>
+      `;
+
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (onSelectPoiRef.current) {
+          onSelectPoiRef.current({
+            nama: poi.nama,
+            kategori: poi.kategori,
+            latitude: poi.lat,
+            longitude: poi.lng,
+          });
+        }
+      });
+
+      const m = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([poi.lng, poi.lat])
+        .addTo(mapRef.current!);
+      markersRef.current.push(m);
+    });
 
     if (locsToRender.length > 0) {
       locsToRender.forEach((loc) => {
@@ -560,7 +694,7 @@ export default function MapCanvas({
 
         const isSelected = loc.id === selectedLocationId;
         const isTransit = loc.entityType === 'TRANSIT_HUB' || loc.category === 'BUS_STOP';
-        const lambang = lambangUntuk(loc);
+        const kunciLambang = kunciIkon(loc);
         const warna = warnaSkor(loc);
         const belumDinilai = loc.aiConfidence == null;
         // Trotoar tampil lebih kecil: ia lapisan dasar, bukan tujuan yang dicari.
@@ -589,7 +723,7 @@ export default function MapCanvas({
               font-weight: 800;
               white-space: nowrap;
             ">
-              <span>${lambang}</span>
+              ${ikonSvg(kunciLambang, 15, '#000000')}
               <span>${loc.name}</span>
               <span style="color: #000000">${
                 // Lokasi tanpa penilaian AI dulu ditampilkan "4.0★" - angka yang
@@ -626,14 +760,13 @@ export default function MapCanvas({
             </svg>
             <span style="
               position: absolute;
-              top: 4px;
+              top: 6px;
               left: 0;
               right: 0;
-              text-align: center;
-              font-size: 13px;
-              line-height: 17px;
+              display: flex;
+              justify-content: center;
               pointer-events: none;
-            ">${lambang}</span>
+            ">${ikonSvg(kunciLambang, 15, warna)}</span>
           </div>
         `;
 
@@ -767,6 +900,10 @@ export default function MapCanvas({
       }
     }
   }, [
+    // Pengelompokan tempat memakai queryRenderedFeatures, yang hanya mengenal
+    // POI di layar saat ini. Tanpa ikut memantau pergeseran peta, pin induk
+    // tidak pernah dihitung ulang setelah pengguna menggeser atau memperbesar.
+    petaBergeser,
     locations,
     activities,
     economicPoints,

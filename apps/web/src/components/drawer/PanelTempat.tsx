@@ -175,7 +175,10 @@ export default function PanelTempat({ poi, onClose }: Props) {
         position: 'absolute',
         top: isMobile ? 'auto' : '16px',
         bottom: isMobile ? 0 : '16px',
-        left: isMobile ? 0 : '16px',
+        // Sidebar kiri selebar 80px dan berposisi fixed. Panel harus mulai
+        // setelahnya, bukan menimpanya - kalau tidak, tombol mode peta dan
+        // tombol laporan ikut tertutup dan tidak bisa ditekan.
+        left: isMobile ? 0 : '96px',
         right: isMobile ? 0 : 'auto',
         width: isMobile ? '100%' : '420px',
         maxHeight: isMobile ? '72vh' : 'calc(100% - 32px)',
