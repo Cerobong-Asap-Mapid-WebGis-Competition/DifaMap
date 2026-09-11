@@ -284,6 +284,12 @@ model Comment {
   content            String             @db.Text
   photoUrls          String[]           @default([]) @map("photo_urls")
 
+  /// Slug tempat dari src/data/tempatPilihan.ts, misalnya "trans-studio-mall".
+  /// Tempat bukan baris basis data - ia gabungan pengamatan yang dikenali orang
+  /// sebagai satu tujuan - jadi komentarnya tidak bisa memakai kunci asing.
+  /// Ditambahkan lewat prisma/migrations_manual/02_komentar_tempat.sql.
+  placeKey           String?            @map("place_key")
+
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
 
@@ -294,6 +300,7 @@ model Comment {
   @@index([userId])
   @@index([locationId])
   @@index([activityId])
+  @@index([placeKey])
   @@map("comments")
 }
 

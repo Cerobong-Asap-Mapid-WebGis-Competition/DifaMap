@@ -148,7 +148,7 @@ export const difaMapApi = {
   /**
    * Membuat ulasan / komentar baru pada lokasi atau aktivitas
    */
-  async createComment(payload: { locationId?: string; activityId?: string; content: string; photoUrls?: string[] }, token?: string) {
+  async createComment(payload: { locationId?: string; activityId?: string; placeKey?: string; content: string; photoUrls?: string[] }, token?: string) {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -231,6 +231,13 @@ export const difaMapApi = {
    * Jaraknya dihitung PostGIS di server, jadi angkanya meter sesungguhnya
    * di permukaan bumi - bukan selisih derajat lintang/bujur.
    */
+  /** Komentar tentang sebuah tempat, ditandai slug dari tempatPilihan.ts. */
+  async getPlaceComments(placeKey: string) {
+    const res = await fetch(`${API_BASE_URL}/api/comments/place/${encodeURIComponent(placeKey)}`);
+    if (!res.ok) return { success: false, data: [] };
+    return res.json();
+  },
+
   async getNearbyLocations(lat: number, lng: number, radiusMeters = 600, limit = 100) {
     const query = new URLSearchParams({
       lat: String(lat),

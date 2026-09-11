@@ -79,6 +79,24 @@ function jarakMeter(lat1: number, lng1: number, lat2: number, lng2: number): num
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+/**
+ * Penanda tempat untuk komentar.
+ *
+ * Tempat tidak punya baris sendiri di basis data, jadi komentarnya ditandai
+ * slug dari namanya. Slug dipakai apa adanya sebagai kunci, sehingga dua tempat
+ * bernama sama akan berbagi komentar - dapat diterima karena daftar tempat
+ * dikelola tim di src/data/tempatPilihan.ts dan namanya dijaga unik.
+ */
+function slugTempat(nama: string): string {
+  return nama
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 120);
+}
+
 /** Parameter hasil pengamatan ada di tempat berbeda untuk lokasi dan aktivitas. */
 function parameterDari(item: any): Record<string, string> {
   return item.observedParameters ?? item;
@@ -168,29 +186,29 @@ export default function PanelTempat({ poi, onClose }: Props) {
   );
 
   /**
-   * Komentar di basis data selalu menempel pada satu lokasi atau aktivitas -
-   * tidak ada tabel untuk "tempat", karena tempat di panel ini bukan baris basis
-   * data. Komentar karena itu disauhkan ke pengamatan terdekat dari titik
-   * tempat, dan hal itu disebutkan kepada penulisnya.
+   * Komentar menempel pada TEMPAT lewat placeKey, bukan pada pengamatan.
+   *
+   * Sebelumnya komentar disauhkan ke pengamatan terdekat, sehingga komentar
+   * tentang Trans Studio Mall tercatat sebagai komentar tentang lobinya - dan
+   * berpindah induk begitu radius diubah atau pengamatan baru ditambahkan.
+   * Kolom place_key ditambahkan lewat migrations_manual/02_komentar_tempat.sql.
    */
-  const lokasiSauh = useMemo(
-    () =>
-      [...lokasiSekitar].sort(
-        (a, b) => (a.distanceMeters ?? a.distance ?? 9e9) - (b.distanceMeters ?? b.distance ?? 9e9)
-      )[0] ?? null,
-    [lokasiSekitar]
-  );
+  const kunciTempat = useMemo(() => slugTempat(poi.nama), [poi.nama]);
+
+  const muatKomentar = async () => {
+    try {
+      const j = await difaMapApi.getPlaceComments(kunciTempat);
+      setKomentar(j?.data ?? []);
+    } catch {
+      setKomentar([]);
+    }
+  };
 
   useEffect(() => {
     let dibatalkan = false;
-    if (!lokasiSauh?.id) {
-      setKomentar([]);
-      return;
-    }
-    const dasar = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-    fetch(`${dasar}/api/comments/location/${lokasiSauh.id}`)
-      .then((r) => (r.ok ? r.json() : { data: [] }))
-      .then((j) => {
+    difaMapApi
+      .getPlaceComments(kunciTempat)
+      .then((j: any) => {
         if (!dibatalkan) setKomentar(j?.data ?? []);
       })
       .catch(() => {
@@ -199,28 +217,25 @@ export default function PanelTempat({ poi, onClose }: Props) {
     return () => {
       dibatalkan = true;
     };
-  }, [lokasiSauh?.id]);
+  }, [kunciTempat]);
 
   const kirimKomentar = async () => {
     const isi = teksKomentar.trim();
-    if (!isi || !lokasiSauh?.id || sedangKirim) return;
+    if (!isi || sedangKirim) return;
 
     setSedangKirim(true);
     setGagalKirim(null);
     try {
       const nama = namaPengirim.trim();
       await difaMapApi.createComment({
-        locationId: lokasiSauh.id,
+        placeKey: kunciTempat,
         content: nama ? `${nama}: ${isi}` : isi,
       });
       setTeksKomentar('');
       // Dimuat ulang dari server, bukan ditambahkan langsung ke layar. Menambah
       // ke layar lebih dulu membuat komentar yang gagal tersimpan tetap terlihat
       // seolah berhasil - dan penulisnya baru tahu setelah memuat ulang halaman.
-      const dasar = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-      const r = await fetch(`${dasar}/api/comments/location/${lokasiSauh.id}`);
-      const j = r.ok ? await r.json() : { data: [] };
-      setKomentar(j?.data ?? []);
+      await muatKomentar();
     } catch (err: any) {
       setGagalKirim('Komentar gagal dikirim. Coba lagi sebentar.');
     } finally {
@@ -594,7 +609,7 @@ export default function PanelTempat({ poi, onClose }: Props) {
       )}
 
       {/* Komentar */}
-      {lokasiSauh && (
+      {(
         <div style={kartu}>
           <div style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
             <MessageSquare size={15} />
@@ -677,9 +692,8 @@ export default function PanelTempat({ poi, onClose }: Props) {
           </button>
 
           <div style={{ fontSize: '10.5px', color: '#94A3B8', marginTop: '8px', lineHeight: '15px' }}>
-            Komentar tersimpan pada pengamatan terdekat, &quot;{lokasiSauh.name}&quot;, karena tempat
-            di panel ini bukan baris tersendiri di basis data. Komentar bersifat indikatif dan tidak
-            mengubah skor resmi survei.
+            Komentar tersimpan untuk tempat ini, bukan untuk satu titik survei di dalamnya, dan tetap
+            ada walau radius diubah. Bersifat indikatif dan tidak mengubah skor resmi survei.
           </div>
         </div>
       )}

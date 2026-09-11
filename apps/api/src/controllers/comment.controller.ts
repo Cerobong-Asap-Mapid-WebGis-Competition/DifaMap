@@ -6,6 +6,9 @@ import { AuthenticatedRequest } from '../middlewares/auth.middleware.js';
 const createCommentSchema = z.object({
   locationId: z.string().uuid().optional().nullable(),
   activityId: z.string().uuid().optional().nullable(),
+  // Tempat bukan baris basis data, melainkan gabungan pengamatan yang dikenali
+  // orang sebagai satu tujuan. Penandanya karena itu teks bebas, bukan UUID.
+  placeKey: z.string().min(1).max(120).optional().nullable(),
   content: z.string().min(1, 'Comment content cannot be empty'),
   photoUrls: z.array(z.string().url()).default([]),
 });
@@ -23,8 +26,10 @@ export async function createCommentController(req: AuthenticatedRequest, res: Re
       return;
     }
 
-    if (!validated.locationId && !validated.activityId) {
-      res.status(400).json({ error: 'Either locationId or activityId must be provided' });
+    if (!validated.locationId && !validated.activityId && !validated.placeKey) {
+      res.status(400).json({
+        error: 'Komentar harus menempel pada locationId, activityId, atau placeKey',
+      });
       return;
     }
 
@@ -44,6 +49,7 @@ export async function createCommentController(req: AuthenticatedRequest, res: Re
         userId,
         locationId: validated.locationId || null,
         activityId: validated.activityId || null,
+        placeKey: validated.placeKey || null,
         content: validated.content,
         photoUrls: validated.photoUrls,
       },
@@ -86,6 +92,40 @@ export async function createCommentController(req: AuthenticatedRequest, res: Re
 /**
  * Mengambil daftar komentar untuk suatu Location
  */
+/**
+ * Komentar tentang sebuah TEMPAT.
+ *
+ * Tempat bukan baris basis data - ia gabungan beberapa pengamatan yang dikenali
+ * orang sebagai satu tujuan, misalnya Trans Studio Mall yang di dalamnya ada
+ * pengamatan toilet dan lobi. Karena itu penandanya slug teks, bukan kunci
+ * asing, dan daftarnya hidup di frontend (src/data/tempatPilihan.ts) supaya
+ * tempat bisa ditambah tanpa menyentuh basis data.
+ */
+export async function getCommentsByPlaceController(req: Request, res: Response): Promise<void> {
+  try {
+    const placeKey = String(req.params.placeKey || '').trim();
+
+    if (!placeKey) {
+      res.status(400).json({ error: 'placeKey wajib diisi' });
+      return;
+    }
+
+    const comments = await prisma.comment.findMany({
+      where: { placeKey },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: { id: true, name: true, avatarUrl: true },
+        },
+      },
+    });
+
+    res.json({ success: true, count: comments.length, data: comments });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to fetch place comments', message: error.message });
+  }
+}
+
 export async function getCommentsByLocationController(req: Request, res: Response): Promise<void> {
   try {
     const locationId = String(req.params.locationId);
