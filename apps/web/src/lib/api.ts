@@ -231,6 +231,28 @@ export const difaMapApi = {
    * Jaraknya dihitung PostGIS di server, jadi angkanya meter sesungguhnya
    * di permukaan bumi - bukan selisih derajat lintang/bujur.
    */
+  /**
+   * Mencari tempat di wilayah studi yang belum tentu ada di basis data DifaMap.
+   *
+   * Dipakai supaya orang bisa mencari tujuan apa pun - hotel, masjid, sekolah -
+   * lalu melihat kondisi aksesibilitas yang sudah terlaporkan di sekitarnya.
+   * Bila belum ada survei di sana, panelnya menyatakan datanya belum ada.
+   */
+  async cariTempatLuas(q: string, limit = 5) {
+    if (q.trim().length < 3) return { success: true, data: [] };
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/geocode?q=${encodeURIComponent(q.trim())}&limit=${limit}`
+      );
+      if (!res.ok) return { success: false, data: [] };
+      return await res.json();
+    } catch {
+      // Pencarian tempat luar adalah pelengkap. Kegagalannya tidak boleh
+      // menjatuhkan pencarian data sendiri yang berjalan di sebelahnya.
+      return { success: false, data: [] };
+    }
+  },
+
   /** Komentar tentang sebuah tempat, ditandai slug dari tempatPilihan.ts. */
   async getPlaceComments(placeKey: string) {
     const res = await fetch(`${API_BASE_URL}/api/comments/place/${encodeURIComponent(placeKey)}`);

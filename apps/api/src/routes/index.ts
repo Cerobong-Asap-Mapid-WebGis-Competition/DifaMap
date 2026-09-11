@@ -5,6 +5,7 @@ import activityRoutes from './activity.routes.js';
 import commentRoutes from './comment.routes.js';
 import chatbotRoutes from './chatbot.routes.js';
 import economicPointRoutes from './economicPoint.routes.js';
+import geocodeRoutes from './geocode.routes.js';
 
 const apiRouter = Router();
 
@@ -22,6 +23,9 @@ apiRouter.use('/comments', commentRoutes);
 apiRouter.use('/chatbot', chatbotRoutes);
 apiRouter.use('/economic-points', economicPointRoutes);
 apiRouter.use('/mapid', mapidRoutes);
+
+// Pencarian tempat di luar basis data DifaMap (Nominatim / OpenStreetMap)
+apiRouter.use('/geocode', geocodeRoutes);
 
 export default apiRouter;
 

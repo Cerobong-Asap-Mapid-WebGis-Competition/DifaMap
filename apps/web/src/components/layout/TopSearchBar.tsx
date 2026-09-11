@@ -18,6 +18,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { SidebarMode } from './AppSidebar';
+import { difaMapApi } from '../../lib/api';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
 /**
@@ -48,6 +49,17 @@ interface TopSearchBarProps {
   locations?: any[];
   activities?: any[];
   onSelectSuggestion?: (item: { type: 'LOCATION' | 'ACTIVITY'; data: any }) => void;
+  /**
+   * Dipilihnya sebuah tempat yang TIDAK ada di basis data DifaMap - hasil
+   * pencarian luar. Yang diteruskan hanya nama dan koordinat; penilaiannya
+   * disusun panel dari survei di sekitarnya, atau dinyatakan belum ada.
+   */
+  onSelectTempatLuar?: (poi: {
+    nama: string;
+    kategori?: string;
+    latitude: number;
+    longitude: number;
+  }) => void;
   onResetToDefault?: () => void;
 }
 
@@ -68,10 +80,53 @@ export default function TopSearchBar({
   locations = [],
   activities = [],
   onSelectSuggestion,
+  onSelectTempatLuar,
   onResetToDefault,
 }: TopSearchBarProps) {
   const isMobile = useIsMobile(768);
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+
+  /**
+   * Tempat di luar basis data DifaMap.
+   *
+   * Pencarian sebelumnya hanya menjangkau 94 titik survei, sehingga tujuan yang
+   * belum pernah disurvei - hotel, masjid, sekolah - seolah tidak ada di
+   * Makassar. Padahal justru di situ orang ingin tahu kondisinya, dan jawaban
+   * "belum ada data" adalah jawaban yang sah.
+   */
+  const [tempatLuar, setTempatLuar] = useState<any[]>([]);
+  const [sedangCariLuar, setSedangCariLuar] = useState(false);
+
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 3) {
+      setTempatLuar([]);
+      return;
+    }
+
+    // Ditunda 500 ms: layanan pencarian luar membatasi satu permintaan per
+    // detik, dan tanpa jeda setiap ketikan huruf akan mengirim satu permintaan.
+    let dibatalkan = false;
+    setSedangCariLuar(true);
+    const timer = setTimeout(() => {
+      difaMapApi
+        .cariTempatLuas(q, 4)
+        .then((j: any) => {
+          if (!dibatalkan) setTempatLuar(j?.data ?? []);
+        })
+        .catch(() => {
+          if (!dibatalkan) setTempatLuar([]);
+        })
+        .finally(() => {
+          if (!dibatalkan) setSedangCariLuar(false);
+        });
+    }, 500);
+
+    return () => {
+      dibatalkan = true;
+      clearTimeout(timer);
+    };
+  }, [searchQuery]);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const searchWrapperRef = useRef<HTMLDivElement>(null);
 
@@ -490,7 +545,79 @@ export default function TopSearchBar({
                   </div>
                 ))}
               </div>
-            ) : (
+            ) : null}
+
+            {/* Tempat lain di Makassar - di luar basis data DifaMap.
+                Ditaruh SESUDAH hasil sendiri karena yang punya data survei
+                lebih berguna; tempat luar justru berguna untuk menunjukkan
+                bahwa datanya belum ada di sana. */}
+            {tempatLuar.length > 0 && (
+              <div>
+                <div
+                  style={{
+                    padding: '8px 16px',
+                    fontSize: '11px',
+                    fontWeight: 800,
+                    color: '#64748B',
+                    backgroundColor: '#F8FAFC',
+                    borderTop: suggestions.length > 0 ? '1px solid #E2E8F0' : 'none',
+                    letterSpacing: '0.03em',
+                  }}
+                >
+                  TEMPAT LAIN DI MAKASSAR &amp; GOWA
+                </div>
+
+                {tempatLuar.map((t, i) => (
+                  <div
+                    key={`luar-${i}-${t.latitude}`}
+                    onClick={() => {
+                      onSearchChange(t.nama);
+                      setIsInputFocused(false);
+                      if (onSelectTempatLuar) onSelectTempatLuar(t);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '12px 16px',
+                      borderBottom: '1px solid #F1F5F9',
+                      cursor: 'pointer',
+                      backgroundColor: '#FFFFFF',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#F8FAFC';
+                      e.currentTarget.style.borderLeft = '3px solid #2563EB';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#FFFFFF';
+                      e.currentTarget.style.borderLeft = 'none';
+                    }}
+                  >
+                    <MapPin size={18} color="#2563EB" />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A' }}>
+                        {t.nama}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '11.5px',
+                          color: '#64748B',
+                          marginTop: '2px',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {t.alamat}
+                      </div>
+                    </div>
+                    <ChevronRight size={16} color="#CBD5E1" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {suggestions.length === 0 && tempatLuar.length === 0 && (
               <div
                 style={{
                   padding: '28px 20px',
@@ -503,10 +630,13 @@ export default function TopSearchBar({
                   gap: '6px',
                 }}
               >
-                <div style={{ fontSize: '20px' }}>🔍</div>
-                <div style={{ fontWeight: '600', color: '#1E293B' }}>Tidak ada tempat yang cocok</div>
+                <div style={{ fontWeight: '600', color: '#1E293B' }}>
+                  {sedangCariLuar ? 'Mencari tempat...' : 'Tidak ada tempat yang cocok'}
+                </div>
                 <div style={{ fontSize: '12px', color: '#94A3B8' }}>
-                  Tidak ditemukan hasil untuk &ldquo;{searchQuery}&rdquo;. Coba kata kunci lain seperti halte, mall, atau rumah sakit.
+                  {sedangCariLuar
+                    ? 'Menelusuri tempat di Makassar & Gowa.'
+                    : 'Tidak ditemukan hasil. Coba kata kunci lain seperti halte, mall, atau rumah sakit.'}
                 </div>
               </div>
             )}

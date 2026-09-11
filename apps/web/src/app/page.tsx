@@ -299,6 +299,7 @@ export default function HomePage() {
         locations={locations}
         activities={activities}
         onResetToDefault={handleResetToDefault}
+        onSelectTempatLuar={(poi) => setSelectedItem({ type: 'POI', data: poi })}
         onSelectSuggestion={(item) => {
           if (item.type === 'LOCATION') {
             handleSelectLocation(item.data);
