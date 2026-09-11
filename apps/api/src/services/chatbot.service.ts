@@ -1,6 +1,6 @@
 import { openai } from '../lib/openai.js';
 import { prisma } from '../lib/prisma.js';
-import { susunKonteks } from './chatbotContext.js';
+import { susunKonteks, type KonteksDifaAI } from './chatbotContext.js';
 import { catatPemakaian } from '../lib/aiUsage.js';
 
 export interface ChatMessage {
@@ -20,16 +20,12 @@ export interface ChatInput {
 
 export interface ChatResponse {
   reply: string;
-  /** Jalur rute untuk digambar di peta, bila pertanyaannya berbentuk perjalanan. */
-  rute?: {
-    awal: string;
-    tujuan: string;
-    awalSebenarnya: string;
-    tujuanSebenarnya: string;
-    jarakMeter: number;
-    durasiDetik: number;
-    jalur: Array<[number, number]>;
-  } | null;
+  /**
+   * Jalur rute untuk digambar di peta, bila pertanyaannya berbentuk perjalanan.
+   * Bentuknya mengikuti konteks supaya daftar jalur alternatif beserta
+   * penilaiannya tidak perlu dituliskan ulang di dua tempat.
+   */
+  rute?: KonteksDifaAI['ruteDigambar'];
   referencedLocations?: Array<{
     id: string;
     name: string;

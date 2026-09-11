@@ -30,7 +30,7 @@
  */
 
 import { prisma } from '../lib/prisma.js';
-import { hitungRute } from './rute.service.js';
+import { hitungRute, hitungBeberapaRute } from './rute.service.js';
 import { cariTempat } from './geocode.service.js';
 
 /** Nilai yang berarti parameter tidak pernah teramati. */
@@ -136,6 +136,47 @@ function bacaRute(pertanyaan: string): { awal: string; tujuan: string } | null {
   return { awal: cocok[1].trim(), tujuan: cocok[2].trim() };
 }
 
+/**
+ * Menilai sebuah jalur dengan data survei DifaMap.
+ *
+ * Inilah yang tidak dimiliki aplikasi peta mana pun: bukan sekadar tahu jalannya
+ * lewat mana, tetapi tahu kondisi trotoar di sepanjangnya. Titik survei yang
+ * berada dekat jalur dianggap mewakili kondisi ruas itu.
+ *
+ * Ambangnya 120 meter - cukup dekat untuk benar-benar berada di jalur yang
+ * sama, dan tidak selebar koridor 400 meter yang dipakai untuk mengumpulkan
+ * konteks umum, yang di sana memang sengaja longgar.
+ */
+function nilaiJalur(jalur: Array<[number, number]>, pengamatan: any[]) {
+  const AMBANG = 120;
+  const dekat = pengamatan.filter((l) => {
+    if (typeof l.latitude !== 'number') return false;
+    for (let i = 0; i < jalur.length - 1; i++) {
+      const [aLng, aLat] = jalur[i];
+      const [bLng, bLat] = jalur[i + 1];
+      if (jarakKeRuas(l.latitude, l.longitude, aLat, aLng, bLat, bLng).jarak <= AMBANG) return true;
+    }
+    return false;
+  });
+
+  const berskor = dekat
+    .map((l) => l.overallScore)
+    .filter((x: any) => typeof x === 'number' && x > 0) as number[];
+
+  const hambatan = dekat.filter(
+    (l) =>
+      ['NONE', 'DAMAGED'].includes(l.rampStatus) ||
+      ['DAMAGED', 'BLOCKED', 'NARROW'].includes(l.sidewalkCondition)
+  );
+
+  return {
+    jumlahTitik: dekat.length,
+    skorRata: berskor.length ? berskor.reduce((a, b) => a + b, 0) / berskor.length : null,
+    jumlahHambatan: hambatan.length,
+    namaHambatan: hambatan.slice(0, 3).map((l) => l.name),
+  };
+}
+
 export interface KonteksDifaAI {
   ringkasan: string;
   daftarPadat: string;
@@ -163,6 +204,19 @@ export interface KonteksDifaAI {
     jarakMeter: number;
     durasiDetik: number;
     jalur: Array<[number, number]>;
+    /**
+     * Jalur lain menuju tujuan yang sama, sudah dinilai dengan data survei.
+     * Yang pertama adalah yang direkomendasikan - belum tentu yang terpendek.
+     */
+    pilihan: Array<{
+      jarakMeter: number;
+      durasiDetik: number;
+      jalur: Array<[number, number]>;
+      skorRata: number | null;
+      jumlahTitik: number;
+      jumlahHambatan: number;
+      direkomendasikan: boolean;
+    }>;
   } | null;
 }
 
@@ -306,6 +360,13 @@ export async function susunKonteks(
       'halte', 'trotoar', 'jalan', 'mall', 'gedung', 'kawasan', 'kampus',
       'pasar', 'masjid', 'rumah', 'sakit', 'hotel', 'terminal', 'stop', 'bus',
       'depan', 'area', 'koridor', 'jalur', 'pintu',
+      // Jenis tempat yang menyusul setelah "Lapangan Karebosi" tercocokkan ke
+      // "Lapangan Basket Fakultas Teknik Unhas" - 19 kilometer melesetnya,
+      // hanya karena sama-sama berkata "lapangan".
+      'lapangan', 'taman', 'pantai', 'anjungan', 'sekolah', 'kantor',
+      'stasiun', 'puskesmas', 'universitas', 'fakultas', 'plaza', 'pusat',
+      'toko', 'cafe', 'kafe', 'restoran', 'apotek', 'bank', 'bandara',
+      'pelabuhan', 'museum', 'benteng', 'perpustakaan', 'kampung',
     ]);
 
     const cariTitik = (frasa: string) => {
@@ -323,9 +384,14 @@ export async function susunKonteks(
         const nama = l.name.toLowerCase();
         const cocokKhas = kataKhas.filter((k) => nama.includes(k)).length;
 
-        // Wajib ada minimal satu kata khas yang cocok. Kata jenis hanya
-        // menambah nilai, tidak pernah menjadi dasar.
-        if (cocokKhas === 0) continue;
+        // SEMUA kata khas harus ada, bukan sekadar salah satunya.
+        //
+        // Kecocokan sebagian terlalu mudah tertipu: "Lapangan Karebosi" cukup
+        // bertemu kata "lapangan" saja untuk mendarat di lapangan lain di
+        // kabupaten sebelah. Bila tidak semua cocok, biarkan kosong - pencarian
+        // tempat umum di tahap berikutnya justru lebih andal untuk nama tempat,
+        // dan lebih baik menyerahkannya daripada menebak dengan percaya diri.
+        if (cocokKhas < kataKhas.length) continue;
 
         const nilai = cocokKhas * 3 + kataFrasa.filter((k) => KATA_JENIS.has(k) && nama.includes(k)).length;
         if (nilai > nilaiTerbaik) {
@@ -405,14 +471,100 @@ export async function susunKonteks(
         jarakMeter(a.latitude, a.longitude, b.latitude, b.longitude)
       );
 
-      // Rute jalan sungguhan bila layanannya tersedia. Profil kursi roda
-      // memperhitungkan kemiringan dan lebar jalur - bukan rute mobil yang
-      // menyamar, yang akan melewati jalan tanpa trotoar.
-      const rutaNyata = await hitungRute(
+      // Beberapa jalur sekaligus, lalu dinilai dengan data survei sendiri.
+      //
+      // Aplikasi peta umum merekomendasikan yang tercepat karena tidak punya
+      // data kondisi trotoar per ruas. DifaMap punya - jadi yang terpendek bisa
+      // ditolak bila trotoarnya terputus, dan yang lebih jauh direkomendasikan
+      // bila jalannya benar-benar bisa dilalui.
+      const semuaJalur = await hitungBeberapaRute(
         { latitude: a.latitude, longitude: a.longitude },
         { latitude: b.latitude, longitude: b.longitude },
-        'wheelchair'
+        'wheelchair',
+        3
       );
+
+      const dinilai = semuaJalur.map((r) => ({
+        ...r,
+        ...nilaiJalur(r.jalur, semua),
+      }));
+
+      /**
+       * Peringkat jalur.
+       *
+       * Dua aturan, keduanya berasal dari kekeliruan yang sempat terjadi:
+       *
+       *  1. Jalur tanpa satu pun titik survei tidak boleh menang. Tanpa ini,
+       *     jalur yang belum pernah didatangi siapa pun tampak "bersih dari
+       *     hambatan" dan justru direkomendasikan - kebalikan dari yang benar.
+       *     Ketiadaan data bukan kabar baik.
+       *
+       *  2. Memutar hanya dibenarkan bila keuntungannya nyata. Uji pertama
+       *     merekomendasikan jalur 284 meter lebih jauh padahal skor keduanya
+       *     sama persis - dan model lalu mengarang alasan untuk membenarkannya.
+       *     Jadi jalur yang skornya setara dianggap sama baiknya, dan di antara
+       *     yang setara dipilih yang terpendek.
+       */
+      const SELISIH_BERARTI = 0.3; // dalam satuan skor 1-5
+
+      const berbukti = dinilai.filter((r) => r.jumlahTitik > 0 && r.skorRata != null);
+      const terpendek = [...dinilai].sort((x, y) => x.jarakMeter - y.jarakMeter)[0];
+
+      let terpilih = terpendek;
+      if (berbukti.length > 0) {
+        const skorTerbaik = Math.max(...berbukti.map((r) => r.skorRata!));
+        const setara = berbukti.filter((r) => skorTerbaik - r.skorRata! <= SELISIH_BERARTI);
+        setara.sort((x, y) => x.jarakMeter - y.jarakMeter);
+        terpilih = setara[0];
+      }
+
+      // Memutar atau tidak - dipakai untuk menjelaskan alasannya apa adanya.
+      const memutar = terpilih !== terpendek && terpendek != null;
+
+      const pilihan = dinilai.map((r) => ({
+        jarakMeter: r.jarakMeter,
+        durasiDetik: r.durasiDetik,
+        jalur: r.jalur,
+        skorRata: r.skorRata,
+        jumlahTitik: r.jumlahTitik,
+        jumlahHambatan: r.jumlahHambatan,
+        direkomendasikan: r === terpilih,
+      }));
+      // Yang direkomendasikan ditaruh paling depan supaya peta menggambarnya
+      // sebagai jalur utama.
+      pilihan.sort((x, y) => Number(y.direkomendasikan) - Number(x.direkomendasikan));
+
+      const rutaNyata = terpilih
+        ? { jarakMeter: terpilih.jarakMeter, durasiDetik: terpilih.durasiDetik, jalur: terpilih.jalur }
+        : await hitungRute(
+            { latitude: a.latitude, longitude: a.longitude },
+            { latitude: b.latitude, longitude: b.longitude },
+            'wheelchair'
+          );
+
+      // Perbandingan antar jalur, untuk dijelaskan Difa AI apa adanya.
+      const barisPilihan =
+        dinilai.length > 1
+          ? [
+              `Ada ${dinilai.length} jalur menuju tujuan yang sama. Penilaian tiap jalur memakai titik survei dalam 120 meter dari jalurnya:`,
+              ...dinilai
+                .sort((x, y) => x.jarakMeter - y.jarakMeter)
+                .map((r, i) => {
+                  const tanda = r === terpilih ? ' [DIREKOMENDASIKAN]' : '';
+                  const dasar =
+                    r.jumlahTitik === 0
+                      ? 'belum ada satu pun titik survei di sepanjangnya - kondisinya tidak diketahui, bukan berarti baik'
+                      : `skor rata-rata ${r.skorRata?.toFixed(2)} dari ${r.jumlahTitik} titik survei, ${r.jumlahHambatan} di antaranya bermasalah${
+                          r.namaHambatan.length ? ` (${r.namaHambatan.join('; ')})` : ''
+                        }`;
+                  return `  Jalur ${i + 1}: ${r.jarakMeter} m, ${Math.round(r.durasiDetik / 60)} menit - ${dasar}${tanda}`;
+                }),
+              memutar
+                ? `Jalur yang direkomendasikan lebih jauh ${terpilih.jarakMeter - terpendek.jarakMeter} meter daripada yang terpendek. Jelaskan bahwa jarak tambahan itu ditempuh demi kondisi jalur yang lebih baik menurut data survei.`
+                : `Jalur yang direkomendasikan sekaligus yang terpendek - tidak ada alasan untuk memutar, karena jalur lain tidak terbukti lebih baik. Katakan begitu saja, jangan mencari-cari alasan lain.`,
+              `PENTING: angka pada tiap jalur di atas adalah SATU-SATUNYA data per jalur yang kamu punya. Daftar titik survei di bawah berlaku untuk seluruh kawasan antara kedua ujung, BUKAN untuk salah satu jalur tertentu - jangan menempelkan daftar yang sama ke tiap jalur seolah itu rincian masing-masing.`,
+            ].join('\n')
+          : null;
 
       if (rutaNyata && rutaNyata.jalur.length > 1) {
         ruteDigambar = {
@@ -429,6 +581,7 @@ export async function susunKonteks(
           jarakMeter: rutaNyata.jarakMeter,
           durasiDetik: rutaNyata.durasiDetik,
           jalur: rutaNyata.jalur,
+          pilihan,
         };
       }
 
@@ -451,6 +604,7 @@ export async function susunKonteks(
         `Perjalanan dari "${a.nama}" ke "${b.nama}".`,
         ...catatanPenggantian,
         barisJarak,
+        ...(barisPilihan ? [barisPilihan] : []),
         `Titik survei dalam ${LEBAR_KORIDOR} meter dari garis penghubung, diurutkan dari awal ke tujuan:`,
         ...sepanjang.map(
           (x) =>

@@ -9,6 +9,7 @@ import { UrbanPlannerFilter, PublicSubMode } from '../layout/TopSearchBar';
 import { MapPin, Layers } from 'lucide-react';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { susunTempat } from '../../data/tempatPilihan';
+import type { RuteDigambar } from '../../data/rute';
 
 export type MapDisplayMode = 'HALTE' | 'TEMPAT' | 'URBAN_PLANNER' | 'NONE';
 
@@ -50,7 +51,12 @@ interface MapCanvasProps {
    * kalimat menjelaskan hambatannya, garis di peta memperlihatkan jalurnya.
    * Membaca "1,7 kilometer" tidak sama dengan melihat jalan mana yang dilewati.
    */
-  rute?: { awal: string; tujuan: string; jalur: Array<[number, number]> } | null;
+  /**
+   * Jalur yang direkomendasikan beserta pembandingnya. Yang tidak terpilih
+   * digambar samar, supaya terlihat bahwa pilihan itu memang dibuat dan bukan
+   * satu-satunya jalan yang ada.
+   */
+  rute?: RuteDigambar | null;
   /** Menutup jalur rute yang sedang tergambar. */
   onTutupRute?: () => void;
   onSelectPoi?: (poi: { nama: string; kategori?: string; latitude: number; longitude: number }) => void;
@@ -243,6 +249,29 @@ export default function MapCanvas({
     // Digambar dua lapis: garis putih tebal di bawah sebagai tepi, garis
     // berwarna di atasnya. Tanpa tepi putih, jalur berwarna tenggelam di atas
     // peta yang juga berwarna - terutama di kawasan padat jalan.
+    // Jalur alternatif ditambahkan LEBIH DULU supaya tertumpuk di bawah jalur
+    // utama. Urutan penambahan lapisan menentukan urutan tumpukan, dan jalur
+    // yang direkomendasikan harus tetap yang paling jelas terbaca.
+    if (!map.getSource('rute-alternatif-source')) {
+      map.addSource('rute-alternatif-source', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      map.addLayer({
+        id: 'rute-alternatif-garis',
+        type: 'line',
+        source: 'rute-alternatif-source',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#94A3B8',
+          'line-width': 4,
+          'line-opacity': 0.7,
+          'line-dasharray': [2, 1.6],
+        },
+      });
+    }
+
     if (!map.getSource('rute-source')) {
       map.addSource('rute-source', {
         type: 'geojson',
@@ -627,12 +656,14 @@ export default function MapCanvas({
     if (!map || !isMapLoaded) return;
 
     const sumber = map.getSource('rute-source') as maplibregl.GeoJSONSource;
+    const sumberLain = map.getSource('rute-alternatif-source') as maplibregl.GeoJSONSource;
     if (!sumber) return;
 
     const ruteJalur = rute?.jalur ?? null;
 
     if (!ruteJalur || ruteJalur.length < 2) {
       sumber.setData({ type: 'FeatureCollection', features: [] });
+      sumberLain?.setData({ type: 'FeatureCollection', features: [] });
       return;
     }
 
@@ -647,10 +678,29 @@ export default function MapCanvas({
       ],
     } as any);
 
-    const batas = ruteJalur.reduce(
-      (b, [lng, lat]) => b.extend([lng, lat] as [number, number]),
-      new maplibregl.LngLatBounds(ruteJalur[0], ruteJalur[0])
+    // Jalur yang tidak terpilih, digambar putus-putus abu-abu.
+    const jalurLain = (rute?.pilihan ?? []).filter(
+      (x) => !x.direkomendasikan && x.jalur.length > 1
     );
+
+    sumberLain?.setData({
+      type: 'FeatureCollection',
+      features: jalurLain.map((x) => ({
+        type: 'Feature',
+        properties: { jarakMeter: x.jarakMeter },
+        geometry: { type: 'LineString', coordinates: x.jalur },
+      })),
+    } as any);
+
+    // Pandangan harus memuat semua jalur, bukan hanya yang terpilih. Kalau
+    // hanya yang terpilih yang masuk bingkai, pembandingnya terpotong di tepi
+    // layar dan justru terlihat seperti garis nyasar.
+    const batas = [ruteJalur, ...jalurLain.map((x) => x.jalur)]
+      .flat()
+      .reduce(
+        (b, [lng, lat]) => b.extend([lng, lat] as [number, number]),
+        new maplibregl.LngLatBounds(ruteJalur[0], ruteJalur[0])
+      );
 
     map.fitBounds(batas, {
       // Ruang kiri disisakan untuk panel Difa AI yang sedang terbuka; tanpa itu
@@ -1399,6 +1449,38 @@ export default function MapCanvas({
           >
             {rute.awal} &rarr; {rute.tujuan}
           </span>
+          {/* Keterangan pilihan jalur.
+              Ketika jalur yang direkomendasikan bukan yang terpendek, itu
+              justru inti jawabannya - dan harus terbaca di peta, bukan hanya
+              di dalam percakapan yang bisa saja sudah tergulung ke atas. */}
+          {(() => {
+            const lain = (rute.pilihan ?? []).filter((x) => !x.direkomendasikan);
+            if (lain.length === 0) return null;
+            const terpilih = (rute.pilihan ?? []).find((x) => x.direkomendasikan);
+            const lebihJauh =
+              terpilih && lain.some((x) => x.jarakMeter < terpilih.jarakMeter);
+            return (
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: lebihJauh ? '#B45309' : '#475569',
+                  backgroundColor: lebihJauh ? '#FEF3C7' : '#F1F5F9',
+                  borderRadius: '10px',
+                  padding: '3px 8px',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+                title={
+                  lebihJauh
+                    ? 'Jalur terpendek dilewati karena kondisi trotoarnya lebih buruk menurut data survei.'
+                    : 'Jalur ini yang terbaik menurut data survei di sepanjangnya.'
+                }
+              >
+                {lebihJauh ? 'bukan terpendek' : 'terbaik'} &middot; {lain.length} jalur lain
+              </span>
+            );
+          })()}
           <button
             onClick={() => onTutupRute?.()}
             title="Tutup jalur rute"

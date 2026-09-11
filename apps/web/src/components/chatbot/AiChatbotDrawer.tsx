@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import type { RuteDigambar } from '../../data/rute';
 import {
   X,
   Sparkles,
@@ -121,7 +122,7 @@ interface AiChatbotDrawerProps {
    */
   onSelectLocation?: (lokasi: any) => void;
   /** Meneruskan jalur rute dari jawaban Difa AI supaya digambar di peta. */
-  onRuteDitemukan?: (rute: { awal: string; tujuan: string; jalur: Array<[number, number]> } | null) => void;
+  onRuteDitemukan?: (rute: RuteDigambar | null) => void;
   analysisTarget?: { lat: number; lng: number; name?: string } | null;
 }
 
@@ -234,7 +235,9 @@ export default function AiChatbotDrawer({
       // layar saat pertanyaan sudah berganti topik.
       const r = response.data?.rute;
       onRuteDitemukan?.(
-        r?.jalur?.length > 1 ? { awal: r.awal, tujuan: r.tujuan, jalur: r.jalur } : null
+        r?.jalur?.length > 1
+          ? { awal: r.awal, tujuan: r.tujuan, jalur: r.jalur, pilihan: r.pilihan ?? [] }
+          : null
       );
     } catch (err) {
       setMessages((prev) => [

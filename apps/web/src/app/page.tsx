@@ -11,6 +11,7 @@ import AiChatbotDrawer from '../components/chatbot/AiChatbotDrawer';
 import InfoModal from '../components/modals/InfoModal';
 import { useLocations, useActivities } from '../hooks/useDifaMap';
 import { saringLokasi } from '../data/filterParameter';
+import type { RuteDigambar } from '../data/rute';
 import { difaMapApi } from '../lib/api';
 import { useIsMobile } from '../hooks/useIsMobile';
 
@@ -68,7 +69,7 @@ export default function HomePage() {
   const [radiusTempat, setRadiusTempat] = useState<number>(500);
 
   /** Jalur rute yang sedang dibahas Difa AI, untuk digambar di peta. */
-  const [rute, setRute] = useState<{ awal: string; tujuan: string; jalur: Array<[number, number]> } | null>(null);
+  const [rute, setRute] = useState<RuteDigambar | null>(null);
   const [pickedCoordinate, setPickedCoordinate] = useState<{ latitude: number; longitude: number } | null>(null);
   const [analysisTarget, setAnalysisTarget] = useState<{ lat: number; lng: number; name?: string } | null>(null);
 

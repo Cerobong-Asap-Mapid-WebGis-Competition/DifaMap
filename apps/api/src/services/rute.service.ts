@@ -81,6 +81,44 @@ export interface RingkasanRute {
 }
 
 /**
+ * Beberapa jalur sekaligus dari satu titik ke titik lain.
+ *
+ * Jalur terpendek belum tentu yang paling bisa dilalui kursi roda - dan itulah
+ * inti persoalannya. Aplikasi peta umum merekomendasikan yang tercepat karena
+ * tidak punya data kondisi trotoar per ruas; DifaMap punya, jadi bisa memilih
+ * berdasarkan apa yang benar-benar ada di jalan.
+ *
+ * share_factor 0.6 membatasi berapa banyak ruas yang boleh dipakai bersama
+ * antar jalur, supaya alternatifnya benar-benar berbeda dan bukan variasi
+ * sepele dari jalur yang sama.
+ */
+export async function hitungBeberapaRute(
+  dari: { latitude: number; longitude: number },
+  ke: { latitude: number; longitude: number },
+  moda: ModaJalan = 'wheelchair',
+  jumlah = 3
+): Promise<RingkasanRute[]> {
+  const hasil = await panggil(`/v2/directions/${profilDari(moda)}/geojson`, {
+    coordinates: [
+      [dari.longitude, dari.latitude],
+      [ke.longitude, ke.latitude],
+    ],
+    alternative_routes: { target_count: jumlah, share_factor: 0.6, weight_factor: 1.6 },
+  });
+
+  const fitur: any[] = hasil?.features ?? [];
+
+  return fitur
+    .filter((f) => f?.properties?.summary && Array.isArray(f?.geometry?.coordinates))
+    .map((f) => ({
+      jarakMeter: Math.round(f.properties.summary.distance),
+      durasiDetik: Math.round(f.properties.summary.duration),
+      moda,
+      jalur: f.geometry.coordinates as Array<[number, number]>,
+    }));
+}
+
+/**
  * Rute dari satu titik ke titik lain, mengikuti jalan yang benar-benar ada.
  * Mengembalikan null bila layanan tidak tersedia - pemanggil memakai garis lurus.
  */
