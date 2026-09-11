@@ -10,7 +10,6 @@ import {
   MapPin,
   Compass,
   Layers,
-  BarChart3,
   Sliders,
   CheckCircle2,
   AlertTriangle,
@@ -35,6 +34,9 @@ import { useIsMobile } from '../../hooks/useIsMobile';
  * membuat keduanya harus melewati menu milik orang lain lebih dulu.
  */
 export type TampilanPanel = 'CHAT' | 'PERENCANA';
+
+/** Alat mana yang sedang dibuka di panel Urban Planner. */
+export type AlatPerencana = 'SELECTION' | 'ANALYSIS';
 
 /**
  * Jarak dua koordinat dalam meter (haversine).
@@ -151,7 +153,9 @@ export default function AiChatbotDrawer({
   analysisTarget,
 }: AiChatbotDrawerProps) {
   const isMobile = useIsMobile(768);
-  // Tidak ada lagi tab: isi panel ditentukan sidebar, bukan pilihan di dalam panel.
+  // Sidebar menentukan ISI panel; di dalam panel Urban Planner, dua alatnya
+  // masih bergantian lewat tombol geser di bawah ini.
+  const [alatPerencana, setAlatPerencana] = useState<AlatPerencana>('SELECTION');
 
   // ----------------------------------------------------
   // State: Tab 1 (Chatbot Spatial RAG)
@@ -223,6 +227,10 @@ export default function AiChatbotDrawer({
   // When analysisTarget changes (user picked point on map), trigger Site Analysis automatically
   useEffect(() => {
     if (analysisTarget && tampilan === 'PERENCANA') {
+      // Titik yang baru dipilih di peta selalu untuk Site Analysis, jadi
+      // alatnya ikut berpindah sendiri - tanpa ini, hasilnya mendarat di balik
+      // tab yang sedang tidak terlihat.
+      setAlatPerencana('ANALYSIS');
       handleRunSiteAnalysis(analysisTarget.lat, analysisTarget.lng, analysisTarget.name);
     }
   }, [analysisTarget]);
@@ -733,8 +741,45 @@ export default function AiChatbotDrawer({
       {/* tab hanya menambah satu ketukan di antara dua langkah yang berurutan.     */}
       {/* ========================================================================= */}
       {tampilan === 'PERENCANA' && (
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            backgroundColor: '#F1F5F9',
+            padding: '4px',
+            margin: '12px 16px 0 16px',
+            borderRadius: '10px',
+            gap: '4px',
+          }}
+        >
+          {([
+            ['SELECTION', '\u{1F3AF} Site Selection'],
+            ['ANALYSIS', '\u{1F4CA} Site Analysis'],
+          ] as Array<[AlatPerencana, string]>).map(([kunci, label]) => (
+            <button
+              key={kunci}
+              onClick={() => setAlatPerencana(kunci)}
+              style={{
+                padding: '8px 4px',
+                border: 'none',
+                borderRadius: '8px',
+                backgroundColor: alatPerencana === kunci ? '#FFFFFF' : 'transparent',
+                color: alatPerencana === kunci ? '#000000' : '#64748B',
+                fontWeight: alatPerencana === kunci ? '700' : '600',
+                fontSize: '12px',
+                cursor: 'pointer',
+                boxShadow: alatPerencana === kunci ? 'var(--shadow-sm)' : 'none',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tampilan === 'PERENCANA' && alatPerencana === 'SELECTION' && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Info Card */}
           <div style={{ backgroundColor: '#F8FAFC', borderRadius: '10px', padding: '12px', border: '1px solid #E2E8F0', fontSize: '12.5px', color: '#475569', lineHeight: '18px' }}>
             <strong style={{ color: '#000000' }}>Difa AI Site Selection</strong> membagi peta menjadi grid sel spasial untuk menemukan zona prioritas intervensi infrastruktur disabilitas berdasarkan formula multi-kriteria.
@@ -867,15 +912,10 @@ export default function AiChatbotDrawer({
             </div>
           )}
         </div>
+      )}
 
-        {/* Pemisah antara kedua alat, supaya batasnya terbaca saat digulung. */}
-        <div style={{ borderTop: '8px solid #F1F5F9' }} />
-
-        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#000000', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <BarChart3 size={16} color="#539BA9" />
-            <span>Site Analysis</span>
-          </h4>
+      {tampilan === 'PERENCANA' && alatPerencana === 'ANALYSIS' && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {/* Action: Pick Point on Map (Sesuai MAPID Screenshot 1) */}
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
@@ -1093,7 +1133,6 @@ export default function AiChatbotDrawer({
               Klik tombol <strong>"Klik di Peta untuk Analisis"</strong> atau <strong>"Mulai Difa AI"</strong> untuk menguji daya jangkau dan titik ekonomi di sekitar titik terpilih.
             </div>
           )}
-        </div>
         </div>
       )}
     </aside>
