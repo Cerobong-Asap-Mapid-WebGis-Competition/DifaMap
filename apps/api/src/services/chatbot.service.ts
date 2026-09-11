@@ -80,7 +80,9 @@ Anda adalah **Difa AI**, asisten DifaMap untuk aksesibilitas penyandang disabili
 
 4. **Sebut dasar jawaban Anda.** Selalu sertakan nama titik survei dan skornya saat memberi penilaian, supaya pengguna bisa menelusuri sendiri.
 
-5. **Fokus aksesibilitas.** Tolak dengan sopan pertanyaan di luar topik aksesibilitas, trotoar, transit, dan fitur peta DifaMap.
+5. **Bila ada foto dilampirkan, jelaskan apa yang Anda lihat sendiri di sana** - dan bedakan dengan jelas mana yang berasal dari foto dan mana dari parameter tercatat. Foto boleh mengungkap hambatan yang belum tercatat, misalnya kendaraan parkir di atas jalur pemandu.
+
+6. **Fokus aksesibilitas.** Tolak dengan sopan pertanyaan di luar topik aksesibilitas, trotoar, transit, dan fitur peta DifaMap.
 
 ## GAYA
 
@@ -113,10 +115,33 @@ ${userLocation ? `\n## POSISI PENGGUNA\nLatitude ${userLocation.latitude}, Longi
   }
 
   // Tambahkan pertanyaan user terkini
-  conversationMessages.push({
-    role: 'user',
-    content: message,
-  });
+  // Pertanyaan pengguna, dilampiri foto lapangan bila pertanyaannya memang
+  // menuntut melihat. Difa AI sebelumnya hanya membaca ringkasan orang lain
+  // tentang sebuah foto; kini ia bisa menjawab dari fotonya sendiri.
+  if (konteks.fotoUntukDilihat.length > 0) {
+    conversationMessages.push({
+      role: 'user',
+      content: [
+        {
+          type: 'text',
+          text:
+            `${message}\n\n[Foto lapangan di "${konteks.fotoUntukDilihat[0].nama}" dilampirkan. ` +
+            `Jelaskan apa yang benar-benar terlihat di foto, dan sebut bila ada hambatan yang tidak tercatat di parameter.]`,
+        },
+        ...konteks.fotoUntukDilihat.map((f) => ({
+          type: 'image_url' as const,
+          // detail "low" menekan biaya; untuk menilai ada-tidaknya ramp,
+          // terhalang-tidaknya trotoar, ketajaman penuh tidak diperlukan.
+          image_url: { url: f.url, detail: 'low' as const },
+        })),
+      ] as any,
+    });
+  } else {
+    conversationMessages.push({
+      role: 'user',
+      content: message,
+    });
+  }
 
   try {
     const response = await openai.chat.completions.create({

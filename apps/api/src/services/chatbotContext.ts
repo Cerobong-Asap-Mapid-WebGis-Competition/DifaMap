@@ -90,6 +90,23 @@ export interface KonteksDifaAI {
   rincianRelevan: string;
   jumlahTitik: number;
   namaRelevan: string[];
+  /** Foto lapangan yang boleh dilihat Difa AI, beserta nama titiknya. */
+  fotoUntukDilihat: Array<{ nama: string; url: string }>;
+}
+
+/**
+ * Apakah pertanyaannya menuntut melihat, bukan sekadar membaca angka.
+ *
+ * Foto mahal: satu gambar memakai sekitar 2.800 token masuk pada gpt-4o-mini,
+ * jauh melampaui seluruh konteks teks yang hanya sekitar 2.800 token untuk 94
+ * titik sekaligus. Karena itu foto hanya dilampirkan bila pertanyaannya memang
+ * tentang rupa atau tingkat kerusakan - "seperti apa", "seberapa parah" - bukan
+ * pada pertanyaan yang cukup dijawab dari parameter tercatat.
+ */
+function butuhMelihat(pertanyaan: string): boolean {
+  return /(foto|gambar|seperti apa|seberapa|parah|rusak|kelihatan|terlihat|tampak|kondisi fisik|bagaimana rupa)/i.test(
+    pertanyaan
+  );
 }
 
 export async function susunKonteks(
@@ -194,11 +211,35 @@ export async function susunKonteks(
         .join('\n\n')
     : '(tidak ada titik survei yang cocok dengan pertanyaan ini)';
 
+  // ------------------------------------------------------------------ foto
+  //
+  // Hanya untuk SATU titik paling relevan, dan maksimal dua foto. Batas ini
+  // sengaja ketat: melampirkan foto delapan titik sekaligus akan memakai lebih
+  // dari 20.000 token untuk satu pertanyaan - puluhan kali lipat biaya teksnya -
+  // tanpa menambah ketepatan jawaban secara sebanding.
+  let fotoUntukDilihat: Array<{ nama: string; url: string }> = [];
+
+  if (relevan.length > 0 && butuhMelihat(pertanyaan)) {
+    const aktivitas = await prisma.activity.findFirst({
+      where: { locationId: relevan[0].id, status: 'PUBLIC' },
+      select: { mediaUrls: true },
+    });
+
+    const foto = (aktivitas?.mediaUrls ?? [])
+      // Cuplikan peta ikut tersimpan di kolom yang sama dan tidak berguna untuk
+      // menilai kondisi fisik; yang dicari foto kamera lapangan.
+      .filter((u) => !u.includes('_map_') && !u.toLowerCase().endsWith('.png'))
+      .slice(0, 2);
+
+    fotoUntukDilihat = foto.map((url) => ({ nama: relevan[0].name, url }));
+  }
+
   return {
     ringkasan,
     daftarPadat,
     rincianRelevan,
     jumlahTitik: semua.length,
     namaRelevan: relevan.map((l) => l.name),
+    fotoUntukDilihat,
   };
 }
