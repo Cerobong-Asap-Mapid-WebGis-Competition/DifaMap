@@ -576,7 +576,6 @@ export default function MapCanvas({
     // Sekarang Tempat hanya berisi tujuan yang orang tuju: 44 PLACE dan 17
     // TRANSIT_HUB. Ruas trotoar pindah ke lapisan dasar, yaitu saat kedua
     // tombol mode dimatikan.
-    const adalahTempat = (l: any) => l.entityType === 'PLACE' || l.entityType === 'TRANSIT_HUB';
     const adalahTrotoar = (l: any) => l.entityType === 'SIDEWALK';
 
     // Tempat ditentukan tim lewat src/data/tempatPilihan.ts, bukan disimpulkan
@@ -588,10 +587,10 @@ export default function MapCanvas({
     // nama yang benar, tetapi hanya untuk POI yang sedang tampil di layar,
     // sehingga pengelompokan hilang begitu peta diperkecil. Daftar pilihan
     // bekerja di semua tingkat zoom.
-    const { tempat: tempatPilihan, idTerpakai } =
-      currentMode === 'TEMPAT'
-        ? susunTempat(locations.filter(adalahTempat))
-        : { tempat: [], idTerpakai: new Set<string>() };
+    // Tempat adalah lapisan tersendiri, bukan hasil penyaringan pengamatan, jadi
+    // digambar di KEDUA mode: bawaan maupun Tempat.
+    const tempatPilihan =
+      currentMode === 'TEMPAT' || currentMode === 'NONE' ? susunTempat(locations) : [];
 
     // Mode bawaan - kedua tombol mati - menampilkan SELURUH titik lokasi: tempat,
     // simpul transit, dan ruas trotoar. Itulah gambaran utuh hasil survei.
@@ -602,18 +601,22 @@ export default function MapCanvas({
     //
     // Tombol Tempat karena itu bukan penambah, melainkan PENYARING: ia menyisakan
     // tujuan saja, dan menampilkannya bernama supaya bisa dibaca sekilas.
-    const locsToRender =
-      currentMode === 'TEMPAT'
-        ? locations.filter((l) => adalahTempat(l) && !idTerpakai.has(l.id))
-        : currentMode === 'NONE'
-          ? locations
-          : [];
+    // Mode bawaan menampilkan SELURUH titik survei. Mode Tempat menyembunyikannya
+    // supaya hanya tujuan yang tersisa - itulah arti tombol Tempat sebagai
+    // penyaring, bukan penambah.
+    const locsToRender = currentMode === 'NONE' ? locations : [];
 
     // Satu pin per tempat, membawa nama, lambang kategori, jumlah pengamatan,
     // dan warna skor rata-ratanya - sehingga tempat terbaca sebelum diklik.
     tempatPilihan.forEach((t) => {
       const el = document.createElement('div');
-      const warna =
+
+      // Badan pin selalu biru supaya tempat terbedakan dari titik survei, yang
+      // warnanya mengikuti skor. Skor tempat tetap ditampilkan, tetapi pindah ke
+      // lencana kecil - tanpa itu, satu-satunya cara mengetahui kondisi sebuah
+      // tempat adalah membuka panelnya satu per satu.
+      const BIRU = '#2563EB';
+      const warnaSkor =
         t.skorRata == null
           ? '#94A3B8'
           : t.skorRata < 2.5
@@ -622,15 +625,34 @@ export default function MapCanvas({
               ? '#F59E0B'
               : '#16A34A';
 
-      el.innerHTML = `
-        <div style="cursor:pointer;display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.35));"
-             title="${t.nama.replace(/"/g, '&quot;')} — ${t.anggota.length} pengamatan survei">
-          <div style="display:flex;align-items:center;gap:6px;background:${warna};color:#FFFFFF;border:2px solid #FFFFFF;border-radius:20px;padding:5px 10px;font-size:12px;font-weight:800;white-space:nowrap;">
+      const judul = `${t.nama.replace(/"/g, '&quot;')} (${
+        t.anggota.length === 0 ? 'belum ada survei di sekitarnya' : `${t.anggota.length} pengamatan di sekitarnya`
+      })`;
+
+      el.innerHTML =
+        currentMode === 'TEMPAT'
+          ? `
+        <div style="cursor:pointer;display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.35));" title="${judul}">
+          <div style="display:flex;align-items:center;gap:6px;background:${BIRU};color:#FFFFFF;border:2px solid #FFFFFF;border-radius:20px;padding:5px 10px;font-size:12px;font-weight:800;white-space:nowrap;">
             ${ikonSvg(t.kategori, 15, '#FFFFFF')}
             <span>${t.nama}</span>
-            <span style="background:rgba(255,255,255,0.3);border-radius:10px;padding:1px 6px;">${t.anggota.length}</span>
+            <span style="background:${warnaSkor};border-radius:10px;padding:1px 7px;min-width:8px;text-align:center;">${t.anggota.length}</span>
           </div>
-          <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid ${warna};margin-top:-1px;"></div>
+          <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid ${BIRU};margin-top:-1px;"></div>
+        </div>
+      `
+          : `
+        <div style="cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:center;transition:transform 0.15s ease;filter:drop-shadow(0 3px 7px rgba(0,0,0,0.34));"
+             onmouseenter="this.style.transform='scale(1.15) translateY(-2px)'" onmouseleave="this.style.transform='scale(1) translateY(0)'"
+             title="${judul}">
+          <svg width="38" height="50" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 0C5.373 0 0 5.373 0 12C0 20.5 10.5 30.75 11.08 31.33C11.58 31.83 12.42 31.83 12.92 31.33C13.5 30.75 24 20.5 24 12C24 5.373 18.627 0 12 0Z" fill="#FFFFFF"/>
+            <path d="M12 1.5C6.2 1.5 1.5 6.2 1.5 12C1.5 19.5 10.6 28.8 11.3 29.5C11.7 29.9 12.3 29.9 12.7 29.5C13.4 28.8 22.5 19.5 22.5 12C22.5 6.2 17.8 1.5 12 1.5Z" fill="${BIRU}"/>
+          </svg>
+          <span style="position:absolute;top:7px;left:0;right:0;display:flex;justify-content:center;pointer-events:none;">
+            ${ikonSvg(t.kategori, 19, '#FFFFFF')}
+          </span>
+          <span style="position:absolute;top:20px;right:2px;width:11px;height:11px;border-radius:50%;background:${warnaSkor};border:2px solid #FFFFFF;pointer-events:none;"></span>
         </div>
       `;
 
@@ -665,7 +687,9 @@ export default function MapCanvas({
         // Trotoar tampil lebih kecil: ia lapisan dasar, bukan tujuan yang dicari.
         // Di mode bawaan seluruh pin dikecilkan - bukan hanya trotoar - karena
         // 108 titik pada satu layar akan saling menutupi bila seukuran penuh.
-        const ukuran = currentMode === 'NONE' ? (adalahTrotoar(loc) ? 0.7 : 0.82) : 1;
+        // Dikecilkan di mode bawaan karena 108 titik seukuran penuh pada satu
+        // layar akan saling menutupi.
+        const ukuran = currentMode === 'NONE' ? 0.74 : 1;
 
         el.innerHTML = isSelected ? `
           <div style="
@@ -710,13 +734,18 @@ export default function MapCanvas({
               margin-top: -2px;
             "></div>
           </div>
-        ` : adalahTrotoar(loc) ? `
+        ` : `
           <!--
-            Trotoar kembali memakai pin bertetes seperti semula. Titik bulat
-            memang lebih mudah dibedakan, tetapi membuat peta terasa kosong:
-            trotoar adalah 47 dari 108 titik, dan bulatan kecil tidak cukup
-            mengisi ruang pandang. Pembedaan kini ditanggung warna - trotoar
-            mengikuti skor, tempat selalu biru.
+            SATU bentuk untuk semua titik survei.
+
+            Seluruh 108 baris di tabel locations adalah pengamatan lapangan -
+            ruas trotoar, simpul transit, dan yang bertipe PLACE seperti "Toilet
+            Cinema XXI Trans Studio Mall". Tidak satu pun mewakili sebuah tempat,
+            jadi tidak ada alasan membedakan tampilannya.
+
+            Yang membedakannya dari tempat adalah warna: titik survei mengikuti
+            skornya, tempat selalu biru. Lambang di dalamnya tetap menunjukkan
+            jenis pengamatan - pejalan kaki untuk trotoar, rambu untuk halte.
           -->
           <div style="
             cursor: pointer;
@@ -727,7 +756,7 @@ export default function MapCanvas({
             transform: scale(${ukuran});
             transition: transform 0.15s ease;
             filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3));
-          " onmouseenter="this.style.transform='scale(${ukuran * 1.25}) translateY(-2px)'" onmouseleave="this.style.transform='scale(${ukuran}) translateY(0)'" title="Trotoar: ${loc.name.replace(/"/g, '&quot;')}">
+          " onmouseenter="this.style.transform='scale(${ukuran * 1.25}) translateY(-2px)'" onmouseleave="this.style.transform='scale(${ukuran}) translateY(0)'" title="${loc.name.replace(/"/g, '&quot;')} (${belumDinilai ? 'belum dinilai AI' : `skor ${loc.overallScore?.toFixed(1)}`})">
             <svg width="30" height="40" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M12 0C5.373 0 0 5.373 0 12C0 20.5 10.5 30.75 11.08 31.33C11.58 31.83 12.42 31.83 12.92 31.33C13.5 30.75 24 20.5 24 12C24 5.373 18.627 0 12 0Z" fill="${warna}"/>
               <circle cx="12" cy="11.5" r="8.2" fill="#FFFFFF"/>
@@ -741,51 +770,6 @@ export default function MapCanvas({
               justify-content: center;
               pointer-events: none;
             ">${ikonSvg(kunciLambang, 15, warna)}</span>
-          </div>
-        ` : `
-          <!--
-            Tempat dan simpul transit: pin biru, sedikit lebih besar daripada
-            trotoar, dengan lambang kategori putih.
-
-            Karena warnanya kini tetap, skor tidak lagi terbaca dari badan pin -
-            maka dipindahkan ke titik kecil di sudut kanan bawah. Tanpa itu,
-            satu-satunya cara mengetahui kondisi sebuah tempat adalah membuka
-            panelnya satu per satu.
-          -->
-          <div style="
-            cursor: pointer;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            transform: scale(${ukuran});
-            transition: transform 0.15s ease;
-            filter: drop-shadow(0 3px 7px rgba(0,0,0,0.34));
-          " onmouseenter="this.style.transform='scale(${ukuran * 1.22}) translateY(-2px)'" onmouseleave="this.style.transform='scale(${ukuran}) translateY(0)'" title="${loc.name.replace(/"/g, '&quot;')} (${belumDinilai ? 'belum dinilai AI' : `skor ${loc.overallScore?.toFixed(1)}`})">
-            <svg width="38" height="50" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 0C5.373 0 0 5.373 0 12C0 20.5 10.5 30.75 11.08 31.33C11.58 31.83 12.42 31.83 12.92 31.33C13.5 30.75 24 20.5 24 12C24 5.373 18.627 0 12 0Z" fill="#FFFFFF"/>
-              <path d="M12 1.5C6.2 1.5 1.5 6.2 1.5 12C1.5 19.5 10.6 28.8 11.3 29.5C11.7 29.9 12.3 29.9 12.7 29.5C13.4 28.8 22.5 19.5 22.5 12C22.5 6.2 17.8 1.5 12 1.5Z" fill="#2563EB"/>
-            </svg>
-            <span style="
-              position: absolute;
-              top: 7px;
-              left: 0;
-              right: 0;
-              display: flex;
-              justify-content: center;
-              pointer-events: none;
-            ">${ikonSvg(kunciLambang, 19, '#FFFFFF')}</span>
-            <span style="
-              position: absolute;
-              top: 20px;
-              right: 2px;
-              width: 11px;
-              height: 11px;
-              border-radius: 50%;
-              background: ${warna};
-              border: 2px solid #FFFFFF;
-              pointer-events: none;
-            "></span>
           </div>
         `;
 
