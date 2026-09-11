@@ -426,6 +426,11 @@ export default function HomePage() {
         isSiniGridVisible={isSiniGridVisible}
         siniGridSize={siniGridSize}
         isochroneGeoJSON={isochroneGeoJSON}
+        titikFokus={
+          selectedItem?.type === 'POI'
+            ? { latitude: selectedItem.data.latitude, longitude: selectedItem.data.longitude }
+            : null
+        }
         onSelectPoi={(poi) => setSelectedItem({ type: 'POI', data: poi })}
         onSelectLocation={handleSelectLocation}
         onSelectActivity={handleSelectActivity}

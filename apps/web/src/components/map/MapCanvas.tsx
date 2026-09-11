@@ -31,6 +31,16 @@ interface MapCanvasProps {
    * DifaMap, dan dipakai sebagai nama tempat kanonik: hasil survei kita di
    * sekitarnya lalu ditampilkan sebagai buktinya.
    */
+  /**
+   * Titik yang sedang dibuka panelnya, untuk didekati peta.
+   *
+   * Lokasi dan aktivitas sudah didekati lewat selectedLocationId dan
+   * selectedActivityId, tetapi TEMPAT tidak punya id - ia bukan baris basis
+   * data. Tanpa prop ini, memilih tempat dari pencarian membuka panelnya
+   * sementara petanya diam di tempat lain, dan pengguna harus mencari sendiri
+   * di mana letaknya.
+   */
+  titikFokus?: { latitude: number; longitude: number } | null;
   onSelectPoi?: (poi: { nama: string; kategori?: string; latitude: number; longitude: number }) => void;
   onSelectLocation?: (location: any) => void;
   onSelectActivity?: (activity: any) => void;
@@ -53,6 +63,7 @@ export default function MapCanvas({
   isSiniGridVisible = false,
   siniGridSize = 1000,
   isochroneGeoJSON = null,
+  titikFokus = null,
   onSelectPoi,
   onSelectLocation,
   onSelectActivity,
@@ -370,6 +381,26 @@ export default function MapCanvas({
   // Auto-fly map to selected location or activity (termasuk saat dipilih dari autocomplete search)
   useEffect(() => {
     if (!mapRef.current || !isMapLoaded) return;
+    // Tempat didahulukan: ia yang paling sering dibuka lewat pencarian, dan
+    // koordinatnya sudah di tangan tanpa perlu dicari di daftar mana pun.
+    // Panel detail menutupi sisi kiri layar - 96 piksel sidebar ditambah 420
+    // piksel panel. Tanpa pergeseran, titik yang didekati mendarat tepat di
+    // baliknya, dan pengguna melihat peta bergerak ke tempat yang justru tidak
+    // bisa dilihatnya. Pusat karena itu dipindah ke kanan separuh lebar panel.
+    //
+    // Di layar sempit panel menempati bagian bawah, jadi yang digeser tingginya.
+    const gesekan: [number, number] = isMobile ? [0, -110] : [258, 0];
+
+    if (titikFokus) {
+      mapRef.current.flyTo({
+        center: [titikFokus.longitude, titikFokus.latitude],
+        zoom: 16,
+        duration: 900,
+        offset: gesekan,
+      });
+      return;
+    }
+
     if (selectedLocationId) {
       const loc = locations.find((l) => l.id === selectedLocationId);
       if (loc && typeof loc.longitude === 'number' && typeof loc.latitude === 'number') {
@@ -377,6 +408,7 @@ export default function MapCanvas({
           center: [loc.longitude, loc.latitude],
           zoom: 16.5,
           duration: 900,
+          offset: gesekan,
         });
       }
     } else if (selectedActivityId) {
@@ -386,10 +418,11 @@ export default function MapCanvas({
           center: [act.longitude, act.latitude],
           zoom: 16,
           duration: 900,
+          offset: gesekan,
         });
       }
     }
-  }, [selectedLocationId, selectedActivityId, isMapLoaded, locations, activities]);
+  }, [titikFokus?.latitude, titikFokus?.longitude, selectedLocationId, selectedActivityId, isMapLoaded, isMobile, locations, activities]);
 
   // Reset map camera and basemap style to default Makassar & Gowa overview & satellite mode
   useEffect(() => {
