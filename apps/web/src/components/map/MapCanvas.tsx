@@ -40,7 +40,7 @@ interface MapCanvasProps {
    * sementara petanya diam di tempat lain, dan pengguna harus mencari sendiri
    * di mana letaknya.
    */
-  titikFokus?: { latitude: number; longitude: number } | null;
+  titikFokus?: { nama?: string; kategori?: string; latitude: number; longitude: number } | null;
   onSelectPoi?: (poi: { nama: string; kategori?: string; latitude: number; longitude: number }) => void;
   onSelectLocation?: (location: any) => void;
   onSelectActivity?: (activity: any) => void;
@@ -847,6 +847,41 @@ export default function MapCanvas({
     }
 
     // =========================================================================
+    // PENANDA TEMPAT YANG SEDANG DIBUKA
+    //
+    // Peta sudah mendekati titiknya, tetapi tanpa penanda pengguna harus menebak
+    // yang mana di antara puluhan pin lain - terutama untuk tempat dari hasil
+    // pencarian, yang bukan bagian dari lapisan mana pun.
+    //
+    // Digambar terakhir supaya berada paling atas, dan sengaja memakai warna
+    // kuning merek: ia bukan titik survei (yang berwarna skor) maupun tempat
+    // pilihan tim (yang biru), melainkan "yang sedang Anda buka".
+    // =========================================================================
+    if (titikFokus && typeof titikFokus.latitude === 'number') {
+      const el = document.createElement('div');
+      const nama = (titikFokus.nama ?? 'Titik terpilih').replace(/"/g, '&quot;');
+      const kunci = titikFokus.kategori && JALUR_IKON[titikFokus.kategori]
+        ? titikFokus.kategori
+        : 'OTHER';
+
+      el.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;pointer-events:none;filter:drop-shadow(0 4px 10px rgba(0,0,0,0.4));">
+          <div style="display:flex;align-items:center;gap:6px;background:#FDC323;color:#000000;border:2px solid #FFFFFF;border-radius:20px;padding:5px 11px;font-size:12px;font-weight:800;white-space:nowrap;">
+            ${ikonSvg(kunci, 15, '#000000')}
+            <span>${nama}</span>
+          </div>
+          <div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid #FDC323;margin-top:-1px;"></div>
+          <div style="width:10px;height:10px;border-radius:50%;background:#FDC323;border:2px solid #FFFFFF;margin-top:-3px;"></div>
+        </div>
+      `;
+
+      const m = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([titikFokus.longitude, titikFokus.latitude])
+        .addTo(mapRef.current!);
+      markersRef.current.push(m);
+    }
+
+    // =========================================================================
     // MODE 3: URBAN PLANNER (Render Khusus Titik Properti Go & Menu Go Saja)
     // =========================================================================
     if (currentMode === 'URBAN_PLANNER') {
@@ -962,6 +997,9 @@ export default function MapCanvas({
     // POI di layar saat ini. Tanpa ikut memantau pergeseran peta, pin induk
     // tidak pernah dihitung ulang setelah pengguna menggeser atau memperbesar.
     petaBergeser,
+    titikFokus?.latitude,
+    titikFokus?.longitude,
+    titikFokus?.nama,
     locations,
     activities,
     economicPoints,

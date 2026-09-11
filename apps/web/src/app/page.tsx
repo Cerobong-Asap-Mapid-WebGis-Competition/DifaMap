@@ -428,7 +428,12 @@ export default function HomePage() {
         isochroneGeoJSON={isochroneGeoJSON}
         titikFokus={
           selectedItem?.type === 'POI'
-            ? { latitude: selectedItem.data.latitude, longitude: selectedItem.data.longitude }
+            ? {
+                nama: selectedItem.data.nama,
+                kategori: selectedItem.data.kategori,
+                latitude: selectedItem.data.latitude,
+                longitude: selectedItem.data.longitude,
+              }
             : null
         }
         onSelectPoi={(poi) => setSelectedItem({ type: 'POI', data: poi })}
