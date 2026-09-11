@@ -712,26 +712,12 @@ export default function MapCanvas({
           </div>
         ` : adalahTrotoar(loc) ? `
           <!--
-            Trotoar digambar sebagai TITIK BULAT, bukan pin bertetes.
-
-            Bentuk terbaca jauh lebih cepat daripada lambang mungil di dalamnya,
-            dan bulatan juga lebih jujur secara makna: trotoar adalah ruas yang
-            dilewati, bukan tujuan yang dituju seperti mall atau rumah sakit.
+            Trotoar kembali memakai pin bertetes seperti semula. Titik bulat
+            memang lebih mudah dibedakan, tetapi membuat peta terasa kosong:
+            trotoar adalah 47 dari 108 titik, dan bulatan kecil tidak cukup
+            mengisi ruang pandang. Pembedaan kini ditanggung warna - trotoar
+            mengikuti skor, tempat selalu biru.
           -->
-          <div style="
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transform: scale(${ukuran});
-            transition: transform 0.15s ease;
-            filter: drop-shadow(0 1px 3px rgba(0,0,0,0.3));
-          " onmouseenter="this.style.transform='scale(${ukuran * 1.35})'" onmouseleave="this.style.transform='scale(${ukuran})'" title="Trotoar: ${loc.name.replace(/"/g, '&quot;')}">
-            <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="8" cy="8" r="6.4" fill="${warna}" stroke="#FFFFFF" stroke-width="2.2"/>
-            </svg>
-          </div>
-        ` : `
           <div style="
             cursor: pointer;
             position: relative;
@@ -741,17 +727,10 @@ export default function MapCanvas({
             transform: scale(${ukuran});
             transition: transform 0.15s ease;
             filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3));
-          " onmouseenter="this.style.transform='scale(${ukuran * 1.25}) translateY(-2px)'" onmouseleave="this.style.transform='scale(${ukuran}) translateY(0)'" title="${loc.name.replace(/"/g, '&quot;')} — ${belumDinilai ? 'belum dinilai AI' : `skor ${loc.overallScore?.toFixed(1)}`}">
-            <!--
-              Tempat dan simpul transit: pin bertetes berwarna PENUH dengan tepi
-              putih, lambang kategori putih di atasnya. Sebelumnya isinya putih
-              dengan lambang berwarna, dan pada ukuran sekecil ini hasilnya nyaris
-              sama dengan titik trotoar - yang membedakan hanya lambang mungil
-              yang tidak terbaca.
-            -->
-            <svg width="32" height="42" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 0C5.373 0 0 5.373 0 12C0 20.5 10.5 30.75 11.08 31.33C11.58 31.83 12.42 31.83 12.92 31.33C13.5 30.75 24 20.5 24 12C24 5.373 18.627 0 12 0Z" fill="#FFFFFF"/>
-              <path d="M12 1.5C6.2 1.5 1.5 6.2 1.5 12C1.5 19.5 10.6 28.8 11.3 29.5C11.7 29.9 12.3 29.9 12.7 29.5C13.4 28.8 22.5 19.5 22.5 12C22.5 6.2 17.8 1.5 12 1.5Z" fill="${warna}"/>
+          " onmouseenter="this.style.transform='scale(${ukuran * 1.25}) translateY(-2px)'" onmouseleave="this.style.transform='scale(${ukuran}) translateY(0)'" title="Trotoar: ${loc.name.replace(/"/g, '&quot;')}">
+            <svg width="30" height="40" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 0C5.373 0 0 5.373 0 12C0 20.5 10.5 30.75 11.08 31.33C11.58 31.83 12.42 31.83 12.92 31.33C13.5 30.75 24 20.5 24 12C24 5.373 18.627 0 12 0Z" fill="${warna}"/>
+              <circle cx="12" cy="11.5" r="8.2" fill="#FFFFFF"/>
             </svg>
             <span style="
               position: absolute;
@@ -761,7 +740,52 @@ export default function MapCanvas({
               display: flex;
               justify-content: center;
               pointer-events: none;
-            ">${ikonSvg(kunciLambang, 16, '#FFFFFF')}</span>
+            ">${ikonSvg(kunciLambang, 15, warna)}</span>
+          </div>
+        ` : `
+          <!--
+            Tempat dan simpul transit: pin biru, sedikit lebih besar daripada
+            trotoar, dengan lambang kategori putih.
+
+            Karena warnanya kini tetap, skor tidak lagi terbaca dari badan pin -
+            maka dipindahkan ke titik kecil di sudut kanan bawah. Tanpa itu,
+            satu-satunya cara mengetahui kondisi sebuah tempat adalah membuka
+            panelnya satu per satu.
+          -->
+          <div style="
+            cursor: pointer;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transform: scale(${ukuran});
+            transition: transform 0.15s ease;
+            filter: drop-shadow(0 3px 7px rgba(0,0,0,0.34));
+          " onmouseenter="this.style.transform='scale(${ukuran * 1.22}) translateY(-2px)'" onmouseleave="this.style.transform='scale(${ukuran}) translateY(0)'" title="${loc.name.replace(/"/g, '&quot;')} (${belumDinilai ? 'belum dinilai AI' : `skor ${loc.overallScore?.toFixed(1)}`})">
+            <svg width="38" height="50" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 0C5.373 0 0 5.373 0 12C0 20.5 10.5 30.75 11.08 31.33C11.58 31.83 12.42 31.83 12.92 31.33C13.5 30.75 24 20.5 24 12C24 5.373 18.627 0 12 0Z" fill="#FFFFFF"/>
+              <path d="M12 1.5C6.2 1.5 1.5 6.2 1.5 12C1.5 19.5 10.6 28.8 11.3 29.5C11.7 29.9 12.3 29.9 12.7 29.5C13.4 28.8 22.5 19.5 22.5 12C22.5 6.2 17.8 1.5 12 1.5Z" fill="#2563EB"/>
+            </svg>
+            <span style="
+              position: absolute;
+              top: 7px;
+              left: 0;
+              right: 0;
+              display: flex;
+              justify-content: center;
+              pointer-events: none;
+            ">${ikonSvg(kunciLambang, 19, '#FFFFFF')}</span>
+            <span style="
+              position: absolute;
+              top: 20px;
+              right: 2px;
+              width: 11px;
+              height: 11px;
+              border-radius: 50%;
+              background: ${warna};
+              border: 2px solid #FFFFFF;
+              pointer-events: none;
+            "></span>
           </div>
         `;
 
