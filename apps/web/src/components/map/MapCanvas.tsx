@@ -258,16 +258,32 @@ export default function MapCanvas({
         data: { type: 'FeatureCollection', features: [] },
       });
 
+      // Tepi putih, sama seperti jalur utama. Percobaan pertama menggambar
+      // alternatifnya abu-abu polos tanpa tepi, dan hasilnya praktis tak
+      // terlihat - garis kelabu di atas basemap yang juga kelabu.
+      map.addLayer({
+        id: 'rute-alternatif-tepi',
+        type: 'line',
+        source: 'rute-alternatif-source',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#FFFFFF', 'line-width': 8, 'line-opacity': 0.9 },
+      });
+
       map.addLayer({
         id: 'rute-alternatif-garis',
         type: 'line',
         source: 'rute-alternatif-source',
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        // Ujung rata, bukan bulat: dengan pola putus-putus, ujung bulat membuat
+        // tiap ruas menggembung dan polanya berubah jadi rentetan kapsul.
+        layout: { 'line-cap': 'butt', 'line-join': 'round' },
         paint: {
-          'line-color': '#94A3B8',
-          'line-width': 4,
-          'line-opacity': 0.7,
-          'line-dasharray': [2, 1.6],
+          // Warna mengikuti skor jalur dengan ambang yang sama persis seperti
+          // pin survei. Merah pada garis karena itu berarti hal yang sama
+          // dengan merah pada pin - satu bahasa warna untuk seluruh peta.
+          'line-color': ['get', 'warna'],
+          'line-width': 4.5,
+          'line-opacity': 0.95,
+          'line-dasharray': [2.2, 1.4],
         },
       });
     }
@@ -645,6 +661,20 @@ export default function MapCanvas({
   }, [titikFokus?.latitude, titikFokus?.longitude, radiusTempat, isMapLoaded, styleId]);
 
   /**
+   * Warna sebuah jalur menurut skor aksesibilitas rata-ratanya.
+   *
+   * Ambangnya sengaja sama persis dengan warna pin survei, supaya warna berarti
+   * satu hal saja di seluruh peta. Jalur tanpa titik survei diberi abu-abu -
+   * bukan hijau: belum terdata bukan berarti aman dilalui.
+   */
+  const warnaJalur = (skor: number | null): string => {
+    if (skor == null) return '#94A3B8';
+    if (skor < 2.5) return '#EF4444';
+    if (skor < 3.5) return '#F59E0B';
+    return '#16A34A';
+  };
+
+  /**
    * Menggambar jalur rute, lalu mengatur pandangan agar seluruh jalur terlihat.
    *
    * Mendekati salah satu ujungnya saja tidak cukup: yang ingin dilihat justru
@@ -678,7 +708,7 @@ export default function MapCanvas({
       ],
     } as any);
 
-    // Jalur yang tidak terpilih, digambar putus-putus abu-abu.
+    // Jalur yang tidak terpilih, digambar putus-putus dan berwarna skor.
     const jalurLain = (rute?.pilihan ?? []).filter(
       (x) => !x.direkomendasikan && x.jalur.length > 1
     );
@@ -687,7 +717,7 @@ export default function MapCanvas({
       type: 'FeatureCollection',
       features: jalurLain.map((x) => ({
         type: 'Feature',
-        properties: { jarakMeter: x.jarakMeter },
+        properties: { jarakMeter: x.jarakMeter, warna: warnaJalur(x.skorRata) },
         geometry: { type: 'LineString', coordinates: x.jalur },
       })),
     } as any);
@@ -1172,6 +1202,72 @@ export default function MapCanvas({
     }
 
     // =========================================================================
+    // LABEL JALUR ALTERNATIF
+    //
+    // Garis berwarna sudah memberi tahu bahwa ada pilihan lain, tetapi tidak
+    // memberi tahu apa isinya. Tanpa label, pengguna melihat tiga garis dan
+    // tidak tahu mana yang lebih jauh, mana yang trotoarnya lebih buruk, atau
+    // mengapa yang biru yang dipilih.
+    //
+    // Label ditaruh di titik jalur yang PALING JAUH dari jalur utama, bukan di
+    // tengah-tengahnya. Di tengah, jalur alternatif sering masih berimpit
+    // dengan jalur utama dan labelnya menumpuk jadi satu tumpukan tak terbaca;
+    // di titik paling menyimpang, ia justru mendarat tepat di tempat pilihan
+    // itu benar-benar terjadi.
+    // =========================================================================
+    if (rute?.jalur && rute.jalur.length > 1) {
+      const lainnya = (rute.pilihan ?? []).filter(
+        (x) => !x.direkomendasikan && x.jalur.length > 1
+      );
+
+      // Jarak kasar dalam derajat sudah cukup: yang dicari hanya titik mana
+      // yang paling menyimpang, bukan berapa meter persisnya.
+      const titikPalingMenyimpang = (jalur: Array<[number, number]>) => {
+        let terjauh = jalur[Math.floor(jalur.length / 2)];
+        let nilaiTerjauh = -1;
+
+        for (const [lng, lat] of jalur) {
+          let terdekat = Infinity;
+          for (const [uLng, uLat] of rute.jalur) {
+            const d = (lng - uLng) ** 2 + (lat - uLat) ** 2;
+            if (d < terdekat) terdekat = d;
+          }
+          if (terdekat > nilaiTerjauh) {
+            nilaiTerjauh = terdekat;
+            terjauh = [lng, lat];
+          }
+        }
+
+        return terjauh;
+      };
+
+      lainnya.forEach((x) => {
+        const warna = warnaJalur(x.skorRata);
+        const jarak = x.jarakMeter.toLocaleString('id-ID');
+        const menit = Math.round(x.durasiDetik / 60);
+        const skor =
+          x.skorRata == null
+            ? 'belum terdata'
+            : `skor ${x.skorRata.toFixed(1).replace('.', ',')}`;
+
+        const el = document.createElement('div');
+        el.innerHTML = `
+          <div style="display:flex;align-items:center;gap:6px;background:#FFFFFF;border:2px solid ${warna};border-radius:14px;padding:3px 9px;font-size:10.5px;font-weight:700;color:#0F172A;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.25);pointer-events:none;">
+            <span style="width:7px;height:7px;border-radius:50%;background:${warna};flex-shrink:0;"></span>
+            <span>${jarak} m &middot; ${menit} mnt</span>
+            <span style="color:${warna};">${skor}</span>
+          </div>
+        `;
+        el.title = 'Jalur lain yang dipertimbangkan Difa AI, tetapi tidak direkomendasikan.';
+
+        const m = new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat(titikPalingMenyimpang(x.jalur))
+          .addTo(mapRef.current!);
+        markersRef.current.push(m);
+      });
+    }
+
+    // =========================================================================
     // PENANDA TEMPAT YANG SEDANG DIBUKA
     //
     // Peta sudah mendekati titiknya, tetapi tanpa penanda pengguna harus menebak
@@ -1477,7 +1573,11 @@ export default function MapCanvas({
                     : 'Jalur ini yang terbaik menurut data survei di sepanjangnya.'
                 }
               >
-                {lebihJauh ? 'bukan terpendek' : 'terbaik'} &middot; {lain.length} jalur lain
+                {terpilih?.skorRata != null
+                  ? `skor ${terpilih.skorRata.toFixed(1).replace('.', ',')}`
+                  : 'belum terdata'}
+                {' '}&middot;{' '}
+                {lebihJauh ? 'bukan terpendek' : 'terbaik'} dari {lain.length + 1} jalur
               </span>
             );
           })()}
