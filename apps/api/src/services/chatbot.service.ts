@@ -1,5 +1,7 @@
 import { openai } from '../lib/openai.js';
 import { prisma } from '../lib/prisma.js';
+import { susunKonteks } from './chatbotContext.js';
+import { catatPemakaian } from '../lib/aiUsage.js';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -60,58 +62,42 @@ export async function handleAccessibilityChat(input: ChatInput): Promise<ChatRes
     });
   }
 
-  // Cari lokasi-lokasi relevan di Makassar & Gowa (7 zona kecamatan)
-  spatialContextData = await prisma.location.findMany({
-    take: 20,
-    orderBy: [
-      { overallScore: 'desc' },
-      { totalActivities: 'desc' },
-    ],
-    select: {
-      id: true,
-      name: true,
-      entityType: true,
-      category: true,
-      specificLocation: true,
-      latitude: true,
-      longitude: true,
-      overallScore: true,
-      physicalScore: true,
-      safetyScore: true,
-      rampStatus: true,
-      guidingBlockStatus: true,
-      sidewalkCondition: true,
-      surfaceCondition: true,
-      seatingAvailability: true,
-      toiletAccessibility: true,
-      lightingLevel: true,
-      crowdLevel: true,
-      peakHours: true,
-      safeVisitTime: true,
-      weeklyPattern: true,
-      aiSummary: true,
-    },
-  });
+  // Konteks disusun dari pertanyaannya, bukan dari dua puluh skor tertinggi.
+  // Lihat chatbotContext.ts untuk alasan lengkapnya beserta hasil pengujian yang
+  // menunjukkan kegagalan cara lama.
+  const konteks = await susunKonteks(message, userLocation);
 
   const systemPrompt = `
-Anda adalah **Difa AI**, asisten DifaMap khusus aksesibilitas disabilitas dan navigasi ramah inklusi untuk wilayah **Kota Makassar dan Kabupaten Gowa** (mencakup 7 zona kecamatan: Tamalate, Tamalanrea, Mariso, Ujung Pandang, Rappocini, Somba Opu, dan Bontomarannu).
+Anda adalah **Difa AI**, asisten DifaMap untuk aksesibilitas penyandang disabilitas di **Kota Makassar dan Kabupaten Gowa** (7 kecamatan: Tamalate, Tamalanrea, Mariso, Ujung Pandang, Rappocini, Somba Opu, Bontomarannu).
 
-Tugas & Batasan Utama:
-1. **Fokus Eksklusif**: Anda HANYA melayani pertanyaan seputar aksesibilitas disabilitas (pengguna kursi roda/tunadaksa, tunanetra, low vision, lansia), kondisi trotoar, ramp, ubin pengarah (guiding block), toilet disabilitas, pencahayaan jalan, waktu kunjungan aman, rute transit massal, dan fitur peta DifaMap di Kota Makassar dan Kabupaten Gowa.
-2. **Batasi Pertanyaan di Luar Konteks**: Jika pengguna bertanya hal di luar topik aksesibilitas, infrastruktur, atau transportasi publik (misalnya tentang coding umum, gosip, resep masakan, politik umum, matematika murni), tolak dengan sopan dan arahkan kembali untuk bertanya seputar fasilitas aksesibel di DifaMap Makassar & Gowa.
-3. **Gunakan Data Nyata DifaMap**: Gunakan informasi lokasi dan kondisi riil yang disediakan di bawah untuk menjawab dengan akurat, spesifik, dan memberikan rekomendasi praktis (seperti waktu aman berkunjung, ketersediaan ramp, kondisi trotoar).
+## ATURAN YANG TIDAK BOLEH DILANGGAR
+
+1. **Hanya gunakan data di bawah ini.** Jangan pernah menyebut kondisi ramp, ubin pemandu, trotoar, toilet, atau penerangan yang tidak tertulis di data. Anda tidak punya pengetahuan lain tentang Makassar selain yang diberikan di sini.
+
+2. **"Belum teramati" bukan "tidak ada".** Bila sebuah parameter tertulis "belum teramati", artinya tidak terlihat di foto survei - BUKAN berarti fasilitasnya tidak ada. Katakan apa adanya: "belum terdata". Jangan disimpulkan menjadi ada maupun tidak ada.
+
+3. **Bila tidak ada datanya, katakan.** Jika tempat yang ditanyakan tidak ada di daftar, jawab terus terang bahwa DifaMap belum pernah mensurvei di sana, lalu tawarkan titik terdekat yang ADA datanya. Jangan menambal dengan tempat lain seolah itu jawabannya.
+
+4. **Sebut dasar jawaban Anda.** Selalu sertakan nama titik survei dan skornya saat memberi penilaian, supaya pengguna bisa menelusuri sendiri.
+
+5. **Fokus aksesibilitas.** Tolak dengan sopan pertanyaan di luar topik aksesibilitas, trotoar, transit, dan fitur peta DifaMap.
+
+## GAYA
+
+Bahasa Indonesia yang ramah dan ringkas. Langsung ke jawabannya di kalimat pertama - misalnya "Kurang ramah" atau "Cukup ramah" - baru alasannya. Pakai butir bila membandingkan beberapa tempat. Sebutkan bila penilaian hanya bersandar pada sedikit pengamatan.
 
 ---
-DATA KONTEKS SPASIAL DIFAMAP:
-${selectedLocationData ? `[LOKASI YANG SEDANG DILIHAT PENGGUNA]\n${JSON.stringify(selectedLocationData, null, 2)}\n` : ''}
-${userLocation ? `[KOORDINAT PENGGUNA]: Latitude ${userLocation.latitude}, Longitude ${userLocation.longitude}\n` : ''}
-[DAFTAR TEMPAT & TROTOAR TERDAFTAR DI MAKASSAR & GOWA (7 ZONA KECAMATAN)]:
-${JSON.stringify(spatialContextData, null, 2)}
----
+## RINGKASAN SELURUH DATA SURVEI DIFAMAP
+${konteks.ringkasan}
 
-Gaya Jawaban:
-- Gunakan bahasa Indonesia yang ramah, jelas, empati, dan terstruktur (gunakan bullet points jika menjelaskan opsi).
-- Sertakan estimasi kelayakan bagi disabilitas terkait (kursi roda/tunanetra).
+## TITIK SURVEI YANG PALING COCOK DENGAN PERTANYAAN INI
+${konteks.rincianRelevan}
+
+## SELURUH TITIK SURVEI (ringkas)
+${konteks.daftarPadat}
+${selectedLocationData ? `\n## TITIK YANG SEDANG DIBUKA PENGGUNA DI PETA\n${JSON.stringify(selectedLocationData, null, 2)}` : ''}
+${userLocation ? `\n## POSISI PENGGUNA\nLatitude ${userLocation.latitude}, Longitude ${userLocation.longitude}` : ''}
+---
 `;
 
   const conversationMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
@@ -137,22 +123,37 @@ Gaya Jawaban:
       model: 'gpt-4o-mini',
       messages: conversationMessages,
       temperature: 0.3,
-      max_tokens: 600,
+      // 900, bukan 600: jawaban yang menyebut dasar penilaian - nama titik dan
+      // skornya - memerlukan ruang lebih. Jawaban terpotong di tengah kalimat
+      // jauh lebih merugikan daripada selisih biayanya, yang di bawah satu sen.
+      max_tokens: 900,
     });
+
+    // Konteks chatbot kini memuat seluruh 94 titik survei, jadi satu pertanyaan
+    // memakai ribuan token masuk - jauh lebih besar daripada penilaian foto.
+    // Tanpa pencatatan, pemakaian terbesar justru yang paling tidak terlihat.
+    catatPemakaian('difa-ai-chat', response.usage);
 
     const reply = response.choices[0]?.message?.content || 'Maaf, saya sedang tidak dapat merespon saat ini. Silakan coba sesaat lagi.';
 
-    // Lokasi yang relevan untuk dikirimkan sebagai metadata rekomendasi kartu ke UI
-    const referencedLocations = spatialContextData.slice(0, 3).map((loc) => ({
-      id: loc.id,
-      name: loc.name,
-      entityType: loc.entityType,
-      category: loc.category,
-      overallScore: loc.overallScore,
-      rampStatus: loc.rampStatus,
-      guidingBlockStatus: loc.guidingBlockStatus,
-      safeVisitTime: loc.safeVisitTime,
-    }));
+    // Kartu rekomendasi mengikuti titik yang benar-benar dipakai menjawab.
+    // Sebelumnya diambil tiga teratas menurut skor - tidak berhubungan dengan
+    // pertanyaannya, dan seringkali justru data seed karangan.
+    const referencedLocations = konteks.namaRelevan.length
+      ? await prisma.location.findMany({
+          where: { name: { in: konteks.namaRelevan.slice(0, 3) } },
+          select: {
+            id: true,
+            name: true,
+            entityType: true,
+            category: true,
+            overallScore: true,
+            rampStatus: true,
+            guidingBlockStatus: true,
+            safeVisitTime: true,
+          },
+        })
+      : [];
 
     return {
       reply,
