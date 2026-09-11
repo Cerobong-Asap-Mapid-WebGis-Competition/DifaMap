@@ -26,7 +26,15 @@ import {
 import { difaMapApi } from '../../lib/api';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
-export type SiniAiTab = 'CHAT' | 'SITE_SELECTION' | 'SITE_ANALYSIS';
+/**
+ * Isi panel kanan, ditentukan oleh sidebar mana yang sedang aktif.
+ *
+ * Dulu ketiganya berbagi satu panel dengan tab di atasnya, dan itu
+ * mencampur dua pemakai yang berbeda: penyandang disabilitas yang bertanya
+ * soal perjalanannya, dan perencana kota yang mencari zona prioritas. Tab
+ * membuat keduanya harus melewati menu milik orang lain lebih dulu.
+ */
+export type TampilanPanel = 'CHAT' | 'PERENCANA';
 
 /**
  * Jarak dua koordinat dalam meter (haversine).
@@ -124,6 +132,8 @@ interface AiChatbotDrawerProps {
   onSelectLocation?: (lokasi: any) => void;
   /** Meneruskan jalur rute dari jawaban Difa AI supaya digambar di peta. */
   onRuteDitemukan?: (rute: RuteDigambar | null) => void;
+  /** Isi panel: percakapan saja, atau kedua alat perencanaan sekaligus. */
+  tampilan?: TampilanPanel;
   analysisTarget?: { lat: number; lng: number; name?: string } | null;
 }
 
@@ -137,11 +147,11 @@ export default function AiChatbotDrawer({
   onSelectCoordinateForAnalysis,
   onSelectLocation,
   onRuteDitemukan,
+  tampilan = 'CHAT',
   analysisTarget,
 }: AiChatbotDrawerProps) {
   const isMobile = useIsMobile(768);
-  // 1. Tab Navigation: Chat vs Site Selection vs Site Analysis
-  const [activeTab, setActiveTab] = useState<SiniAiTab>('CHAT');
+  // Tidak ada lagi tab: isi panel ditentukan sidebar, bukan pilihan di dalam panel.
 
   // ----------------------------------------------------
   // State: Tab 1 (Chatbot Spatial RAG)
@@ -212,7 +222,7 @@ export default function AiChatbotDrawer({
 
   // When analysisTarget changes (user picked point on map), trigger Site Analysis automatically
   useEffect(() => {
-    if (analysisTarget && activeTab === 'SITE_ANALYSIS') {
+    if (analysisTarget && tampilan === 'PERENCANA') {
       handleRunSiteAnalysis(analysisTarget.lat, analysisTarget.lng, analysisTarget.name);
     }
   }, [analysisTarget]);
@@ -461,7 +471,9 @@ export default function AiChatbotDrawer({
               </span>
             </div>
             <span style={{ fontSize: '11px', color: '#5FD300', fontWeight: '600' }}>
-              ● Spatial Multi-Criteria RAG Aktif
+              {tampilan === 'PERENCANA'
+                ? '● Site Selection & Site Analysis'
+                : '● Spatial Multi-Criteria RAG Aktif'}
             </span>
           </div>
         </div>
@@ -493,77 +505,10 @@ export default function AiChatbotDrawer({
         </button>
       </div>
 
-      {/* 2. Top Segmented Tabs (Tanya AI / Site Selection / Site Analysis) */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
-          backgroundColor: '#F1F5F9',
-          padding: '4px',
-          margin: '12px 16px 0 16px',
-          borderRadius: '10px',
-          gap: '4px',
-        }}
-      >
-        <button
-          onClick={() => setActiveTab('CHAT')}
-          style={{
-            padding: '8px 4px',
-            border: 'none',
-            borderRadius: '8px',
-            backgroundColor: activeTab === 'CHAT' ? '#FFFFFF' : 'transparent',
-            color: activeTab === 'CHAT' ? '#000000' : '#64748B',
-            fontWeight: activeTab === 'CHAT' ? '700' : '600',
-            fontSize: '12px',
-            cursor: 'pointer',
-            boxShadow: activeTab === 'CHAT' ? 'var(--shadow-sm)' : 'none',
-            transition: 'all 0.15s ease',
-          }}
-        >
-          💬 Tanya AI
-        </button>
-
-        <button
-          onClick={() => setActiveTab('SITE_SELECTION')}
-          style={{
-            padding: '8px 4px',
-            border: 'none',
-            borderRadius: '8px',
-            backgroundColor: activeTab === 'SITE_SELECTION' ? '#FFFFFF' : 'transparent',
-            color: activeTab === 'SITE_SELECTION' ? '#000000' : '#64748B',
-            fontWeight: activeTab === 'SITE_SELECTION' ? '700' : '600',
-            fontSize: '12px',
-            cursor: 'pointer',
-            boxShadow: activeTab === 'SITE_SELECTION' ? 'var(--shadow-sm)' : 'none',
-            transition: 'all 0.15s ease',
-          }}
-        >
-          🎯 Site Selection
-        </button>
-
-        <button
-          onClick={() => setActiveTab('SITE_ANALYSIS')}
-          style={{
-            padding: '8px 4px',
-            border: 'none',
-            borderRadius: '8px',
-            backgroundColor: activeTab === 'SITE_ANALYSIS' ? '#FFFFFF' : 'transparent',
-            color: activeTab === 'SITE_ANALYSIS' ? '#000000' : '#64748B',
-            fontWeight: activeTab === 'SITE_ANALYSIS' ? '700' : '600',
-            fontSize: '12px',
-            cursor: 'pointer',
-            boxShadow: activeTab === 'SITE_ANALYSIS' ? 'var(--shadow-sm)' : 'none',
-            transition: 'all 0.15s ease',
-          }}
-        >
-          📊 Site Analysis
-        </button>
-      </div>
-
       {/* ========================================================================= */}
-      {/* TAB 1: CHATBOT SPATIAL RAG                                                */}
+      {/* PANEL DISABILITAS: percakapan Difa AI                                     */}
       {/* ========================================================================= */}
-      {activeTab === 'CHAT' && (
+      {tampilan === 'CHAT' && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* Messages Body */}
           <div
@@ -780,10 +725,16 @@ export default function AiChatbotDrawer({
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 2: SITE SELECTION (Grid prioritas Difa AI)                            */}
+      {/* PANEL URBAN PLANNER: Site Selection dan Site Analysis berurutan           */}
+      {/*                                                                           */}
+      {/* Keduanya tampil sekaligus dalam satu gulungan, tanpa tab. Seorang         */}
+      {/* perencana memakai keduanya dalam satu duduk - menemukan zona prioritas,   */}
+      {/* lalu menguji daya jangkau titik di dalamnya - jadi memisahkannya ke dua   */}
+      {/* tab hanya menambah satu ketukan di antara dua langkah yang berurutan.     */}
       {/* ========================================================================= */}
-      {activeTab === 'SITE_SELECTION' && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {tampilan === 'PERENCANA' && (
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Info Card */}
           <div style={{ backgroundColor: '#F8FAFC', borderRadius: '10px', padding: '12px', border: '1px solid #E2E8F0', fontSize: '12.5px', color: '#475569', lineHeight: '18px' }}>
             <strong style={{ color: '#000000' }}>Difa AI Site Selection</strong> membagi peta menjadi grid sel spasial untuk menemukan zona prioritas intervensi infrastruktur disabilitas berdasarkan formula multi-kriteria.
@@ -916,13 +867,15 @@ export default function AiChatbotDrawer({
             </div>
           )}
         </div>
-      )}
 
-      {/* ========================================================================= */}
-      {/* TAB 3: SITE ANALYSIS (Demography, Isochrone, POI, Land Value)             */}
-      {/* ========================================================================= */}
-      {activeTab === 'SITE_ANALYSIS' && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        {/* Pemisah antara kedua alat, supaya batasnya terbaca saat digulung. */}
+        <div style={{ borderTop: '8px solid #F1F5F9' }} />
+
+        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#000000', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <BarChart3 size={16} color="#539BA9" />
+            <span>Site Analysis</span>
+          </h4>
           {/* Action: Pick Point on Map (Sesuai MAPID Screenshot 1) */}
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
@@ -1140,6 +1093,7 @@ export default function AiChatbotDrawer({
               Klik tombol <strong>"Klik di Peta untuk Analisis"</strong> atau <strong>"Mulai Difa AI"</strong> untuk menguji daya jangkau dan titik ekonomi di sekitar titik terpilih.
             </div>
           )}
+        </div>
         </div>
       )}
     </aside>

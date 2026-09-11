@@ -1065,7 +1065,11 @@ export default function TopSearchBar({
         <button
           onClick={onOpenAiAssistant}
           className={isMobile ? 'btn-white-pill' : 'btn-circle-action'}
-          title="Tanya Difa AI"
+          title={
+            sidebarMode === 'URBAN_PLANNER'
+              ? 'Buka Site Selection & Site Analysis'
+              : 'Tanya Difa AI'
+          }
           style={{
             position: 'relative',
             height: isMobile ? '42px' : '48px',
@@ -1078,7 +1082,7 @@ export default function TopSearchBar({
           }}
         >
           <Sparkles size={isMobile ? 18 : 22} color="#D97706" />
-          {isMobile && <span>Tanya AI</span>}
+          {isMobile && <span>{sidebarMode === 'URBAN_PLANNER' ? 'Analisis' : 'Tanya AI'}</span>}
           <span
             style={{
               position: 'absolute',

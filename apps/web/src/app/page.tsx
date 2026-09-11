@@ -153,6 +153,23 @@ export default function HomePage() {
     }
   }, [sidebarMode]);
 
+  /**
+   * Panel kanan mengikuti sidebar yang dipilih.
+   *
+   * Di sidebar Urban Planner, Site Selection dan Site Analysis langsung
+   * tertera tanpa perlu ditekan lebih dulu - keduanya memang satu-satunya
+   * alasan orang masuk ke sidebar itu. Di sidebar disabilitas, panelnya
+   * kembali tertutup sampai tombol Difa AI ditekan, sebab di sana petanyalah
+   * yang utama, bukan percakapan.
+   */
+  useEffect(() => {
+    setIsAiChatOpen(sidebarMode === 'URBAN_PLANNER');
+    if (sidebarMode !== 'URBAN_PLANNER') {
+      setIsochroneGeoJSON(null);
+      setAnalysisTarget(null);
+    }
+  }, [sidebarMode]);
+
   // Handlers for Map Marker Interactions
   const handleSelectActivity = (activity: any) => {
     setIsAiChatOpen(false);
@@ -498,6 +515,7 @@ export default function HomePage() {
           handleSelectLocation(lokasi);
         }}
         onRuteDitemukan={setRute}
+        tampilan={sidebarMode === 'URBAN_PLANNER' ? 'PERENCANA' : 'CHAT'}
         onSelectCoordinateForAnalysis={() => {
           setIsPickingAnalysisTarget(true);
           setIsAiChatOpen(false);
