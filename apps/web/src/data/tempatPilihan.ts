@@ -1,74 +1,68 @@
 /**
- * Daftar tempat yang ditentukan tim, bukan disimpulkan dari data.
+ * Daftar tempat yang ditentukan tim.
  *
- * Tabel locations berisi PENGAMATAN survei, bukan tempat: "Toilet Cinema XXI
- * Trans Studio Mall" adalah satu titik di dalam mall, bukan mallnya. Dua cara
- * menurunkan nama tempat secara otomatis sudah dicoba dan keduanya gagal:
+ * Tempat BERDIRI SENDIRI, bukan hasil penyaringan data survei. Seluruh baris di
+ * tabel locations adalah pengamatan lapangan - termasuk yang bertipe PLACE,
+ * seperti "Toilet Cinema XXI Trans Studio Mall" - dan tidak satu pun mewakili
+ * sebuah tempat. Mall dan rumah sakitnya sendiri tidak pernah tersimpan sebagai
+ * baris. Pengamatan hanya diambil menurut radius ketika panel tempat dibuka.
  *
- *   - Kesamaan kata antar pengamatan menghasilkan nama tak bermakna seperti
- *     "Unhas Dilengkapi" dan "Teknik".
- *   - Pengelompokan menurut jarak saja menyatukan hal yang tak berhubungan,
- *     misalnya "Halte Bus RS Grestelina" dengan "Bus Stop SD Katolik Santo
- *     Aloysius".
  *
- * POI basemap MAPID memberi nama yang benar, tetapi hanya untuk POI yang sedang
- * tampil di layar - di bawah zoom 14 tidak ada satu pun. Daftar di bawah ini
- * bekerja pada semua tingkat zoom.
+ * DASAR PEMILIHAN
  *
- * Tempat BERDIRI SENDIRI, bukan hasil penyaringan data survei. Seluruh 108 baris
- * di tabel locations adalah pengamatan lapangan - termasuk yang bertipe PLACE -
- * dan tidak satu pun mewakili sebuah tempat. Mall dan rumah sakitnya sendiri
- * tidak pernah tersimpan sebagai baris.
+ * Daftar ini disusun dari kepadatan pengamatan yang nyata, bukan dari daftar
+ * tempat terkenal. Versi sebelumnya memuat Nipah Park, Phinisi Point, Anjungan
+ * Losari, Masjid 99 Kubah, dan Kawasan CPI - semuanya berakhir kosong, nol
+ * pengamatan bahkan dalam radius 500 m. Koordinatnya berasal dari data seed
+ * karangan, dan tim memang tidak pernah mensurvei di sana. Tempat yang tidak
+ * bisa dinilai tidak berguna di peta; kelimanya dikeluarkan sampai ada surveinya.
  *
- * Karena itu setiap tempat di sini punya koordinatnya sendiri, dan tetap muncul
- * di peta walau belum ada satu pun survei di sekitarnya - keadaan yang justru
- * berguna, karena menandai sasaran survei berikutnya.
+ * Koordinat setiap tempat diambil dari pusat sebaran titik GPS surveyor yang
+ * berdiri di sekitarnya, jadi berasal dari pengukuran lapangan. Ditulis tetap di
+ * sini supaya letaknya tidak bergeser setiap ada laporan baru masuk.
  *
- * Menambah tempat cukup satu baris di sini.
+ * Menambah tempat cukup satu baris. Sebelum menambah, pastikan ada pengamatan di
+ * sekitarnya - kalau tidak, pinnya akan kosong saat dibuka.
  */
 
 export interface DefinisiTempat {
   nama: string;
   /** Menentukan lambang di peta; lihat JALUR_IKON di MapCanvas. */
   kategori: 'MALL' | 'HEALTHCARE' | 'EDUCATION' | 'TOURISM' | 'BUS_STOP' | 'HOTEL' | 'OFFICE' | 'OTHER';
-  /**
-   * Letak tempat itu sendiri.
-   *
-   * Diturunkan dari titik GPS surveyor yang berdiri di lokasi tersebut, jadi
-   * angkanya berasal dari pengukuran lapangan - bukan dikarang. Ditulis tetap
-   * di sini supaya tempat berdiri sendiri: ia tetap ada di peta walau kelak
-   * pengamatannya dihapus, dan letaknya tidak bergeser setiap kali ada laporan
-   * baru masuk.
-   */
   latitude: number;
   longitude: number;
   /**
-   * Dipakai HANYA untuk mengenali pengamatan mana yang berada di tempat ini
-   * ketika panelnya dibuka. Tidak menentukan letak maupun keberadaan pin.
+   * Dipakai HANYA untuk mengenali pengamatan mana yang dianggap bagian dari
+   * tempat ini pada angka di pin. Tidak menentukan letak maupun keberadaan pin -
+   * isi panel tetap diambil menurut radius dari koordinat di atas.
    */
   kataKunci: RegExp;
 }
 
+/** Angka dalam kurung: jumlah pengamatan dalam radius 500 m saat daftar disusun. */
 export const TEMPAT_PILIHAN: DefinisiTempat[] = [
-  { nama: 'Trans Studio Mall', kategori: 'MALL', latitude: -5.160593, longitude: 119.394285, kataKunci: /trans studio/i },
-  { nama: 'Mall Ratu Indah', kategori: 'MALL', latitude: -5.153782, longitude: 119.416868, kataKunci: /ratu indah|\bmari\b/i },
-  { nama: 'Mall Panakkukang', kategori: 'MALL', latitude: -5.156774, longitude: 119.446498, kataKunci: /panakkukang|panakukang/i },
-  { nama: 'Nipah Park', kategori: 'MALL', latitude: -5.13781, longitude: 119.44892, kataKunci: /nipah/i },
-  { nama: 'Phinisi Point Mall', kategori: 'MALL', latitude: -5.1524, longitude: 119.4081, kataKunci: /phinisi point|\bpipo\b/i },
+  // --- Gowa ---
+  { nama: 'Kampus Teknik Unhas Gowa', kategori: 'EDUCATION', latitude: -5.231121, longitude: 119.502307, kataKunci: /teknik unhas|teknik gowa|gedung (elektro|sipil|arsitektur|csa|classroom)/i }, // (16)
+  { nama: 'Puskesmas Bontomarannu', kategori: 'HEALTHCARE', latitude: -5.2315, longitude: 119.50415, kataKunci: /bontomarannu/i }, // (16)
+  { nama: 'RSUD Syekh Yusuf Gowa', kategori: 'HEALTHCARE', latitude: -5.2013, longitude: 119.4512, kataKunci: /syekh yusuf/i }, // (1)
 
-  { nama: 'Kampus Teknik Unhas Gowa', kategori: 'EDUCATION', latitude: -5.231121, longitude: 119.502307, kataKunci: /teknik unhas|teknik gowa|gedung (elektro|sipil|arsitektur|csa|classroom)/i },
-  { nama: 'Universitas Hasanuddin Tamalanrea', kategori: 'EDUCATION', latitude: -5.136879, longitude: 119.488753, kataKunci: /universitas hasanuddin|unhas tamalanrea|danau unhas|pintu 0/i },
+  // --- Makassar pusat ---
+  { nama: 'Kawasan Karebosi & Balai Kota', kategori: 'OFFICE', latitude: -5.13421, longitude: 119.40932, kataKunci: /karebosi|balai kota|kantor pos|taman macan/i }, // (7)
+  { nama: 'Pasar Maricaya', kategori: 'OTHER', latitude: -5.149211, longitude: 119.423572, kataKunci: /maricaya|jl\.? rusa/i }, // (6)
+  { nama: 'Kawasan Jl. Arief Rate', kategori: 'TOURISM', latitude: -5.144692, longitude: 119.412258, kataKunci: /arief rate|taman segitiga|rajawali/i }, // (3)
 
-  { nama: 'RSUP Dr. Wahidin Sudirohusodo', kategori: 'HEALTHCARE', latitude: -5.13455, longitude: 119.4952, kataKunci: /wahidin/i },
-  { nama: 'RSUD Syekh Yusuf Gowa', kategori: 'HEALTHCARE', latitude: -5.2013, longitude: 119.4512, kataKunci: /syekh yusuf/i },
-  { nama: 'RS Grestelina', kategori: 'HEALTHCARE', latitude: -5.168027, longitude: 119.454055, kataKunci: /grestelina/i },
-  { nama: 'Puskesmas Bontomarannu', kategori: 'HEALTHCARE', latitude: -5.2315, longitude: 119.50415, kataKunci: /bontomarannu/i },
+  // --- Makassar selatan & timur ---
+  { nama: 'Mall Ratu Indah', kategori: 'MALL', latitude: -5.152648, longitude: 119.41695, kataKunci: /ratu indah|\bmari\b/i }, // (6)
+  { nama: 'RS Labuang Baji', kategori: 'HEALTHCARE', latitude: -5.162745, longitude: 119.41755, kataKunci: /labuang baji|tvri|politeknik muhammadiyah/i }, // (6)
+  { nama: 'Mall Panakkukang', kategori: 'MALL', latitude: -5.156774, longitude: 119.446498, kataKunci: /panakkukang|panakukang/i }, // (3)
+  { nama: 'Kawasan Minasa Upa', kategori: 'OTHER', latitude: -5.17893, longitude: 119.462896, kataKunci: /minasa upa|citraland|aroepala/i }, // (3)
+  { nama: 'Koridor Hertasning', kategori: 'BUS_STOP', latitude: -5.1644, longitude: 119.442, kataKunci: /hertasning/i }, // (2)
+  { nama: 'RS Grestelina', kategori: 'HEALTHCARE', latitude: -5.168027, longitude: 119.454055, kataKunci: /grestelina/i }, // (2)
+  { nama: 'Trans Studio Mall', kategori: 'MALL', latitude: -5.160593, longitude: 119.394285, kataKunci: /trans studio/i }, // (2)
 
-  { nama: 'Anjungan Pantai Losari', kategori: 'TOURISM', latitude: -5.142086, longitude: 119.405841, kataKunci: /losari|penghibur/i },
-  { nama: 'Masjid 99 Kubah CPI', kategori: 'TOURISM', latitude: -5.1501, longitude: 119.4035, kataKunci: /99 kubah/i },
-  { nama: 'Kawasan CPI', kategori: 'TOURISM', latitude: -5.15125, longitude: 119.4058, kataKunci: /\bcpi\b/i },
-
-  { nama: 'Halte Karebosi', kategori: 'BUS_STOP', latitude: -5.13421, longitude: 119.40932, kataKunci: /karebosi/i },
+  // --- Makassar utara ---
+  { nama: 'Kawasan GOR & Pintu 0 Unhas', kategori: 'EDUCATION', latitude: -5.134425, longitude: 119.48529, kataKunci: /universitas hasanuddin|unhas tamalanrea|danau unhas|pintu 0|gor unhas|galigo/i }, // (5)
+  { nama: 'RSUP Dr. Wahidin Sudirohusodo', kategori: 'HEALTHCARE', latitude: -5.13455, longitude: 119.4952, kataKunci: /wahidin/i }, // (2)
 ];
 
 export interface TempatTerhitung {
@@ -76,7 +70,7 @@ export interface TempatTerhitung {
   kategori: DefinisiTempat['kategori'];
   latitude: number;
   longitude: number;
-  /** Pengamatan survei yang berada di tempat ini; boleh kosong. */
+  /** Pengamatan survei yang dianggap bagian dari tempat ini; boleh kosong. */
   anggota: any[];
   /** Rata-rata skor anggota, null bila belum ada pengamatan atau belum dinilai. */
   skorRata: number | null;
@@ -85,28 +79,16 @@ export interface TempatTerhitung {
 /**
  * Menyusun tempat untuk digambar di peta.
  *
- * Tempat BERDIRI SENDIRI, terpisah dari data survei. Seluruh 108 baris di tabel
- * locations adalah pengamatan lapangan - termasuk yang bertipe PLACE, seperti
- * "Toilet Cinema XXI Trans Studio Mall" dan "Gedung Elektro Unhas". Tidak satu
- * pun di antaranya mewakili sebuah tempat; mall dan rumah sakitnya sendiri tidak
- * pernah tersimpan sebagai baris.
- *
- * Karena itu daftar tempat tidak disaring dari pengamatan: ia ditulis tim, punya
- * koordinatnya sendiri, dan tetap muncul di peta walau belum ada satu pun survei
- * di sekitarnya - keadaan itu justru berguna, karena menandai sasaran survei
- * berikutnya.
- *
- * Pengamatan hanya DIKAITKAN untuk mengisi ringkasan panel, dan tetap digambar
- * sendiri di peta sebagai titik survei.
+ * Pengamatan hanya DIKAITKAN untuk mengisi angka pada pin, dan tetap digambar
+ * sendiri di peta sebagai titik survei. Satu pengamatan hanya dikaitkan ke satu
+ * tempat, definisi terdahulu menang - tanpa itu kawasan yang saling bertumpang
+ * tindih akan menghitung pengamatan yang sama berkali-kali.
  */
 export function susunTempat(pengamatan: any[]): TempatTerhitung[] {
   const sudahDiklaim = new Set<string>();
   const tempat: TempatTerhitung[] = [];
 
   for (const def of TEMPAT_PILIHAN) {
-    // Satu pengamatan hanya dikaitkan ke satu tempat, definisi terdahulu menang.
-    // Tanpa itu "Kawasan CPI" ikut mengklaim pengamatan Masjid 99 Kubah yang
-    // berada di dalamnya, dan ringkasan keduanya menjadi rancu.
     const anggota = pengamatan.filter(
       (p) => !sudahDiklaim.has(p.id) && typeof p.name === 'string' && def.kataKunci.test(p.name)
     );

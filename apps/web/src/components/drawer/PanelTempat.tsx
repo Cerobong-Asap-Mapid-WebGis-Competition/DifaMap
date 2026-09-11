@@ -148,7 +148,10 @@ function parameterDari(item: any): Record<string, string> {
 
 export default function PanelTempat({ poi, onClose }: Props) {
   const isMobile = useIsMobile(768);
-  const [radius, setRadius] = useState<number>(300);
+  // 500 m, bukan 300. Diukur terhadap 15 tempat pada daftar: pada radius 300 m,
+  // empat di antaranya tidak menangkap satu pun pengamatan - panelnya terbuka
+  // kosong meski surveinya ada, hanya beberapa ratus meter di luar lingkaran.
+  const [radius, setRadius] = useState<number>(500);
   const [sedangMuat, setSedangMuat] = useState(true);
   const [gagal, setGagal] = useState<string | null>(null);
   const [lokasiSekitar, setLokasiSekitar] = useState<any[]>([]);

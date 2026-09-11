@@ -589,8 +589,20 @@ export default function MapCanvas({
     // bekerja di semua tingkat zoom.
     // Tempat adalah lapisan tersendiri, bukan hasil penyaringan pengamatan, jadi
     // digambar di KEDUA mode: bawaan maupun Tempat.
+    // Baris tanpa aiConfidence bukan hasil survei: itu 14 data seed karangan yang
+    // ringkasannya ditulis tangan di seed.ts, lengkap dengan skor yang tidak
+    // pernah diamati siapa pun. Sebelumnya digambar abu-abu sebagai penanda
+    // "belum dinilai", tetapi abu-abu tetap mengesankan ada sesuatu di sana -
+    // dan di daftar skor tertinggi mereka justru menempati peringkat teratas.
+    //
+    // Disaring di sini saja, tidak dihapus dari basis data: penghapusan menyentuh
+    // Supabase yang dipakai bersama dan menunggu koordinasi tim.
+    const hasilSurvei = locations.filter((l: any) => l.aiConfidence != null);
+
+    // Tempat adalah lapisan tersendiri, bukan hasil penyaringan pengamatan, jadi
+    // digambar di KEDUA mode: bawaan maupun Tempat.
     const tempatPilihan =
-      currentMode === 'TEMPAT' || currentMode === 'NONE' ? susunTempat(locations) : [];
+      currentMode === 'TEMPAT' || currentMode === 'NONE' ? susunTempat(hasilSurvei) : [];
 
     // Mode bawaan - kedua tombol mati - menampilkan SELURUH titik lokasi: tempat,
     // simpul transit, dan ruas trotoar. Itulah gambaran utuh hasil survei.
@@ -604,7 +616,7 @@ export default function MapCanvas({
     // Mode bawaan menampilkan SELURUH titik survei. Mode Tempat menyembunyikannya
     // supaya hanya tujuan yang tersisa - itulah arti tombol Tempat sebagai
     // penyaring, bukan penambah.
-    const locsToRender = currentMode === 'NONE' ? locations : [];
+    const locsToRender = currentMode === 'NONE' ? hasilSurvei : [];
 
     // Satu pin per tempat, membawa nama, lambang kategori, jumlah pengamatan,
     // dan warna skor rata-ratanya - sehingga tempat terbaca sebelum diklik.
