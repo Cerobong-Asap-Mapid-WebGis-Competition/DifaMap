@@ -39,6 +39,15 @@ const createActivitySchema = z.object({
     toiletAccessibility: z.nativeEnum(ToiletAccessibility).optional(),
     lightingLevel: z.nativeEnum(LightingLevel).optional(),
     crowdLevel: z.nativeEnum(CrowdLevel).optional(),
+    /**
+     * Waktu pelapor benar-benar berada di lokasi, format ISO.
+     *
+     * Bukan createdAt: laporan bisa dikirim malam hari tentang kunjungan pagi,
+     * dan 94 pengamatan yang ada sekarang ber-createdAt waktu impor dari MAPID -
+     * bukan waktu kunjungan sama sekali. Grafik pola keramaian mingguan membaca
+     * kolom ini, dan sengaja mengabaikan createdAt karena alasan itu.
+     */
+    visitedAt: z.string().datetime().optional(),
   }).optional(),
 });
 

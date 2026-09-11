@@ -35,6 +35,9 @@ export interface CreateActivityPayload {
     sidewalkCondition?: 'GOOD' | 'NARROW' | 'DAMAGED' | 'BLOCKED' | 'NOT_VISIBLE';
     surfaceCondition?: 'SMOOTH' | 'SLIPPERY' | 'POTHOLE' | 'UNEVEN' | 'NOT_VISIBLE';
     lightingLevel?: 'BRIGHT' | 'DIM' | 'DARK' | 'NOT_VISIBLE';
+    crowdLevel?: 'QUIET' | 'MODERATE' | 'CROWDED' | 'NOT_VISIBLE';
+    /** Waktu pelapor berada di lokasi, ISO. Mengisi grafik pola keramaian. */
+    visitedAt?: string;
   };
 }
 

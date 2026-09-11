@@ -40,6 +40,8 @@ export interface AnalyzeActivityInput {
   mediaUrls?: string[];
   entityTypeHint?: 'PLACE' | 'SIDEWALK' | 'TRANSIT_HUB';
   userObservedHints?: {
+    /** Waktu pelapor berada di lokasi, ISO. Diteruskan apa adanya ke hasil. */
+    visitedAt?: string;
     rampStatus?: RampStatus;
     guidingBlockStatus?: GuidingBlockStatus;
     sidewalkCondition?: SidewalkCondition;
@@ -265,6 +267,10 @@ Jumlah Foto Dilampirkan: ${mediaUrls.length}`;
         toiletAccessibility: (obs.toiletAccessibility as ToiletAccessibility) || userObservedHints?.toiletAccessibility || ToiletAccessibility.NOT_VISIBLE,
         lightingLevel: (obs.lightingLevel as LightingLevel) || userObservedHints?.lightingLevel || LightingLevel.NOT_VISIBLE,
         crowdLevel: (obs.crowdLevel as CrowdLevel) || userObservedHints?.crowdLevel || CrowdLevel.NOT_VISIBLE,
+        // Waktu kunjungan diteruskan apa adanya, tidak diminta ke AI: hanya
+        // pelapor yang tahu kapan ia berdiri di sana, dan menebaknya dari foto
+        // adalah persis jenis karangan yang ingin dihindari.
+        ...(userObservedHints?.visitedAt ? { visitedAt: userObservedHints.visitedAt } : {}),
       },
     };
   } catch (error) {
@@ -288,6 +294,10 @@ Jumlah Foto Dilampirkan: ${mediaUrls.length}`;
         toiletAccessibility: userObservedHints?.toiletAccessibility || ToiletAccessibility.NOT_VISIBLE,
         lightingLevel: userObservedHints?.lightingLevel || LightingLevel.NOT_VISIBLE,
         crowdLevel: userObservedHints?.crowdLevel || CrowdLevel.NOT_VISIBLE,
+        // Waktu kunjungan diteruskan apa adanya, tidak diminta ke AI: hanya
+        // pelapor yang tahu kapan ia berdiri di sana, dan menebaknya dari foto
+        // adalah persis jenis karangan yang ingin dihindari.
+        ...(userObservedHints?.visitedAt ? { visitedAt: userObservedHints.visitedAt } : {}),
       },
     };
   }

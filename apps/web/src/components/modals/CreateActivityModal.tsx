@@ -43,6 +43,23 @@ export default function CreateActivityModal({
   const [lightingLevel, setLightingLevel] = useState<'BRIGHT' | 'DIM' | 'DARK' | 'NOT_VISIBLE'>('NOT_VISIBLE');
   const [sidewalkCondition, setSidewalkCondition] = useState<'GOOD' | 'NARROW' | 'DAMAGED' | 'BLOCKED' | 'NOT_VISIBLE'>('NOT_VISIBLE');
 
+  /**
+   * Waktu pelapor berada di lokasi, dan seberapa ramai saat itu.
+   *
+   * Keduanya tidak bisa disimpulkan AI dari foto: sebuah jepretan tidak memberi
+   * tahu hari apa, dan keramaian sesaat bukan pola. Hanya orang yang berdiri di
+   * sana yang tahu - dan menjawabnya butuh lima detik.
+   *
+   * Inilah yang mengisi grafik pola keramaian mingguan, yang sampai sekarang
+   * kosong karena tidak ada satu pun laporan berwaktu.
+   */
+  const [waktuKunjungan, setWaktuKunjungan] = useState(() => {
+    const n = new Date();
+    const pad = (x: number) => String(x).padStart(2, '0');
+    return `${n.getFullYear()}-${pad(n.getMonth() + 1)}-${pad(n.getDate())}T${pad(n.getHours())}:${pad(n.getMinutes())}`;
+  });
+  const [tingkatKeramaian, setTingkatKeramaian] = useState<'QUIET' | 'MODERATE' | 'CROWDED' | 'NOT_VISIBLE'>('NOT_VISIBLE');
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -93,6 +110,11 @@ export default function CreateActivityModal({
           guidingBlockStatus,
           lightingLevel,
           sidewalkCondition,
+          crowdLevel: tingkatKeramaian,
+          // Diubah ke ISO lengkap dengan zona waktu. Input datetime-local
+          // memberi waktu lokal tanpa zona, dan tanpa pengubahan ini server
+          // menolaknya - grafik mingguan lalu tetap kosong tanpa pesan apa pun.
+          ...(waktuKunjungan ? { visitedAt: new Date(waktuKunjungan).toISOString() } : {}),
         },
       };
 
@@ -344,6 +366,44 @@ export default function CreateActivityModal({
           <div style={{ backgroundColor: '#F8FAFC', padding: '14px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
             <div style={{ fontSize: '13px', fontWeight: '700', color: '#000000', marginBottom: '10px' }}>
               Parameter Fasilitas yang Teramati:
+            </div>
+
+            {/* Waktu kunjungan & keramaian - dua hal yang hanya diketahui
+                orang yang berdiri di sana, dan tidak bisa disimpulkan dari
+                foto. Diletakkan paling atas karena paling cepat dijawab. */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+              <div>
+                <label style={{ fontSize: '12px', color: '#767676', display: 'block', marginBottom: '4px' }}>
+                  Kapan Anda di sini?
+                </label>
+                <input
+                  type="datetime-local"
+                  value={waktuKunjungan}
+                  onChange={(e) => setWaktuKunjungan(e.target.value)}
+                  style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px', fontFamily: 'inherit' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', color: '#767676', display: 'block', marginBottom: '4px' }}>
+                  Seberapa ramai saat itu?
+                </label>
+                <select
+                  value={tingkatKeramaian}
+                  onChange={(e: any) => setTingkatKeramaian(e.target.value)}
+                  style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
+                >
+                  <option value="NOT_VISIBLE">Tidak saya perhatikan</option>
+                  <option value="QUIET">Sepi</option>
+                  <option value="MODERATE">Sedang</option>
+                  <option value="CROWDED">Ramai</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ fontSize: '10.5px', color: '#94A3B8', marginBottom: '12px', lineHeight: '15px' }}>
+              Dua isian di atas mengisi grafik pola keramaian mingguan. Keramaian tidak bisa
+              disimpulkan dari foto, jadi tanpa jawaban Anda bagian itu tetap kosong.
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
