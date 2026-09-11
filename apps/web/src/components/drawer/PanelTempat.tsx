@@ -97,6 +97,50 @@ function slugTempat(nama: string): string {
     .slice(0, 120);
 }
 
+const HARI_PENDEK = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+
+/** Tingkat keramaian dipetakan ke angka supaya bisa dirata-rata dan digambar. */
+const NILAI_KERAMAIAN: Record<string, number> = { QUIET: 1, MODERATE: 2, CROWDED: 3 };
+
+/**
+ * Menyusun pola keramaian per hari dari pengamatan di sekitar tempat.
+ *
+ * Dasarnya `observedParameters.visitedAt` - waktu pelapor benar-benar berada di
+ * lokasi, diisi lewat formulir laporan. Kolom `createdAt` SENGAJA tidak dipakai
+ * meski selalu terisi: untuk 94 pengamatan yang ada sekarang, nilainya adalah
+ * waktu impor dari MAPID, bukan waktu kunjungan. Memakainya akan menghasilkan
+ * grafik yang seluruh datanya menumpuk di satu hari - hari impor - dan terbaca
+ * seolah itu pola keramaian tempatnya.
+ *
+ * Selama belum ada laporan berwaktu, fungsi ini mengembalikan tujuh hari kosong,
+ * dan grafiknya menyatakan kekosongan itu apa adanya.
+ */
+function susunMingguan(pengamatan: any[]): { hari: Array<{ nama: string; rata: number | null; jumlah: number }>; totalLaporan: number } {
+  const ember: number[][] = [[], [], [], [], [], [], []];
+
+  for (const x of pengamatan) {
+    const par = x.observedParameters ?? {};
+    const waktu = par.visitedAt;
+    const tingkat = par.crowdLevel ?? x.crowdLevel;
+    if (!waktu || !tingkat || !(tingkat in NILAI_KERAMAIAN)) continue;
+
+    const t = new Date(waktu);
+    if (Number.isNaN(t.getTime())) continue;
+
+    // getDay(): 0 = Minggu. Digeser agar Senin menjadi indeks 0.
+    const indeks = (t.getDay() + 6) % 7;
+    ember[indeks].push(NILAI_KERAMAIAN[tingkat]);
+  }
+
+  const hari = ember.map((nilai, i) => ({
+    nama: HARI_PENDEK[i],
+    rata: nilai.length ? nilai.reduce((a, b) => a + b, 0) / nilai.length : null,
+    jumlah: nilai.length,
+  }));
+
+  return { hari, totalLaporan: ember.reduce((n, e) => n + e.length, 0) };
+}
+
 /** Parameter hasil pengamatan ada di tempat berbeda untuk lokasi dan aktivitas. */
 function parameterDari(item: any): Record<string, string> {
   return item.observedParameters ?? item;
@@ -242,6 +286,8 @@ export default function PanelTempat({ poi, onClose }: Props) {
       setSedangKirim(false);
     }
   };
+
+  const mingguan = useMemo(() => susunMingguan(pengamatan), [pengamatan]);
 
   const ringkasan = useMemo(() => {
     const semua = pengamatan;
@@ -460,65 +506,144 @@ export default function PanelTempat({ poi, onClose }: Props) {
             </div>
           </div>
 
-          {/* Pola keramaian - grafik batang tiga tingkat. Tingkat yang kosong
-              tetap digambar sebagai batang abu-abu setinggi minimum, supaya
-              ketiadaan data terbaca sebagai nol, bukan sebagai kategori hilang. */}
+          {/* Pola keramaian mingguan */}
           <div style={kartu}>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-              <Users size={15} />
-              <span>Pola keramaian</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Users size={15} />
+                <span>Pola keramaian</span>
+              </div>
+              <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B' }}>Mingguan</span>
             </div>
+
             {(() => {
-              const urut = ['QUIET', 'MODERATE', 'CROWDED'];
-              const warnaTingkat: Record<string, string> = {
-                QUIET: '#16A34A',
-                MODERATE: '#F59E0B',
-                CROWDED: '#EF4444',
-              };
-              const nilai = urut.map((k) => ringkasan.keramaian[k] ?? 0);
-              const total = nilai.reduce((a, b) => a + b, 0);
-              const tertinggi = Math.max(1, ...nilai);
+              const L = 34;   // ruang kiri untuk label sumbu
+              const A = 8;    // jarak atas
+              const B = 22;   // ruang bawah untuk nama hari
+              const T = 118;  // tinggi keseluruhan
+              const W = 300;  // lebar acuan; digambar responsif lewat viewBox
+              const tinggiPlot = T - A - B;
+              const xDari = (i: number) => L + (i * (W - L - 6)) / 6;
+              // Nilai 1 (sepi) di bawah, 3 (ramai) di atas.
+              const yDari = (v: number) => A + tinggiPlot - ((v - 1) / 2) * tinggiPlot;
+
+              const titik = mingguan.hari
+                .map((h, i) => (h.rata == null ? null : { x: xDari(i), y: yDari(h.rata), h, i }))
+                .filter(Boolean) as Array<{ x: number; y: number; h: any; i: number }>;
+
+              const garis = titik.map((t) => `${t.x},${t.y}`).join(' ');
 
               return (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: '14px', height: '96px', padding: '0 4px' }}>
-                    {urut.map((k, i) => (
-                      <div key={k} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', height: '100%' }}>
-                        <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'flex-end' }}>
-                          <div
-                            style={{
-                              width: '100%',
-                              height: `${Math.max(3, (nilai[i] / tertinggi) * 100)}%`,
-                              backgroundColor: nilai[i] > 0 ? warnaTingkat[k] : '#E2E8F0',
-                              borderRadius: '6px 6px 0 0',
-                              transition: 'height 0.25s ease',
-                            }}
-                          />
-                        </div>
-                        <span style={{ fontSize: '12px', fontWeight: 800, color: nilai[i] > 0 ? '#0F172A' : '#CBD5E1' }}>
-                          {nilai[i]}
-                        </span>
-                        <span style={{ fontSize: '10.5px', color: '#64748B' }}>{LABEL_KERAMAIAN[k]}</span>
-                      </div>
+                <div style={{ position: 'relative' }}>
+                  <svg viewBox={`0 0 ${W} ${T}`} width="100%" height={T} role="img"
+                       aria-label="Grafik pola keramaian mingguan">
+                    {/* Garis bantu dan label tingkat */}
+                    {[3, 2, 1].map((v) => (
+                      <g key={v}>
+                        <line x1={L} y1={yDari(v)} x2={W - 6} y2={yDari(v)} stroke="#E2E8F0" strokeWidth="1" />
+                        <text x={L - 6} y={yDari(v) + 3.5} textAnchor="end" fontSize="9" fill="#94A3B8">
+                          {v === 3 ? 'Ramai' : v === 2 ? 'Sedang' : 'Sepi'}
+                        </text>
+                      </g>
                     ))}
-                  </div>
 
-                  <div style={{ fontSize: '10.5px', color: '#94A3B8', marginTop: '10px', lineHeight: '15px', display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
-                    {total === 0 ? (
-                      <>
-                        <AlertTriangle size={14} color="#94A3B8" style={{ flexShrink: 0, marginTop: '1px' }} />
-                        <span>
-                          Belum ada data. Keramaian tidak bisa disimpulkan dari satu foto survei, dan
-                          DifaMap belum punya sumber data kunjungan.
-                        </span>
-                      </>
-                    ) : (
-                      <span>
-                        Dari {ringkasan.jumlah} pengamatan, {total} yang keramaiannya sempat teramati.
-                      </span>
+                    {/* Nama hari */}
+                    {mingguan.hari.map((h, i) => (
+                      <text key={h.nama} x={xDari(i)} y={T - 6} textAnchor="middle" fontSize="9.5"
+                            fill={h.jumlah > 0 ? '#334155' : '#CBD5E1'}>
+                        {h.nama}
+                      </text>
+                    ))}
+
+                    {titik.length > 1 && (
+                      <polyline points={garis} fill="none" stroke="#539BA9" strokeWidth="2"
+                                strokeLinejoin="round" strokeLinecap="round" />
                     )}
-                  </div>
-                </>
+                    {titik.map((t) => (
+                      <circle key={t.i} cx={t.x} cy={t.y} r="3.5" fill="#539BA9" stroke="#FFFFFF" strokeWidth="1.5">
+                        <title>{`${t.h.nama}: ${t.h.jumlah} laporan`}</title>
+                      </circle>
+                    ))}
+                  </svg>
+
+                  {mingguan.totalLaporan === 0 && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '0 12px',
+                      }}
+                    >
+                      <span
+                        style={{
+                          backgroundColor: 'rgba(248, 250, 252, 0.94)',
+                          border: '1px dashed #CBD5E1',
+                          borderRadius: '10px',
+                          padding: '8px 12px',
+                          fontSize: '11px',
+                          color: '#64748B',
+                          textAlign: 'center',
+                          lineHeight: '16px',
+                        }}
+                      >
+                        Belum ada laporan berwaktu untuk tempat ini.
+                        <br />
+                        Grafik terisi sendiri begitu ada yang melapor sambil mencatat waktu kunjungan.
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            <div style={{ fontSize: '10.5px', color: '#94A3B8', marginTop: '8px', lineHeight: '15px' }}>
+              {mingguan.totalLaporan === 0 ? (
+                <span>
+                  Keramaian tidak bisa disimpulkan dari satu foto, dan waktu impor data bukan waktu
+                  kunjungan — jadi tidak ada yang bisa digambar sekarang.
+                </span>
+              ) : (
+                <span>
+                  Berdasarkan {mingguan.totalLaporan} laporan berwaktu. Hari tanpa titik berarti belum
+                  ada laporan pada hari itu, bukan berarti sepi.
+                </span>
+              )}
+            </div>
+
+            {/* Keramaian yang sempat teramati, tanpa dimensi hari */}
+            {(() => {
+              const urut = ['QUIET', 'MODERATE', 'CROWDED'];
+              const warna: Record<string, string> = { QUIET: '#16A34A', MODERATE: '#F59E0B', CROWDED: '#EF4444' };
+              const total = urut.reduce((n, k) => n + (ringkasan.keramaian[k] ?? 0), 0);
+              if (total === 0) return null;
+              return (
+                <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
+                  {urut.map((k) => {
+                    const n = ringkasan.keramaian[k] ?? 0;
+                    if (n === 0) return null;
+                    return (
+                      <span
+                        key={k}
+                        style={{
+                          fontSize: '10.5px',
+                          fontWeight: 700,
+                          color: '#FFFFFF',
+                          backgroundColor: warna[k],
+                          padding: '3px 9px',
+                          borderRadius: '20px',
+                        }}
+                      >
+                        {LABEL_KERAMAIAN[k]}: {n}
+                      </span>
+                    );
+                  })}
+                  <span style={{ fontSize: '10.5px', color: '#94A3B8', alignSelf: 'center' }}>
+                    tercatat tanpa keterangan hari
+                  </span>
+                </div>
               );
             })()}
           </div>
