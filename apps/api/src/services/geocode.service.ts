@@ -52,6 +52,38 @@ const JEDA_MS = 250;
 /** Umur simpanan sementara. Nama tempat hampir tidak pernah berubah. */
 const UMUR_SIMPANAN_MS = 30 * 60 * 1000;
 
+/**
+ * Nama lokal yang tidak dikenal OpenStreetMap.
+ *
+ * OSM menyimpan sebagian tempat dengan nama historis atau asingnya saja.
+ * "Benteng Rotterdam" - nama yang dipakai sehari-hari di Makassar - menghasilkan
+ * NOL hasil di Photon maupun Nominatim, karena OSM hanya mengenal "Fort
+ * Rotterdam". Tidak ada cara memperbaikinya dari sisi kita selain menerjemahkan
+ * sebelum bertanya.
+ *
+ * Daftar ini sengaja pendek dan dirawat tangan. Menambahnya cukup satu baris,
+ * dan sebaiknya dilakukan setiap kali ada pencarian yang gagal padahal
+ * tempatnya jelas ada.
+ */
+const NAMA_LOKAL: Array<[RegExp, string]> = [
+  [/benteng\s+rotterdam/i, 'Fort Rotterdam'],
+  [/benteng\s+ujung\s+pandang/i, 'Fort Rotterdam'],
+  [/bandara\s+(sultan\s+)?hasanuddin/i, 'Sultan Hasanuddin International Airport'],
+  [/pantai\s+losari/i, 'Anjungan Pantai Losari'],
+  [/mal\s+ratu\s+indah/i, 'Mall Ratu Indah'],
+  [/\bmari\b/i, 'Mall Ratu Indah'],
+  [/\bmtos\b/i, 'Mall Panakkukang'],
+  [/\bunhas\b/i, 'Universitas Hasanuddin'],
+  [/\bunm\b/i, 'Universitas Negeri Makassar'],
+];
+
+function terjemahkanNamaLokal(kueri: string): string {
+  for (const [pola, ganti] of NAMA_LOKAL) {
+    if (pola.test(kueri)) return kueri.replace(pola, ganti);
+  }
+  return kueri;
+}
+
 export interface TempatDitemukan {
   nama: string;
   alamat: string;
@@ -99,27 +131,49 @@ export async function cariTempat(kueri: string, batas = 5): Promise<TempatDitemu
 
   await tungguGiliran();
 
-  const alamat = new URL(PHOTON);
-  alamat.searchParams.set('q', kueri.trim());
-  alamat.searchParams.set('limit', String(Math.min(10, batas)));
-  // Kotak pembatas membuang hasil luar wilayah. Tanpa ini "hotel cla" pernah
-  // mengembalikan penginapan di Argentina dan Spanyol sebelum yang di Makassar.
-  alamat.searchParams.set(
-    'bbox',
-    `${KOTAK_WILAYAH.minLng},${KOTAK_WILAYAH.minLat},${KOTAK_WILAYAH.maxLng},${KOTAK_WILAYAH.maxLat}`
-  );
+  const kueriCari = terjemahkanNamaLokal(kueri.trim());
 
-  const res = await fetch(alamat.toString(), {
-    headers: { 'User-Agent': IDENTITAS },
-  });
+  async function tanya(pakaiKotak: boolean): Promise<any[]> {
+    const alamat = new URL(PHOTON);
+    alamat.searchParams.set('q', kueriCari);
+    alamat.searchParams.set('limit', String(Math.min(15, batas * 3)));
 
-  if (!res.ok) {
-    throw new Error(`Photon menjawab ${res.status}`);
+    if (pakaiKotak) {
+      // Kotak pembatas membuang hasil luar wilayah. Tanpa ini "hotel cla" pernah
+      // mengembalikan penginapan di Argentina dan Spanyol lebih dulu.
+      alamat.searchParams.set(
+        'bbox',
+        `${KOTAK_WILAYAH.minLng},${KOTAK_WILAYAH.minLat},${KOTAK_WILAYAH.maxLng},${KOTAK_WILAYAH.maxLat}`
+      );
+    } else {
+      // Percobaan kedua: tanpa kotak, hanya dibias ke pusat Makassar, lalu
+      // disaring sendiri. Kotak pembatas kadang membuang tempat yang titiknya
+      // terdaftar sedikit di luar batas - bandara dan kawasan pinggiran
+      // termasuk di antaranya.
+      alamat.searchParams.set('lat', '-5.15');
+      alamat.searchParams.set('lon', '119.43');
+    }
+
+    const res = await fetch(alamat.toString(), { headers: { 'User-Agent': IDENTITAS } });
+    if (!res.ok) throw new Error(`Photon menjawab ${res.status}`);
+    const isi = (await res.json()) as any;
+    return isi?.features ?? [];
   }
 
-  // fetch bawaan Node mengembalikan unknown; bentuknya dijamin oleh Photon.
-  const mentah = (await res.json()) as any;
-  const fitur: any[] = mentah?.features ?? [];
+  let fitur = await tanya(true);
+
+  if (fitur.length === 0) {
+    await tungguGiliran();
+    const cadangan = await tanya(false);
+    fitur = cadangan.filter((f: any) => {
+      const c = f?.geometry?.coordinates;
+      if (!Array.isArray(c)) return false;
+      const [lng, lat] = c;
+      // Sedikit lebih longgar dari kotak wilayah studi, supaya tempat di tepi
+      // - bandara, kawasan Gowa selatan - tetap terjaring.
+      return lng > 119.3 && lng < 119.65 && lat > -5.35 && lat < -5.0;
+    });
+  }
 
   const hasil: TempatDitemukan[] = fitur
     .filter((f) => f?.properties?.name && Array.isArray(f?.geometry?.coordinates))
@@ -135,7 +189,8 @@ export async function cariTempat(kueri: string, batas = 5): Promise<TempatDitemu
         latitude: Number(f.geometry.coordinates[1]),
         longitude: Number(f.geometry.coordinates[0]),
       };
-    });
+    })
+    .slice(0, batas);
 
   simpanan.set(q, { waktu: Date.now(), hasil });
   return hasil;

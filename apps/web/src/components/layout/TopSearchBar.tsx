@@ -111,7 +111,7 @@ export default function TopSearchBar({
     setSedangCariLuar(true);
     const timer = setTimeout(() => {
       difaMapApi
-        .cariTempatLuas(q, 4)
+        .cariTempatLuas(q, 6)
         .then((j: any) => {
           if (!dibatalkan) setTempatLuar(j?.data ?? []);
         })
