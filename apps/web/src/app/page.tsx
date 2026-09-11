@@ -69,7 +69,7 @@ export default function HomePage() {
   const [pickedCoordinate, setPickedCoordinate] = useState<{ latitude: number; longitude: number } | null>(null);
   const [analysisTarget, setAnalysisTarget] = useState<{ lat: number; lng: number; name?: string } | null>(null);
 
-  // 6. SINI AI Site Selection & Site Analysis Layers
+  // 6. Lapisan Site Selection & Site Analysis Difa AI
   const [isSiniGridVisible, setIsSiniGridVisible] = useState(false);
   const [siniGridSize, setSiniGridSize] = useState<number>(1000);
   const [isochroneGeoJSON, setIsochroneGeoJSON] = useState<any>(null);
@@ -370,7 +370,7 @@ export default function HomePage() {
         onToggleBufferVisible={setIsBufferVisible}
       />
 
-      {/* Floating Indicator: Mode Pilih Titik Analisis Spasial SINI AI */}
+      {/* Floating Indicator: Mode Pilih Titik Analisis Spasial Difa AI */}
       {isPickingAnalysisTarget && (
         <div
           style={{
@@ -415,7 +415,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* 3. Interactive Map Canvas (MapLibre GL + Polaroid Pins & Location Badges + SINI Grid Layer) */}
+      {/* 3. Interactive Map Canvas (MapLibre GL + penanda lokasi + lapisan grid prioritas) */}
       <MapCanvas
         locations={filteredLocations}
         activities={filteredActivities}
@@ -469,7 +469,7 @@ export default function HomePage() {
         }}
       />
 
-      {/* 5. AI Assistant Chatbot Drawer (Spatial RAG + SINI AI Site Selection + Site Analysis) */}
+      {/* 5. Panel Difa AI (Spatial RAG + Site Selection + Site Analysis) */}
       <AiChatbotDrawer
         isOpen={isAiChatOpen}
         onClose={() => {

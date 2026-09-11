@@ -1065,7 +1065,7 @@ export default function TopSearchBar({
         <button
           onClick={onOpenAiAssistant}
           className={isMobile ? 'btn-white-pill' : 'btn-circle-action'}
-          title="Tanya Asisten AI DifaMap (Spatial RAG & SINI AI)"
+          title="Tanya Difa AI"
           style={{
             position: 'relative',
             height: isMobile ? '42px' : '48px',

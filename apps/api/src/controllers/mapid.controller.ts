@@ -130,7 +130,7 @@ export async function getElevationSlopeController(req: Request, res: Response): 
 }
 
 /**
- * MAPID SINI AI: Grid Analisis Kesesuaian & Prioritas Aksesibilitas Makassar
+ * Difa AI: grid analisis kesesuaian & prioritas aksesibilitas Makassar
  */
 export async function getSiniGridPriorityController(req: Request, res: Response): Promise<void> {
   try {

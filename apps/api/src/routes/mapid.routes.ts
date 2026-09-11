@@ -35,7 +35,7 @@ router.get('/analysis/isochrone', getIsochroneCatchmentController);
 // 6. MAP Analysis Tools - Profil Ketinggian & Kelandaian (Slope Analysis)
 router.post('/analysis/elevation-slope', getElevationSlopeController);
 
-// 7. MAPID SINI AI - Multi-Criteria Accessibility Priority Grid
+// 7. Grid prioritas aksesibilitas Difa AI (multi-kriteria)
 router.get('/analysis/sini-grid', getSiniGridPriorityController);
 
 // 8. MAPID Competition API - Community Maps (data survei aksesibilitas)

@@ -218,7 +218,7 @@ export const difaMapApi = {
   },
 
   /**
-   * MAPID SINI AI: Mengambil Grid Heatmap Prioritas Wilayah Makassar
+   * Difa AI: mengambil grid prioritas wilayah Makassar & Gowa
    */
   async getSiniGridPriority(gridSize = 1000) {
     const res = await fetch(`${API_BASE_URL}/api/mapid/analysis/sini-grid?gridSize=${gridSize}`);

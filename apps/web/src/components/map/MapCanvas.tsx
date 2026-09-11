@@ -106,7 +106,7 @@ export default function MapCanvas({
   const isPickingLocationRef = useRef(isPickingLocation);
   isPickingLocationRef.current = isPickingLocation;
 
-  // Helper untuk mendaftarkan semua GeoJSON sources dan layers custom (Buffer, SINI Grid, Isochrone)
+  // Helper untuk mendaftarkan semua GeoJSON sources dan layers custom (Buffer, grid prioritas, jangkauan)
   const setupCustomLayers = useCallback((map: maplibregl.Map) => {
     // 1. Urban Planner Buffer Catchment Zone Layer
     if (!map.getSource('buffer-source')) {
@@ -137,7 +137,7 @@ export default function MapCanvas({
       });
     }
 
-    // 2. SINI Grid AI Layer (1000m / 500m Priority Heatmap)
+    // 2. Lapisan grid prioritas Difa AI (sel 250 / 500 / 1000 m)
     if (!map.getSource('sini-grid-source')) {
       map.addSource('sini-grid-source', {
         type: 'geojson',
@@ -1090,7 +1090,7 @@ export default function MapCanvas({
       }
     }
 
-    // 4. Update SINI Grid AI Layer Data (Site Selection)
+    // 4. Perbarui data lapisan grid prioritas Difa AI (Site Selection)
     const siniSource = mapRef.current?.getSource('sini-grid-source') as maplibregl.GeoJSONSource;
     if (siniSource) {
       if (isSiniGridVisible) {

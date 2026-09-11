@@ -390,7 +390,7 @@ class MapIdService {
   }
 
   /**
-   * MAPID SINI AI: Multi-Criteria Spatial Accessibility Grid untuk Makassar & Gowa
+   * Difa AI: grid prioritas aksesibilitas multi-kriteria untuk Makassar & Gowa
    * Menghasilkan grid sel analisis kesesuaian & prioritas intervensi fasilitas trotoar/ramp.
    * Mencakup 7 zona: Tamalate, Tamalanrea, Mariso, Ujung Pandang, Rappocini (Makassar), Bontomarannu, Somba Opu (Gowa).
    */
@@ -492,7 +492,7 @@ class MapIdService {
     return {
       type: 'FeatureCollection',
       features,
-      summary: `Analisis Grid SINI AI untuk ${features.length} sel di Kota Makassar & Kabupaten Gowa (7 Zona Kecamatan) dengan formula multi-kriteria aksesibilitas & kepadatan fasilitas publik.`,
+      summary: `Analisis grid prioritas Difa AI untuk ${features.length} sel di Kota Makassar & Kabupaten Gowa (7 Zona Kecamatan) dengan formula multi-kriteria aksesibilitas & kepadatan fasilitas publik.`,
     };
   }
 

@@ -136,7 +136,7 @@ export default function AiChatbotDrawer({
     {
       role: 'assistant',
       content:
-        'Halo! Saya **DifaMap AI Assistant**. Saya terintegrasi dengan data **SINI AI MAPID** untuk membantu analisis rute ramah disabilitas, pencarian lokasi prioritas (*Site Selection*), dan analisis daya jangkau (*Site Analysis*) di Kota Makassar dan Kabupaten Gowa.',
+        'Halo! Saya **Difa AI**. Saya membaca hasil survei aksesibilitas DifaMap di atas basemap MAPID untuk membantu mencari rute ramah disabilitas, menemukan zona prioritas perbaikan (*Site Selection*), dan menilai daya jangkau sebuah titik (*Site Analysis*) di Kota Makassar dan Kabupaten Gowa.',
     },
   ]);
   const [inputText, setInputText] = useState('');
@@ -144,7 +144,7 @@ export default function AiChatbotDrawer({
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // ----------------------------------------------------
-  // State: Tab 2 (Site Selection - MAPID SINI Grid & Formula)
+  // State: Tab 2 (Site Selection - grid prioritas Difa AI)
   // ----------------------------------------------------
   const [gridSize, setGridSize] = useState<number>(1000);
   const [isComputingGrid, setIsComputingGrid] = useState(false);
@@ -226,7 +226,7 @@ export default function AiChatbotDrawer({
     }
   };
 
-  // Handler: Execute SINI AI Site Selection Grid
+  // Handler: Execute Difa AI Site Selection Grid
   const handleComputeSiniGrid = async () => {
     try {
       setIsComputingGrid(true);
@@ -271,7 +271,7 @@ export default function AiChatbotDrawer({
         onToggleSiniGrid(true, gridSize);
       }
     } catch (err) {
-      console.error('Failed to run SINI Grid AI:', err);
+      console.error('Gagal menghitung grid prioritas Difa AI:', err);
     } finally {
       setIsComputingGrid(false);
     }
@@ -354,7 +354,13 @@ export default function AiChatbotDrawer({
         position: 'fixed',
         left: isMobile ? 0 : 'auto',
         right: isMobile ? 0 : '24px',
-        top: isMobile ? 'auto' : '24px',
+        // Mulai di bawah baris tombol atas, bukan sejajar dengannya.
+        //
+        // Sebelumnya panel dan tombol Tempat, Halte, serta Bagikan Laporan
+        // sama-sama dimulai di 24px - dan karena panel berlapis 50 sementara
+        // bilah tombol 70, tombol-tombol itu menimpa kepala panel: judul "Difa
+        // AI" tertutup separuh dan tab di bawahnya ikut terpotong.
+        top: isMobile ? 'auto' : '96px',
         bottom: isMobile ? 0 : '24px',
         width: isMobile ? '100%' : '460px',
         maxWidth: isMobile ? '100vw' : 'calc(100vw - 48px)',
@@ -373,7 +379,7 @@ export default function AiChatbotDrawer({
       {/* Mobile Top Drag Handle Bar */}
       {isMobile && <div className="bottom-sheet-drag-handle" />}
 
-      {/* 1. Header with MAPID SINI AI Branding */}
+      {/* 1. Header Difa AI */}
       <div
         style={{
           padding: isMobile ? '12px 18px' : '16px 20px',
@@ -402,7 +408,7 @@ export default function AiChatbotDrawer({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <h3 style={{ fontSize: '15px', fontWeight: '800', color: '#000000' }}>
-                SINI AI Assistant
+                Difa AI
               </h3>
               <span style={{ fontSize: '10px', backgroundColor: '#FDC323', color: '#000000', fontWeight: '800', padding: '2px 6px', borderRadius: '10px' }}>
                 MAPID ENGINE
@@ -579,7 +585,7 @@ export default function AiChatbotDrawer({
             {[
               'Halte paling ramah kursi roda',
               'Kondisi guiding block Hertasning',
-              'Analisis zona SINI AI',
+              'Analisis zona prioritas',
             ].map((q, i) => (
               <button
                 key={i}
@@ -655,13 +661,13 @@ export default function AiChatbotDrawer({
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 2: SITE SELECTION (MAPID SINI Grid & Formula Generator)               */}
+      {/* TAB 2: SITE SELECTION (Grid prioritas Difa AI)                            */}
       {/* ========================================================================= */}
       {activeTab === 'SITE_SELECTION' && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Info Card */}
           <div style={{ backgroundColor: '#F8FAFC', borderRadius: '10px', padding: '12px', border: '1px solid #E2E8F0', fontSize: '12.5px', color: '#475569', lineHeight: '18px' }}>
-            <strong style={{ color: '#000000' }}>SINI AI Site Selection</strong> membagi peta menjadi grid sel spasial untuk menemukan zona prioritas intervensi infrastruktur disabilitas berdasarkan formula multi-kriteria.
+            <strong style={{ color: '#000000' }}>Difa AI Site Selection</strong> membagi peta menjadi grid sel spasial untuk menemukan zona prioritas intervensi infrastruktur disabilitas berdasarkan formula multi-kriteria.
           </div>
 
           {/* Grid Settings (Sesuai MAPID Screenshot 2) */}
@@ -724,11 +730,11 @@ export default function AiChatbotDrawer({
             </button>
           </div>
 
-          {/* Hasil SINI Grid Priority Summary */}
+          {/* Ringkasan hasil grid prioritas */}
           {gridResultSummary && (
             <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #CBD5E1', borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '13px', fontWeight: '700', color: '#000000' }}>Hasil Analisis SINI Grid AI</span>
+                <span style={{ fontSize: '13px', fontWeight: '700', color: '#000000' }}>Hasil Analisis Grid Difa AI</span>
                 <span style={{ fontSize: '11px', backgroundColor: '#10b981', color: '#FFFFFF', padding: '2px 8px', borderRadius: '10px', fontWeight: '700' }}>
                   {gridResultSummary.totalCells} Sel Ter-generate
                 </span>
@@ -833,7 +839,7 @@ export default function AiChatbotDrawer({
                 fontSize: '12.5px',
               }}
             >
-              <span>Mulai SINI AI</span>
+              <span>Mulai Difa AI</span>
             </button>
 
             {siteAnalysisData && (
@@ -1008,7 +1014,7 @@ export default function AiChatbotDrawer({
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '30px 16px', color: '#767676', fontSize: '12.5px', border: '1px dashed #CBD5E1', borderRadius: '10px' }}>
-              Klik tombol <strong>"Klik di Peta untuk Analisis"</strong> atau <strong>"Mulai SINI AI"</strong> untuk menguji daya jangkau isokron dan catchment ekonomi POI di titik terpilih.
+              Klik tombol <strong>"Klik di Peta untuk Analisis"</strong> atau <strong>"Mulai Difa AI"</strong> untuk menguji daya jangkau dan titik ekonomi di sekitar titik terpilih.
             </div>
           )}
         </div>

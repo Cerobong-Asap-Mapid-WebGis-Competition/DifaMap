@@ -31,7 +31,7 @@ export interface ChatResponse {
 }
 
 /**
- * Chatbot Asisten Aksesibilitas DifaMap dengan Konteks Spasial (RAG)
+ * Difa AI - asisten aksesibilitas DifaMap dengan konteks spasial (RAG)
  * Terkoneksi dengan data database lokasi & aktivitas sekitar Kota Makassar.
  */
 export async function handleAccessibilityChat(input: ChatInput): Promise<ChatResponse> {
@@ -94,7 +94,7 @@ export async function handleAccessibilityChat(input: ChatInput): Promise<ChatRes
   });
 
   const systemPrompt = `
-Anda adalah **DifaMap AI Assistant**, asisten cerdas khusus aksesibilitas disabilitas dan navigasi ramah inklusi untuk wilayah **Kota Makassar dan Kabupaten Gowa** (mencakup 7 zona kecamatan: Tamalate, Tamalanrea, Mariso, Ujung Pandang, Rappocini, Somba Opu, dan Bontomarannu).
+Anda adalah **Difa AI**, asisten DifaMap khusus aksesibilitas disabilitas dan navigasi ramah inklusi untuk wilayah **Kota Makassar dan Kabupaten Gowa** (mencakup 7 zona kecamatan: Tamalate, Tamalanrea, Mariso, Ujung Pandang, Rappocini, Somba Opu, dan Bontomarannu).
 
 Tugas & Batasan Utama:
 1. **Fokus Eksklusif**: Anda HANYA melayani pertanyaan seputar aksesibilitas disabilitas (pengguna kursi roda/tunadaksa, tunanetra, low vision, lansia), kondisi trotoar, ramp, ubin pengarah (guiding block), toilet disabilitas, pencahayaan jalan, waktu kunjungan aman, rute transit massal, dan fitur peta DifaMap di Kota Makassar dan Kabupaten Gowa.
@@ -161,7 +161,7 @@ Gaya Jawaban:
   } catch (error: any) {
     console.error('Error during DifaMap chatbot response generation:', error);
     return {
-      reply: 'Halo! Saya DifaMap AI Assistant. Saat ini ada sedikit gangguan koneksi ke server AI, namun Anda tetap dapat menjelajahi peta interaktif, kondisi ramp, trotoar, dan aktivitas ramah disabilitas langsung pada map.',
+      reply: 'Halo! Saya Difa AI. Saat ini ada sedikit gangguan koneksi ke server AI, namun Anda tetap dapat menjelajahi peta interaktif, kondisi ramp, trotoar, dan aktivitas ramah disabilitas langsung pada map.',
     };
   }
 }
