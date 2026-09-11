@@ -26,7 +26,12 @@ import ImageLightboxModal from '../modals/ImageLightboxModal';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
 export interface SelectedItemState {
-  type: 'ACTIVITY' | 'LOCATION';
+  /**
+   * POI adalah tempat dari basemap MAPID - bukan baris di basis data DifaMap.
+   * Yang kita punya tentangnya hanyalah namanya dan koordinatnya; seluruh isi
+   * panelnya disusun dari hasil survei kita yang berada di sekitarnya.
+   */
+  type: 'ACTIVITY' | 'LOCATION' | 'POI';
   data: any;
 }
 

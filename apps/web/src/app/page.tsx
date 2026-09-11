@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import AppSidebar, { SidebarMode } from '../components/layout/AppSidebar';
 import TopSearchBar, { PublicSubMode, UrbanPlannerFilter } from '../components/layout/TopSearchBar';
 import DetailDrawer, { SelectedItemState } from '../components/drawer/DetailDrawer';
+import PanelTempat from '../components/drawer/PanelTempat';
 import MapCanvas, { MapDisplayMode } from '../components/map/MapCanvas';
 import CreateActivityModal from '../components/modals/CreateActivityModal';
 import AiChatbotDrawer from '../components/chatbot/AiChatbotDrawer';
@@ -375,6 +376,7 @@ export default function HomePage() {
         isSiniGridVisible={isSiniGridVisible}
         siniGridSize={siniGridSize}
         isochroneGeoJSON={isochroneGeoJSON}
+        onSelectPoi={(poi) => setSelectedItem({ type: 'POI', data: poi })}
         onSelectLocation={handleSelectLocation}
         onSelectActivity={handleSelectActivity}
         onPickCoordinate={handlePickCoordinate}
@@ -384,8 +386,14 @@ export default function HomePage() {
       />
 
       {/* 4. Left Detail Drawer (Automatically slides in when a pin / polaroid is clicked) */}
+      {/* Panel tempat MAPID - dipakai saat yang diklik adalah POI basemap,
+          bukan baris di basis data DifaMap. */}
+      {selectedItem?.type === 'POI' && (
+        <PanelTempat poi={selectedItem.data} onClose={() => setSelectedItem(null)} />
+      )}
+
       <DetailDrawer
-        selectedItem={selectedItem}
+        selectedItem={selectedItem?.type === 'POI' ? null : selectedItem}
         onClose={() => setSelectedItem(null)}
         onOpenCreateModalWithLocation={(loc) => {
           setPickedCoordinate({ latitude: loc.latitude, longitude: loc.longitude });

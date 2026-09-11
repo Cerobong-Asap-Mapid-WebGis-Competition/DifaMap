@@ -24,6 +24,13 @@ interface MapCanvasProps {
   isSiniGridVisible?: boolean;
   siniGridSize?: number;
   isochroneGeoJSON?: any;
+  /**
+   * Dipanggil saat pengguna mengklik label POI milik basemap MAPID - misalnya
+   * "Trans Studio Mall". POI ini berasal dari tile MAPID, bukan dari basis data
+   * DifaMap, dan dipakai sebagai nama tempat kanonik: hasil survei kita di
+   * sekitarnya lalu ditampilkan sebagai buktinya.
+   */
+  onSelectPoi?: (poi: { nama: string; kategori?: string; latitude: number; longitude: number }) => void;
   onSelectLocation?: (location: any) => void;
   onSelectActivity?: (activity: any) => void;
   onPickCoordinate?: (coord: { latitude: number; longitude: number }) => void;
@@ -45,6 +52,7 @@ export default function MapCanvas({
   isSiniGridVisible = false,
   siniGridSize = 1000,
   isochroneGeoJSON = null,
+  onSelectPoi,
   onSelectLocation,
   onSelectActivity,
   onPickCoordinate,
@@ -58,9 +66,16 @@ export default function MapCanvas({
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [styleId, setStyleId] = useState<string>(process.env.NEXT_PUBLIC_MAPID_STYLE_ID || 'satellite');
+  // Dipantau khusus untuk petunjuk POI: lapisan poi_* pada tile MAPID baru ada
+  // mulai zoom 14, jadi di bawah itu tidak ada tempat yang bisa diklik sama
+  // sekali - dan tanpa penjelasan, keadaan itu terbaca sebagai fitur rusak.
+  const [zoomSekarang, setZoomSekarang] = useState<number>(13);
 
   const onMapClickRef = useRef(onMapClick);
   onMapClickRef.current = onMapClick;
+
+  const onSelectPoiRef = useRef(onSelectPoi);
+  onSelectPoiRef.current = onSelectPoi;
 
   const onPickCoordinateRef = useRef(onPickCoordinate);
   onPickCoordinateRef.current = onPickCoordinate;
@@ -268,17 +283,59 @@ export default function MapCanvas({
       setupCustomLayers(map);
     });
 
+    map.on('moveend', () => setZoomSekarang(map.getZoom()));
+
     // Setiap kali basemap style di-load ulang (misal ganti Street ke Dark Mode), pasang kembali layer custom
     map.on('style.load', () => {
       setupCustomLayers(map);
     });
 
+    // Lapisan POI milik basemap MAPID. Hanya ada mulai zoom 14, dan poi_z16
+    // bahkan baru muncul di zoom 16 - jadi pada tampilan se-kota tidak ada yang
+    // bisa diklik. Itu ditangani lewat petunjuk zoom di bawah peta.
+    const LAPISAN_POI = ['poi_z16', 'poi_z15', 'poi_z14'];
+
+    const poiDiTitik = (titik: any) => {
+      const tersedia = LAPISAN_POI.filter((id) => map.getLayer(id));
+      if (tersedia.length === 0) return null;
+      // Kotak kecil di sekitar kursor: label POI kecil dan sulit dikenai tepat.
+      const kotak: any = [
+        [titik.x - 8, titik.y - 8],
+        [titik.x + 8, titik.y + 8],
+      ];
+      const fitur = map.queryRenderedFeatures(kotak, { layers: tersedia });
+      return fitur.find((f: any) => f.properties?.name) ?? null;
+    };
+
     map.on('click', (e: any) => {
       if (isPickingLocationRef.current && onPickCoordinateRef.current && e.lngLat) {
         onPickCoordinateRef.current({ latitude: e.lngLat.lat, longitude: e.lngLat.lng });
-      } else if (onMapClickRef.current) {
+        return;
+      }
+
+      const poi = poiDiTitik(e.point);
+      if (poi && onSelectPoiRef.current) {
+        const geom: any = poi.geometry;
+        const [lng, lat] = geom?.type === 'Point' ? geom.coordinates : [e.lngLat.lng, e.lngLat.lat];
+        onSelectPoiRef.current({
+          nama: poi.properties.name,
+          kategori: poi.properties.class ?? poi.properties.subclass,
+          latitude: lat,
+          longitude: lng,
+        });
+        return;
+      }
+
+      if (onMapClickRef.current) {
         onMapClickRef.current();
       }
+    });
+
+    // Kursor berubah di atas POI supaya ketahuan bisa diklik - tanpa ini,
+    // tidak ada isyarat apa pun bahwa label basemap punya fungsi.
+    map.on('mousemove', (e: any) => {
+      if (isPickingLocationRef.current) return;
+      map.getCanvas().style.cursor = poiDiTitik(e.point) ? 'pointer' : '';
     });
 
     mapRef.current = map;
@@ -749,6 +806,29 @@ export default function MapCanvas({
           cursor: isPickingLocation ? 'crosshair' : 'grab',
         }}
       />
+
+      {/* Petunjuk POI: muncul hanya saat peta belum cukup dekat */}
+      {zoomSekarang < 14 && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '18px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: 'rgba(15, 23, 42, 0.88)',
+            color: '#FFFFFF',
+            padding: '8px 14px',
+            borderRadius: '20px',
+            fontSize: '12px',
+            fontWeight: 600,
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+            zIndex: 5,
+          }}
+        >
+          Perbesar peta untuk memilih tempat seperti mall, masjid, atau rumah sakit
+        </div>
+      )}
 
       {/* Floating Style Switcher (MAPID Basemap) */}
       <div
