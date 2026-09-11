@@ -120,6 +120,8 @@ interface AiChatbotDrawerProps {
    * fotonya. Kartu menjadikan dasar penilaian itu satu ketukan saja.
    */
   onSelectLocation?: (lokasi: any) => void;
+  /** Meneruskan jalur rute dari jawaban Difa AI supaya digambar di peta. */
+  onRuteDitemukan?: (jalur: Array<[number, number]> | null) => void;
   analysisTarget?: { lat: number; lng: number; name?: string } | null;
 }
 
@@ -132,6 +134,7 @@ export default function AiChatbotDrawer({
   onClearAnalysis,
   onSelectCoordinateForAnalysis,
   onSelectLocation,
+  onRuteDitemukan,
   analysisTarget,
 }: AiChatbotDrawerProps) {
   const isMobile = useIsMobile(768);
@@ -225,6 +228,11 @@ export default function AiChatbotDrawer({
         ...prev,
         { role: 'assistant', content: reply, rujukan: response.data?.referencedLocations ?? [] },
       ]);
+
+      // Jalur rute hanya ada bila pertanyaannya berbentuk perjalanan. Bila
+      // tidak, peta dibersihkan supaya rute lama tidak tertinggal menempel di
+      // layar saat pertanyaan sudah berganti topik.
+      onRuteDitemukan?.(response.data?.rute?.jalur ?? null);
     } catch (err) {
       setMessages((prev) => [
         ...prev,

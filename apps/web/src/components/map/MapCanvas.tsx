@@ -43,6 +43,14 @@ interface MapCanvasProps {
   titikFokus?: { nama?: string; kategori?: string; latitude: number; longitude: number } | null;
   /** Radius jangkauan yang sedang dipakai panel tempat, dalam meter. */
   radiusTempat?: number;
+  /**
+   * Jalur rute yang sedang dibahas Difa AI, [lng, lat].
+   *
+   * Dikirim terpisah dari teks jawaban karena keduanya untuk mata yang berbeda:
+   * kalimat menjelaskan hambatannya, garis di peta memperlihatkan jalurnya.
+   * Membaca "1,7 kilometer" tidak sama dengan melihat jalan mana yang dilewati.
+   */
+  ruteJalur?: Array<[number, number]> | null;
   onSelectPoi?: (poi: { nama: string; kategori?: string; latitude: number; longitude: number }) => void;
   onSelectLocation?: (location: any) => void;
   onSelectActivity?: (activity: any) => void;
@@ -67,6 +75,7 @@ export default function MapCanvas({
   isochroneGeoJSON = null,
   titikFokus = null,
   radiusTempat = 500,
+  ruteJalur = null,
   onSelectPoi,
   onSelectLocation,
   onSelectActivity,
@@ -223,6 +232,34 @@ export default function MapCanvas({
           'line-width': 2,
           'line-opacity': 0.5,
         },
+      });
+    }
+
+    // 5. Jalur rute kursi roda.
+    //
+    // Digambar dua lapis: garis putih tebal di bawah sebagai tepi, garis
+    // berwarna di atasnya. Tanpa tepi putih, jalur berwarna tenggelam di atas
+    // peta yang juga berwarna - terutama di kawasan padat jalan.
+    if (!map.getSource('rute-source')) {
+      map.addSource('rute-source', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      map.addLayer({
+        id: 'rute-tepi',
+        type: 'line',
+        source: 'rute-source',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#FFFFFF', 'line-width': 9, 'line-opacity': 0.95 },
+      });
+
+      map.addLayer({
+        id: 'rute-garis',
+        type: 'line',
+        source: 'rute-source',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#2563EB', 'line-width': 5 },
       });
     }
 
@@ -574,6 +611,52 @@ export default function MapCanvas({
       }
     };
   }, [titikFokus?.latitude, titikFokus?.longitude, radiusTempat, isMapLoaded, styleId]);
+
+  /**
+   * Menggambar jalur rute, lalu mengatur pandangan agar seluruh jalur terlihat.
+   *
+   * Mendekati salah satu ujungnya saja tidak cukup: yang ingin dilihat justru
+   * keseluruhan jalannya - di mana ia berbelok, seberapa jauh memutar, dan
+   * titik survei mana yang dilaluinya.
+   */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapLoaded) return;
+
+    const sumber = map.getSource('rute-source') as maplibregl.GeoJSONSource;
+    if (!sumber) return;
+
+    if (!ruteJalur || ruteJalur.length < 2) {
+      sumber.setData({ type: 'FeatureCollection', features: [] });
+      return;
+    }
+
+    sumber.setData({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: { type: 'LineString', coordinates: ruteJalur },
+        },
+      ],
+    } as any);
+
+    const batas = ruteJalur.reduce(
+      (b, [lng, lat]) => b.extend([lng, lat] as [number, number]),
+      new maplibregl.LngLatBounds(ruteJalur[0], ruteJalur[0])
+    );
+
+    map.fitBounds(batas, {
+      // Ruang kiri disisakan untuk panel Difa AI yang sedang terbuka; tanpa itu
+      // separuh jalur mendarat di baliknya.
+      padding: isMobile
+        ? { top: 110, bottom: 320, left: 40, right: 40 }
+        : { top: 120, bottom: 60, left: 80, right: 520 },
+      duration: 1100,
+      maxZoom: 16.5,
+    });
+  }, [ruteJalur, isMapLoaded, isMobile]);
 
   // 2. Render Markers Berdasarkan Mode (Aktivitas vs Tempat vs Urban Planner)
   useEffect(() => {

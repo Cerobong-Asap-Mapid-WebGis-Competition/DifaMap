@@ -20,6 +20,14 @@ export interface ChatInput {
 
 export interface ChatResponse {
   reply: string;
+  /** Jalur rute untuk digambar di peta, bila pertanyaannya berbentuk perjalanan. */
+  rute?: {
+    awal: string;
+    tujuan: string;
+    jarakMeter: number;
+    durasiDetik: number;
+    jalur: Array<[number, number]>;
+  } | null;
   referencedLocations?: Array<{
     id: string;
     name: string;
@@ -189,6 +197,7 @@ ${userLocation ? `\n## POSISI PENGGUNA\nLatitude ${userLocation.latitude}, Longi
     return {
       reply,
       referencedLocations,
+      rute: konteks.ruteDigambar,
     };
   } catch (error: any) {
     console.error('Error during DifaMap chatbot response generation:', error);

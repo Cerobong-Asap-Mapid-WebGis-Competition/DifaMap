@@ -31,6 +31,7 @@
 
 import { prisma } from '../lib/prisma.js';
 import { hitungRute } from './rute.service.js';
+import { cariTempat } from './geocode.service.js';
 
 /** Nilai yang berarti parameter tidak pernah teramati. */
 const BELUM = ['NOT_VISIBLE', 'NOT_APPLICABLE'];
@@ -147,6 +148,20 @@ export interface KonteksDifaAI {
   cakupan: string;
   /** Hambatan sepanjang koridor, bila pertanyaannya berbentuk "dari A ke B". */
   koridor: string | null;
+  /**
+   * Jalur rute untuk digambar di peta, bila pertanyaannya berbentuk perjalanan.
+   *
+   * Dikirim terpisah dari teks jawaban karena keduanya untuk mata yang berbeda:
+   * kalimat menjelaskan hambatannya, garis di peta memperlihatkan jalurnya.
+   * Membaca "1,5 kilometer" tidak sama dengan melihat jalan mana yang dilewati.
+   */
+  ruteDigambar: {
+    awal: string;
+    tujuan: string;
+    jarakMeter: number;
+    durasiDetik: number;
+    jalur: Array<[number, number]>;
+  } | null;
 }
 
 /**
@@ -274,6 +289,7 @@ export async function susunKonteks(
 
   // -------------------------------------------------------------- koridor
   let koridor: string | null = null;
+  let ruteDigambar: KonteksDifaAI['ruteDigambar'] = null;
   const rute = bacaRute(pertanyaan);
 
   if (rute) {
@@ -319,10 +335,60 @@ export async function susunKonteks(
       return terbaik;
     };
 
-    const a = cariTitik(rute.awal);
-    const b = cariTitik(rute.tujuan);
+    /**
+     * Ujung rute dicari dua tahap.
+     *
+     * Pertama di titik survei, karena namanya paling sesuai dengan istilah yang
+     * dipakai di aplikasi. Bila tidak ketemu, dicari sebagai tempat umum lewat
+     * layanan pencarian - sebab orang bertanya "dari Puskesmas Bontomarannu",
+     * bukan "dari titik survei nomor sekian", dan tempat itu bisa saja memang
+     * belum pernah disurvei.
+     *
+     * Tanpa tahap kedua, pertanyaan perjalanan gagal diam-diam setiap kali salah
+     * satu ujungnya adalah tempat yang belum ada di data kita - padahal justru
+     * perjalanan ke sanalah yang paling perlu diperingatkan.
+     */
+    const cariUjung = async (frasa: string) => {
+      const dariSurvei = cariTitik(frasa);
+      if (dariSurvei) {
+        return {
+          nama: dariSurvei.name,
+          latitude: dariSurvei.latitude,
+          longitude: dariSurvei.longitude,
+          asal: 'survei' as const,
+          diminta: frasa,
+        };
+      }
 
-    if (a && b && a.id !== b.id) {
+      // Buang kata tanya yang ikut terbawa regex, misalnya "bagaimana untuk
+      // kursi roda" yang menempel di belakang nama tempat.
+      const bersih = frasa
+        .replace(/,.*$/, '')
+        .replace(/(bagaimana|apa|apakah|untuk|kursi roda|tunanetra|hambatannya|kondisinya|berapa jauh)/gi, '')
+        .trim();
+
+      try {
+        const hasil = await cariTempat(bersih || frasa, 1);
+        if (hasil.length > 0) {
+          return {
+            nama: hasil[0].nama,
+            latitude: hasil[0].latitude,
+            longitude: hasil[0].longitude,
+            asal: 'peta' as const,
+            diminta: bersih || frasa,
+          };
+        }
+      } catch {
+        // Pencarian tempat luar adalah pelengkap; kegagalannya tidak boleh
+        // menjatuhkan seluruh jawaban.
+      }
+      return null;
+    };
+
+    const a = await cariUjung(rute.awal);
+    const b = await cariUjung(rute.tujuan);
+
+    if (a && b && a.nama !== b.nama) {
       const LEBAR_KORIDOR = 400; // meter dari garis lurus penghubung
 
       const sepanjang = semua
@@ -343,12 +409,34 @@ export async function susunKonteks(
         'wheelchair'
       );
 
+      if (rutaNyata && rutaNyata.jalur.length > 1) {
+        ruteDigambar = {
+          awal: a.nama,
+          tujuan: b.nama,
+          jarakMeter: rutaNyata.jarakMeter,
+          durasiDetik: rutaNyata.durasiDetik,
+          jalur: rutaNyata.jalur,
+        };
+      }
+
       const barisJarak = rutaNyata
         ? `Jarak tempuh nyata mengikuti jalan: ${rutaNyata.jarakMeter} meter, sekitar ${Math.round(rutaNyata.durasiDetik / 60)} menit dengan kursi roda (garis lurus hanya ${jarakLurus} meter).`
         : `Jarak lurus sekitar ${jarakLurus} meter. Rute jalan sebenarnya tidak tersedia saat ini, jadi angka ini pasti lebih pendek daripada perjalanan yang sesungguhnya.`;
 
+      // Nama yang diminta bisa berbeda dari yang ditemukan: "Puskesmas
+      // Bontomarannu" pernah tercocokkan ke "PUSKESMAS Pakatto". Perbedaan itu
+      // harus tersurat, sebab model cenderung memakai ulang kata-kata penanya
+      // dan penggantiannya jadi tidak terlihat sama sekali.
+      const catatanPenggantian = [a, b]
+        .filter((u) => u.asal === 'peta' && u.nama.toLowerCase() !== u.diminta.toLowerCase())
+        .map(
+          (u) =>
+            `CATATAN PENTING: "${u.diminta}" tidak ada di data survei DifaMap. Yang dipakai sebagai titiknya adalah "${u.nama}" dari peta umum - sebutkan perbedaan nama ini kepada pengguna, jangan menyamakannya begitu saja.`
+        );
+
       koridor = [
-        `Perjalanan dari "${a.name}" ke "${b.name}".`,
+        `Perjalanan dari "${a.nama}" ke "${b.nama}".`,
+        ...catatanPenggantian,
         barisJarak,
         `Titik survei dalam ${LEBAR_KORIDOR} meter dari garis penghubung, diurutkan dari awal ke tujuan:`,
         ...sepanjang.map(
@@ -437,5 +525,6 @@ export async function susunKonteks(
     fotoUntukDilihat,
     cakupan,
     koridor,
+    ruteDigambar,
   };
 }
