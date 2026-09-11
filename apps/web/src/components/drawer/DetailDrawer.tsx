@@ -55,6 +55,19 @@ export default function DetailDrawer({
   const [authorName, setAuthorName] = useState('');
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
 
+  /**
+   * Aktivitas asal sebuah lokasi.
+   *
+   * Setiap baris locations berasal dari satu laporan survei, dan laporan itulah
+   * yang menyimpan sumber aslinya: seluruh fotonya dan catatan surveyornya.
+   * Barisnya sendiri hanya membawa coverImageUrl - satu foto dari dua atau
+   * lebih - dan deskripsi yang di layar tertimpa ringkasan AI.
+   *
+   * Diambil supaya panel menampilkan apa yang benar-benar dilihat dan ditulis
+   * orang di lapangan, bukan hanya olahannya.
+   */
+  const [aktivitasAsal, setAktivitasAsal] = useState<any | null>(null);
+
   // Lightbox Pop-up State
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
@@ -92,6 +105,33 @@ export default function DetailDrawer({
   }, [selectedItem, showCommentInput, isLightboxOpen, onClose]);
 
   // Fetch comments when selected item changes
+  useEffect(() => {
+    let dibatalkan = false;
+
+    if (!selectedItem || selectedItem.type !== 'LOCATION') {
+      setAktivitasAsal(null);
+      return;
+    }
+
+    difaMapApi
+      .getActivities({ locationId: selectedItem.data.id, limit: 5 })
+      .then((j: any) => {
+        if (dibatalkan) return;
+        const daftar: any[] = j?.data ?? [];
+        // Yang berfoto didahulukan; kalau tidak ada, ambil yang pertama.
+        setAktivitasAsal(
+          daftar.find((a) => Array.isArray(a.mediaUrls) && a.mediaUrls.length > 0) ?? daftar[0] ?? null
+        );
+      })
+      .catch(() => {
+        if (!dibatalkan) setAktivitasAsal(null);
+      });
+
+    return () => {
+      dibatalkan = true;
+    };
+  }, [selectedItem]);
+
   useEffect(() => {
     if (!selectedItem) return;
 
@@ -430,9 +470,18 @@ export default function DetailDrawer({
 
         {/* Photo Gallery & Preview */}
         {(() => {
-          const rawMedias: string[] = data.mediaUrls && data.mediaUrls.length > 0
-            ? data.mediaUrls
-            : (data.coverImageUrl ? [data.coverImageUrl] : []);
+          // Foto diambil dari laporan survei asalnya, bukan dari kolom ringkas
+          // di baris lokasi. Kolom coverImageUrl hanya memuat SATU foto,
+          // sedangkan laporannya membawa dua atau lebih - dan foto kedua sering
+          // memperlihatkan sisi yang justru menjelaskan hambatannya.
+          const rawMedias: string[] =
+            data.mediaUrls && data.mediaUrls.length > 0
+              ? data.mediaUrls
+              : aktivitasAsal?.mediaUrls && aktivitasAsal.mediaUrls.length > 0
+                ? aktivitasAsal.mediaUrls
+                : data.coverImageUrl
+                  ? [data.coverImageUrl]
+                  : [];
           
           if (rawMedias.length === 0) return null;
 
@@ -750,6 +799,49 @@ export default function DetailDrawer({
           </div>
         </div>
 
+        {/* Catatan surveyor - sumber utama, didahulukan sebelum olahan AI.
+            Sebelumnya teks ini tidak pernah muncul untuk sebuah lokasi: kartu di
+            bawahnya memakai aiSummary, sehingga kata-kata orang yang benar-benar
+            berdiri di sana tertimpa ringkasan mesin. Padahal catatan itu memuat
+            hal yang tidak ada di tempat lain - hari dan jam kunjungan, serta
+            hambatan yang hanya terasa saat dilalui. */}
+        {isLocation && (aktivitasAsal?.description || data.description) && (
+          <div
+            style={{
+              backgroundColor: '#F8FAFC',
+              border: '1.5px solid #E2E8F0',
+              borderRadius: '14px',
+              padding: '14px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              width: '100%',
+              boxSizing: 'border-box',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#334155', fontWeight: '800', fontSize: '12.5px' }}>
+                <Camera size={15} color="#334155" />
+                <span>CATATAN SURVEYOR</span>
+              </div>
+              {aktivitasAsal?.user?.name && (
+                <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '700' }}>
+                  {aktivitasAsal.user.name}
+                </span>
+              )}
+            </div>
+
+            <p style={{ fontSize: '13px', color: '#1E293B', lineHeight: '19px', margin: 0 }}>
+              {aktivitasAsal?.description || data.description}
+            </p>
+
+            <span style={{ fontSize: '10.5px', color: '#94A3B8' }}>
+              Ditulis di lapangan bersama fotonya. Penilaian AI di bawah disusun dari catatan dan
+              foto ini.
+            </span>
+          </div>
+        )}
+
         {/* AI Insight Summary (Evaluasi Citra Nyata OpenAI Vision) */}
         {(data.aiAnalysis || data.aiSummary) && (
           <div
@@ -776,7 +868,7 @@ export default function DetailDrawer({
             </div>
 
             <p style={{ fontSize: '13px', color: '#1E293B', lineHeight: '19px', margin: 0 }}>
-              {data.aiAnalysis?.summary || data.aiSummary || data.description}
+              {data.aiAnalysis?.summary || data.aiSummary}
             </p>
 
             {data.aiAnalysis?.barrierType && data.aiAnalysis.barrierType !== 'NONE' && (
