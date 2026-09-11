@@ -8,6 +8,7 @@ import { difaMapApi, getPrimaryPhotoUrl } from '../../lib/api';
 import { UrbanPlannerFilter, PublicSubMode } from '../layout/TopSearchBar';
 import { MapPin, Layers } from 'lucide-react';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { susunTempat } from '../../data/tempatPilihan';
 
 export type MapDisplayMode = 'AKTIVITAS' | 'TEMPAT' | 'URBAN_PLANNER' | 'NONE';
 
@@ -72,6 +73,12 @@ export default function MapCanvas({
   const [zoomSekarang, setZoomSekarang] = useState<number>(13);
   // Dinaikkan setiap peta selesai bergeser, sebagai pemicu hitung ulang penanda.
   const [petaBergeser, setPetaBergeser] = useState(0);
+
+  // Basemap MAPID kadang lambat menjawab. Saat itu terjadi peta berpindah ke
+  // OpenStreetMap, dan tanpa pemberitahuan pengguna hanya melihat peta yang
+  // "tiba-tiba berbeda" tanpa tahu sebabnya maupun cara kembali.
+  const [pakaiCadangan, setPakaiCadangan] = useState(false);
+  const [cobaLagiPeta, setCobaLagiPeta] = useState(0);
 
   const onMapClickRef = useRef(onMapClick);
   onMapClickRef.current = onMapClick;
@@ -248,6 +255,7 @@ export default function MapCanvas({
       if (hasFallenBack) return;
       hasFallenBack = true;
       console.warn('[MapCanvas] MAPID basemap service slow or errored; gracefully falling back to resilient tiles.');
+      setPakaiCadangan(true);
       try {
         map.setStyle(styleId === 'satellite' ? fallbackSatelliteStyle : fallbackStyle);
       } catch (err) {
@@ -263,12 +271,18 @@ export default function MapCanvas({
       }
     });
 
-    // Timeout safety net: jika dalam 4 detik peta belum berhasil memuat style (misal MAPID timeout), auto-fallback
+    // Jaring pengaman waktu.
+    //
+    // Sebelumnya 4 detik, dan itu terlalu ketat: isStyleLoaded() baru bernilai
+    // benar setelah sprite, glyph huruf, DAN indeks tile ikut termuat. Pada
+    // pengukuran, mapidtiles.json saja pernah memakan 10,3 detik - sehingga peta
+    // hampir selalu menyerah lebih dulu dan diam-diam pindah ke OpenStreetMap,
+    // walaupun MAPID sebenarnya menjawab dengan benar.
     const timeoutId = setTimeout(() => {
       if (!map.isStyleLoaded()) {
         triggerFallback();
       }
-    }, 4000);
+    }, 20000);
 
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
     map.addControl(
@@ -282,6 +296,7 @@ export default function MapCanvas({
     map.on('load', () => {
       clearTimeout(timeoutId);
       setIsMapLoaded(true);
+      if (!hasFallenBack) setPakaiCadangan(false);
       setupCustomLayers(map);
     });
 
@@ -350,7 +365,7 @@ export default function MapCanvas({
       map.remove();
       mapRef.current = null;
     };
-  }, [setupCustomLayers, styleId]);
+  }, [setupCustomLayers, styleId, cobaLagiPeta]);
 
   // Auto-fly map to selected location or activity (termasuk saat dipilih dari autocomplete search)
   useEffect(() => {
@@ -564,106 +579,49 @@ export default function MapCanvas({
     const adalahTempat = (l: any) => l.entityType === 'PLACE' || l.entityType === 'TRANSIT_HUB';
     const adalahTrotoar = (l: any) => l.entityType === 'SIDEWALK';
 
-    // Pengamatan yang sudah terwakili sebuah POI MAPID tidak digambar sendiri.
+    // Tempat ditentukan tim lewat src/data/tempatPilihan.ts, bukan disimpulkan
+    // dari data. Pendekatan otomatis sudah dicoba dan gagal - kesamaan kata
+    // antar pengamatan menghasilkan nama seperti "Unhas Dilengkapi", dan
+    // pengelompokan jarak menyatukan halte yang tak berhubungan.
     //
-    // Di Trans Studio Mall ada dua pengamatan - "Toilet Cinema XXI" dan "Lobby
-    // Selatan" - dan keduanya dulu muncul sebagai pin terpisah, sehingga yang
-    // terlihat lebih dulu justru bagian dari tempat, bukan tempatnya. Sekarang
-    // keduanya diwakili satu pin di POI "Trans Studio Mall", dan isinya baru
-    // terbuka setelah pin itu ditekan.
-    //
-    // Menyimpulkan nama tempat dari nama pengamatan sudah dicoba dan gagal:
-    // penggalan kata yang sama antar pengamatan menghasilkan "Unhas Dilengkapi"
-    // dan "Teknik", serta menggabungkan halte yang tidak berhubungan. Nama
-    // kanonik hanya bisa datang dari POI MAPID.
-    const RADIUS_INDUK_METER = 200;
-
-    const jarakMeterPeta = (aLat: number, aLng: number, bLat: number, bLng: number) => {
-      const R = 6_371_000;
-      const rad = (d: number) => (d * Math.PI) / 180;
-      const dLat = rad(bLat - aLat);
-      const dLng = rad(bLng - aLng);
-      const t =
-        Math.sin(dLat / 2) ** 2 + Math.cos(rad(aLat)) * Math.cos(rad(bLat)) * Math.sin(dLng / 2) ** 2;
-      return 2 * R * Math.asin(Math.sqrt(t));
-    };
-
-    const poiTampak = (() => {
-      const map = mapRef.current;
-      if (!map || currentMode !== 'TEMPAT') return [];
-      const tersedia = ['poi_z16', 'poi_z15', 'poi_z14'].filter((id) => map.getLayer(id));
-      if (tersedia.length === 0) return [];
-      const unik = new Map<string, { nama: string; lat: number; lng: number; kategori?: string }>();
-      for (const f of map.queryRenderedFeatures({ layers: tersedia } as any)) {
-        const nama = (f.properties as any)?.name;
-        const geom: any = f.geometry;
-        if (!nama || geom?.type !== 'Point') continue;
-        const [lng, lat] = geom.coordinates;
-        if (!unik.has(nama)) {
-          unik.set(nama, { nama, lat, lng, kategori: (f.properties as any)?.class });
-        }
-      }
-      return [...unik.values()];
-    })();
-
-    const indukDari = (l: any) => {
-      let terdekat: any = null;
-      let jarakTerdekat = RADIUS_INDUK_METER;
-      for (const p of poiTampak) {
-        const d = jarakMeterPeta(l.latitude, l.longitude, p.lat, p.lng);
-        if (d <= jarakTerdekat) {
-          jarakTerdekat = d;
-          terdekat = p;
-        }
-      }
-      return terdekat;
-    };
-
-    const tempatMentah = currentMode === 'TEMPAT' ? locations.filter(adalahTempat) : [];
-    const berinduk = new Map<string, { poi: any; anggota: any[] }>();
-    const tanpaInduk: any[] = [];
-
-    for (const l of tempatMentah) {
-      const induk = indukDari(l);
-      if (induk) {
-        const kunci = induk.nama;
-        if (!berinduk.has(kunci)) berinduk.set(kunci, { poi: induk, anggota: [] });
-        berinduk.get(kunci)!.anggota.push(l);
-      } else {
-        tanpaInduk.push(l);
-      }
-    }
+    // Sebelumnya sempat memakai POI basemap MAPID sebagai induk. Itu memberi
+    // nama yang benar, tetapi hanya untuk POI yang sedang tampil di layar,
+    // sehingga pengelompokan hilang begitu peta diperkecil. Daftar pilihan
+    // bekerja di semua tingkat zoom.
+    const { tempat: tempatPilihan, idTerpakai } =
+      currentMode === 'TEMPAT'
+        ? susunTempat(locations.filter(adalahTempat))
+        : { tempat: [], idTerpakai: new Set<string>() };
 
     const locsToRender =
       currentMode === 'TEMPAT'
-        ? tanpaInduk
+        ? locations.filter((l) => adalahTempat(l) && !idTerpakai.has(l.id))
         : currentMode === 'NONE'
           ? locations.filter(
               (l) => adalahTrotoar(l) || (selectedLocationId ? l.id === selectedLocationId : false)
             )
           : [];
 
-    // Satu pin DifaMap per POI yang punya hasil survei di sekitarnya. Warnanya
-    // rata-rata skor anggotanya, sehingga tempat terbaca sebelum diklik.
-    berinduk.forEach(({ poi, anggota }) => {
+    // Satu pin per tempat, membawa nama, lambang kategori, jumlah pengamatan,
+    // dan warna skor rata-ratanya - sehingga tempat terbaca sebelum diklik.
+    tempatPilihan.forEach((t) => {
       const el = document.createElement('div');
-      const berskor = anggota
-        .map((a) => a.overallScore)
-        .filter((x: any) => typeof x === 'number') as number[];
-      const rata = berskor.length ? berskor.reduce((x, y) => x + y, 0) / berskor.length : null;
       const warna =
-        rata == null ? '#94A3B8' : rata < 2.5 ? '#EF4444' : rata < 3.5 ? '#F59E0B' : '#16A34A';
-      const kunci = JALUR_IKON[String(poi.kategori ?? '').toUpperCase()]
-        ? String(poi.kategori).toUpperCase()
-        : kunciIkon(anggota[0]);
+        t.skorRata == null
+          ? '#94A3B8'
+          : t.skorRata < 2.5
+            ? '#EF4444'
+            : t.skorRata < 3.5
+              ? '#F59E0B'
+              : '#16A34A';
 
       el.innerHTML = `
         <div style="cursor:pointer;display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.35));"
-             title="${String(poi.nama).replace(/"/g, '&quot;')} — ${anggota.length} pengamatan survei">
+             title="${t.nama.replace(/"/g, '&quot;')} — ${t.anggota.length} pengamatan survei">
           <div style="display:flex;align-items:center;gap:6px;background:${warna};color:#FFFFFF;border:2px solid #FFFFFF;border-radius:20px;padding:5px 10px;font-size:12px;font-weight:800;white-space:nowrap;">
-            ${ikonSvg(kunci, 15, '#FFFFFF')}
-            <span>${poi.nama}</span>
-            <span style="background:rgba(255,255,255,0.28);border-radius:10px;padding:1px 6px;">${anggota.length}</span>
+            ${ikonSvg(t.kategori, 15, '#FFFFFF')}
+            <span>${t.nama}</span>
+            <span style="background:rgba(255,255,255,0.3);border-radius:10px;padding:1px 6px;">${t.anggota.length}</span>
           </div>
           <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid ${warna};margin-top:-1px;"></div>
         </div>
@@ -673,16 +631,16 @@ export default function MapCanvas({
         e.stopPropagation();
         if (onSelectPoiRef.current) {
           onSelectPoiRef.current({
-            nama: poi.nama,
-            kategori: poi.kategori,
-            latitude: poi.lat,
-            longitude: poi.lng,
+            nama: t.nama,
+            kategori: t.kategori,
+            latitude: t.latitude,
+            longitude: t.longitude,
           });
         }
       });
 
       const m = new maplibregl.Marker({ element: el, anchor: 'bottom' })
-        .setLngLat([poi.lng, poi.lat])
+        .setLngLat([t.longitude, t.latitude])
         .addTo(mapRef.current!);
       markersRef.current.push(m);
     });
@@ -943,6 +901,53 @@ export default function MapCanvas({
           cursor: isPickingLocation ? 'crosshair' : 'grab',
         }}
       />
+
+      {/* Pemberitahuan saat basemap MAPID gagal dimuat.
+          Dulu hanya console.warn, sehingga pengguna melihat peta berubah tanpa
+          tahu sebabnya maupun cara mengembalikannya. */}
+      {pakaiCadangan && (
+        <div
+          role="alert"
+          style={{
+            position: 'absolute',
+            top: '76px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: '#FEF3C7',
+            border: '1px solid #FDE68A',
+            color: '#92400E',
+            padding: '8px 12px',
+            borderRadius: '10px',
+            fontSize: '12px',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
+            zIndex: 6,
+          }}
+        >
+          <span>Basemap MAPID lambat menjawab — sementara memakai OpenStreetMap.</span>
+          <button
+            onClick={() => {
+              setPakaiCadangan(false);
+              setCobaLagiPeta((n) => n + 1);
+            }}
+            style={{
+              border: 'none',
+              borderRadius: '8px',
+              padding: '4px 10px',
+              backgroundColor: '#92400E',
+              color: '#FFFFFF',
+              fontSize: '11.5px',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Coba lagi
+          </button>
+        </div>
+      )}
 
       {/* Petunjuk POI: muncul hanya saat peta belum cukup dekat */}
       {zoomSekarang < 14 && (
