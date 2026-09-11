@@ -357,7 +357,11 @@ export default function TopSearchBar({
         alignItems: isMobile ? 'stretch' : 'center',
         justifyContent: 'space-between',
         gap: isMobile ? '8px' : '16px',
-        zIndex: 30,
+        // Di atas kedua panel detail (50 dan 20). Daftar saran pencarian tumbuh
+        // ke bawah dan melintasi panel yang terbuka - dengan lapisan lebih
+        // rendah, saran itu terpotong di balik panel meski kotak pencariannya
+        // sendiri terlihat.
+        zIndex: 70,
         pointerEvents: 'none',
       }}
     >

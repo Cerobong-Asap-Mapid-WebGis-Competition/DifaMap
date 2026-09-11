@@ -362,7 +362,11 @@ export default function PanelTempat({ poi, onClose, onRadiusChange }: Props) {
       onClick={(e) => e.stopPropagation()}
       style={{
         position: 'absolute',
-        top: isMobile ? 'auto' : '16px',
+        // Mulai di bawah bilah pencarian. Sebelumnya panel mulai di 16px dan
+        // berlapis 20, sementara bilah pencarian di 24px berlapis 30 - jadi
+        // kebalikan dari DetailDrawer: justru kepala panel ini yang tertutup
+        // kotak pencarian, dan nama tempatnya tidak terbaca.
+        top: isMobile ? 'auto' : '96px',
         bottom: isMobile ? 0 : '16px',
         // Sidebar kiri selebar 80px dan berposisi fixed. Panel harus mulai
         // setelahnya, bukan menimpanya - kalau tidak, tombol mode peta dan
@@ -370,7 +374,7 @@ export default function PanelTempat({ poi, onClose, onRadiusChange }: Props) {
         left: isMobile ? 0 : '96px',
         right: isMobile ? 0 : 'auto',
         width: isMobile ? '100%' : '420px',
-        maxHeight: isMobile ? '72vh' : 'calc(100% - 32px)',
+        maxHeight: isMobile ? '72vh' : 'calc(100% - 112px)',
         overflowY: 'auto',
         backgroundColor: '#F8FAFC',
         borderRadius: isMobile ? '16px 16px 0 0' : '16px',

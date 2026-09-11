@@ -348,11 +348,17 @@ export default function DetailDrawer({
         position: 'fixed',
         left: isMobile ? 0 : '96px',
         right: isMobile ? 0 : 'auto',
-        top: isMobile ? 'auto' : '20px',
+        // Mulai DI BAWAH bilah pencarian, bukan dari puncak layar.
+        //
+        // Sebelumnya panel mulai di 20px sementara bilah pencarian di 24px, dan
+        // karena panel berlapis 50 sedangkan bilah 30, panel menutupi kotak
+        // pencarian sepenuhnya. Pengguna yang membuka sebuah titik kehilangan
+        // cara mencari titik berikutnya tanpa menutup panelnya lebih dulu.
+        top: isMobile ? 'auto' : '96px',
         bottom: isMobile ? 0 : '20px',
         width: isMobile ? '100%' : '440px',
         maxWidth: isMobile ? '100vw' : 'calc(100vw - 116px)',
-        maxHeight: isMobile ? '86vh' : 'calc(100vh - 40px)',
+        maxHeight: isMobile ? '86vh' : 'calc(100vh - 116px)',
         backgroundColor: '#FFFFFF',
         borderRadius: isMobile ? '24px 24px 0 0' : '20px',
         boxShadow: isMobile ? '0px -8px 36px rgba(0, 0, 0, 0.3)' : '0px 14px 44px rgba(0, 0, 0, 0.16)',
