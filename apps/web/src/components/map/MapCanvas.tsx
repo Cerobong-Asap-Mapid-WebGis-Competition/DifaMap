@@ -10,7 +10,7 @@ import { MapPin, Layers } from 'lucide-react';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { susunTempat } from '../../data/tempatPilihan';
 
-export type MapDisplayMode = 'AKTIVITAS' | 'TEMPAT' | 'URBAN_PLANNER' | 'NONE';
+export type MapDisplayMode = 'HALTE' | 'TEMPAT' | 'URBAN_PLANNER' | 'NONE';
 
 interface MapCanvasProps {
   locations?: any[];
@@ -467,11 +467,14 @@ export default function MapCanvas({
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
 
-    const actsToRender = currentMode === 'AKTIVITAS'
-      ? activities
-      : (currentMode === 'NONE' && selectedActivityId
-          ? activities.filter((a) => a.id === selectedActivityId)
-          : []);
+    // Aktivitas tidak lagi punya lapisannya sendiri. Setiap aktivitas menunjuk
+    // balik ke sebuah lokasi dengan judul yang sama persis, jadi menggambar
+    // keduanya berarti menumpuk dua pin di titik yang sama. Yang tersisa hanya
+    // aktivitas yang sedang dipilih, supaya pilihan pengguna tetap terlihat.
+    const actsToRender =
+      currentMode === 'NONE' && selectedActivityId
+        ? activities.filter((a) => a.id === selectedActivityId)
+        : [];
 
     if (actsToRender.length > 0) {
       actsToRender.forEach((act, index) => {
@@ -613,10 +616,17 @@ export default function MapCanvas({
     //
     // Tombol Tempat karena itu bukan penambah, melainkan PENYARING: ia menyisakan
     // tujuan saja, dan menampilkannya bernama supaya bisa dibaca sekilas.
-    // Mode bawaan menampilkan SELURUH titik survei. Mode Tempat menyembunyikannya
-    // supaya hanya tujuan yang tersisa - itulah arti tombol Tempat sebagai
-    // penyaring, bukan penambah.
-    const locsToRender = currentMode === 'NONE' ? hasilSurvei : [];
+    // Kedua tombol adalah PENYARING, bukan penambah: mode bawaan menampilkan
+    // seluruh titik survei, Tempat menyisakan tujuan saja, Halte menyisakan
+    // simpul transit saja.
+    const locsToRender =
+      currentMode === 'NONE'
+        ? hasilSurvei
+        : currentMode === 'HALTE'
+          ? hasilSurvei.filter(
+              (l: any) => l.entityType === 'TRANSIT_HUB' || l.category === 'BUS_STOP'
+            )
+          : [];
 
     // Satu pin per tempat, membawa nama, lambang kategori, jumlah pengamatan,
     // dan warna skor rata-ratanya - sehingga tempat terbaca sebelum diklik.

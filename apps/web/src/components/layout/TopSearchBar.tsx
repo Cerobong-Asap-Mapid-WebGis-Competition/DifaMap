@@ -10,6 +10,7 @@ import {
   Building,
   UtensilsCrossed,
   Activity,
+  BusFront,
   MapPin,
   Layers,
   Bus,
@@ -19,7 +20,15 @@ import {
 import { SidebarMode } from './AppSidebar';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
-export type PublicSubMode = 'AKTIVITAS' | 'TEMPAT' | 'NONE';
+/**
+ * Mode penyaring peta publik.
+ *
+ * AKTIVITAS dihapus: seluruh titik survei kini tampil di mode bawaan, sehingga
+ * tombolnya tidak menambah apa pun - ia hanya menampilkan ulang yang sudah ada.
+ * Digantikan HALTE, yang melengkapi rantai perjalanan bersama TEMPAT: tujuan
+ * yang hendak dicapai, dan simpul transit untuk mencapainya.
+ */
+export type PublicSubMode = 'HALTE' | 'TEMPAT' | 'NONE';
 export type UrbanPlannerFilter = 'PROPERTI_GO' | 'MENU_GO';
 
 interface TopSearchBarProps {
@@ -278,8 +287,8 @@ export default function TopSearchBar({
             }}
             placeholder={
               sidebarMode === 'PUBLIC'
-                ? publicSubMode === 'AKTIVITAS'
-                  ? 'Cari laporan kondisi jalan, halte, trotoar...'
+                ? publicSubMode === 'HALTE'
+                  ? 'Cari halte bus, terminal, simpul transit...'
                   : 'Cari Halte Bus, RS Grestelina, Mall...'
                 : 'Cari titik analisis spasial (Halte / Hub)...'
             }
@@ -541,22 +550,22 @@ export default function TopSearchBar({
               <span>Tempat</span>
             </button>
 
-            {/* Tab: Aktivitas */}
+            {/* Tab: Halte - pasangan Tempat dalam rantai perjalanan */}
             <button
-              onClick={() => onSelectPublicSubMode(publicSubMode === 'AKTIVITAS' ? 'NONE' : 'AKTIVITAS')}
-              className={publicSubMode === 'AKTIVITAS' ? 'btn-yellow-pill' : 'btn-white-pill'}
+              onClick={() => onSelectPublicSubMode(publicSubMode === 'HALTE' ? 'NONE' : 'HALTE')}
+              className={publicSubMode === 'HALTE' ? 'btn-yellow-pill' : 'btn-white-pill'}
               style={{
-                backgroundColor: publicSubMode === 'AKTIVITAS' ? '#FDC323' : '#FFFFFF',
+                backgroundColor: publicSubMode === 'HALTE' ? '#FDC323' : '#FFFFFF',
                 height: isMobile ? '42px' : '48px',
                 padding: isMobile ? '0 14px' : '0 24px',
                 fontSize: isMobile ? '14px' : '15px',
                 fontWeight: '700',
                 flexShrink: 0,
               }}
-              title="Tampilkan Laporan Aktivitas"
+              title="Tampilkan halte dan simpul transit saja"
             >
-              <Activity size={18} strokeWidth={2.4} />
-              <span>Aktivitas</span>
+              <BusFront size={18} strokeWidth={2.4} />
+              <span>Halte</span>
             </button>
           </>
         ) : (

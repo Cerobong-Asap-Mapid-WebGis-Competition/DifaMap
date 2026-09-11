@@ -15,7 +15,7 @@ import { useIsMobile } from '../hooks/useIsMobile';
 
 export default function HomePage() {
   const isMobile = useIsMobile(768);
-  // 1. Navigation Modes: Sidebar (PUBLIC vs URBAN_PLANNER) & Public SubMode (AKTIVITAS vs TEMPAT vs NONE)
+  // 1. Navigation Modes: Sidebar (PUBLIC vs URBAN_PLANNER) & Public SubMode (HALTE vs TEMPAT vs NONE)
   // Default on load: Tampilan map biasa (NONE) tanpa marker bertumpuk
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>('PUBLIC');
   const [publicSubMode, setPublicSubMode] = useState<PublicSubMode>('NONE');
@@ -239,7 +239,7 @@ export default function HomePage() {
           setSearchQuery('');
           return;
         }
-        // 7. Jika submode aktif (misal filter TEMPAT / AKTIVITAS), kembalikan ke NONE
+        // 7. Jika submode aktif (misal filter TEMPAT / HALTE), kembalikan ke NONE
         if (publicSubMode !== 'NONE') {
           setPublicSubMode('NONE');
           return;
