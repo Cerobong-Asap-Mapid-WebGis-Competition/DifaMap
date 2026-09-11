@@ -112,6 +112,14 @@ interface AiChatbotDrawerProps {
   onRunIsochroneAnalysis?: (lat: number, lng: number, mode?: 'walking' | 'wheelchair') => void;
   onClearAnalysis?: () => void;
   onSelectCoordinateForAnalysis?: () => void;
+  /**
+   * Membuka panel detail sebuah titik survei dari kartu rujukan jawaban.
+   *
+   * Difa AI menyebut nama titik yang jadi dasar jawabannya, tetapi nama itu
+   * hanya teks - pengguna harus mencarinya sendiri di peta untuk melihat
+   * fotonya. Kartu menjadikan dasar penilaian itu satu ketukan saja.
+   */
+  onSelectLocation?: (lokasi: any) => void;
   analysisTarget?: { lat: number; lng: number; name?: string } | null;
 }
 
@@ -123,6 +131,7 @@ export default function AiChatbotDrawer({
   onRunIsochroneAnalysis,
   onClearAnalysis,
   onSelectCoordinateForAnalysis,
+  onSelectLocation,
   analysisTarget,
 }: AiChatbotDrawerProps) {
   const isMobile = useIsMobile(768);
@@ -132,7 +141,7 @@ export default function AiChatbotDrawer({
   // ----------------------------------------------------
   // State: Tab 1 (Chatbot Spatial RAG)
   // ----------------------------------------------------
-  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
+  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; rujukan?: any[] }>>([
     {
       role: 'assistant',
       content:
@@ -212,7 +221,10 @@ export default function AiChatbotDrawer({
       );
 
       const reply = response.data?.reply || 'Terima kasih atas pertanyaannya.';
-      setMessages((prev) => [...prev, { role: 'assistant', content: reply }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: reply, rujukan: response.data?.referencedLocations ?? [] },
+      ]);
     } catch (err) {
       setMessages((prev) => [
         ...prev,
@@ -558,6 +570,66 @@ export default function AiChatbotDrawer({
                 >
                   {msg.content}
                 </div>
+
+                {/* Kartu titik survei yang menjadi dasar jawaban.
+                    Difa AI menyebut namanya di dalam teks, tetapi nama itu hanya
+                    kata - pengguna harus mencarinya sendiri di peta untuk
+                    melihat fotonya dan catatan surveyornya. Kartu menjadikan
+                    dasar penilaian itu satu ketukan saja, sekaligus memperlihatkan
+                    bahwa jawabannya memang bersandar pada data, bukan karangan. */}
+                {msg.role === 'assistant' && Array.isArray(msg.rujukan) && msg.rujukan.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px', maxWidth: '85%' }}>
+                    <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.03em' }}>
+                      DASAR JAWABAN INI
+                    </span>
+                    {msg.rujukan.map((r: any) => {
+                      const warna =
+                        typeof r.overallScore !== 'number'
+                          ? '#94A3B8'
+                          : r.overallScore < 2.5
+                            ? '#EF4444'
+                            : r.overallScore < 3.5
+                              ? '#F59E0B'
+                              : '#16A34A';
+                      return (
+                        <div
+                          key={r.id}
+                          onClick={() => onSelectLocation?.(r)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '9px',
+                            padding: '9px 11px',
+                            borderRadius: '10px',
+                            border: '1px solid #E2E8F0',
+                            backgroundColor: '#FFFFFF',
+                            cursor: 'pointer',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#F8FAFC';
+                            e.currentTarget.style.borderColor = '#CBD5E1';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#FFFFFF';
+                            e.currentTarget.style.borderColor = '#E2E8F0';
+                          }}
+                        >
+                          <span style={{ width: '9px', height: '9px', borderRadius: '50%', backgroundColor: warna, flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {r.name}
+                            </div>
+                            <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: '1px' }}>
+                              {typeof r.overallScore === 'number' ? `Skor ${r.overallScore.toFixed(1)}` : 'Belum dinilai'}
+                              {r.rampStatus && r.rampStatus !== 'NOT_VISIBLE' && ` · ramp ${r.rampStatus === 'GOOD' ? 'layak' : r.rampStatus === 'NONE' ? 'tidak ada' : 'rusak'}`}
+                            </div>
+                          </div>
+                          <ChevronRight size={15} color="#CBD5E1" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             ))}
 

@@ -487,6 +487,10 @@ export default function HomePage() {
           setIsochroneGeoJSON(null);
           setAnalysisTarget(null);
         }}
+        onSelectLocation={(lokasi) => {
+          setIsAiChatOpen(false);
+          handleSelectLocation(lokasi);
+        }}
         onSelectCoordinateForAnalysis={() => {
           setIsPickingAnalysisTarget(true);
           setIsAiChatOpen(false);
