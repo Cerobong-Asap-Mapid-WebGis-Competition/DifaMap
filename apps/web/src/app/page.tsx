@@ -68,7 +68,7 @@ export default function HomePage() {
   const [radiusTempat, setRadiusTempat] = useState<number>(500);
 
   /** Jalur rute yang sedang dibahas Difa AI, untuk digambar di peta. */
-  const [ruteJalur, setRuteJalur] = useState<Array<[number, number]> | null>(null);
+  const [rute, setRute] = useState<{ awal: string; tujuan: string; jalur: Array<[number, number]> } | null>(null);
   const [pickedCoordinate, setPickedCoordinate] = useState<{ latitude: number; longitude: number } | null>(null);
   const [analysisTarget, setAnalysisTarget] = useState<{ lat: number; lng: number; name?: string } | null>(null);
 
@@ -443,7 +443,7 @@ export default function HomePage() {
             : null
         }
         radiusTempat={radiusTempat}
-        ruteJalur={ruteJalur}
+        rute={rute}
         onSelectPoi={(poi) => setSelectedItem({ type: 'POI', data: poi })}
         onSelectLocation={handleSelectLocation}
         onSelectActivity={handleSelectActivity}
@@ -495,7 +495,7 @@ export default function HomePage() {
           setIsAiChatOpen(false);
           handleSelectLocation(lokasi);
         }}
-        onRuteDitemukan={setRuteJalur}
+        onRuteDitemukan={setRute}
         onSelectCoordinateForAnalysis={() => {
           setIsPickingAnalysisTarget(true);
           setIsAiChatOpen(false);

@@ -50,7 +50,7 @@ interface MapCanvasProps {
    * kalimat menjelaskan hambatannya, garis di peta memperlihatkan jalurnya.
    * Membaca "1,7 kilometer" tidak sama dengan melihat jalan mana yang dilewati.
    */
-  ruteJalur?: Array<[number, number]> | null;
+  rute?: { awal: string; tujuan: string; jalur: Array<[number, number]> } | null;
   onSelectPoi?: (poi: { nama: string; kategori?: string; latitude: number; longitude: number }) => void;
   onSelectLocation?: (location: any) => void;
   onSelectActivity?: (activity: any) => void;
@@ -75,7 +75,7 @@ export default function MapCanvas({
   isochroneGeoJSON = null,
   titikFokus = null,
   radiusTempat = 500,
-  ruteJalur = null,
+  rute = null,
   onSelectPoi,
   onSelectLocation,
   onSelectActivity,
@@ -626,6 +626,8 @@ export default function MapCanvas({
     const sumber = map.getSource('rute-source') as maplibregl.GeoJSONSource;
     if (!sumber) return;
 
+    const ruteJalur = rute?.jalur ?? null;
+
     if (!ruteJalur || ruteJalur.length < 2) {
       sumber.setData({ type: 'FeatureCollection', features: [] });
       return;
@@ -656,7 +658,7 @@ export default function MapCanvas({
       duration: 1100,
       maxZoom: 16.5,
     });
-  }, [ruteJalur, isMapLoaded, isMobile]);
+  }, [rute, isMapLoaded, isMobile]);
 
   // 2. Render Markers Berdasarkan Mode (Aktivitas vs Tempat vs Urban Planner)
   useEffect(() => {
@@ -1060,6 +1062,63 @@ export default function MapCanvas({
     }
 
     // =========================================================================
+    // PENANDA AWAL DAN TUJUAN RUTE
+    //
+    // Garis rute memperlihatkan jalannya, tetapi tidak arahnya. Tanpa penanda,
+    // pengguna harus menebak sendiri ujung mana yang titik berangkat - dan pada
+    // rute yang memutar, tebakan itu sering keliru.
+    //
+    // Dibedakan bentuk maupun warnanya: lingkaran hijau berlubang untuk titik
+    // berangkat, bendera merah untuk tujuan. Warna saja tidak cukup bagi
+    // pengguna buta warna, yang justru termasuk sasaran aplikasi ini.
+    // =========================================================================
+    if (rute?.jalur && rute.jalur.length > 1) {
+      const ujung: Array<{
+        koordinat: [number, number];
+        nama: string;
+        label: string;
+        warna: string;
+        isi: string;
+      }> = [
+        {
+          koordinat: rute.jalur[0],
+          nama: rute.awal,
+          label: 'BERANGKAT',
+          warna: '#16A34A',
+          isi: `<circle cx="13" cy="13" r="6.5" fill="none" stroke="#FFFFFF" stroke-width="3.5"/>`,
+        },
+        {
+          koordinat: rute.jalur[rute.jalur.length - 1],
+          nama: rute.tujuan,
+          label: 'TUJUAN',
+          warna: '#EF4444',
+          isi: `<path d="M9.5 7v12M9.5 7.5h8l-2 2.8 2 2.8h-8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.6" stroke-linejoin="round"/>`,
+        },
+      ];
+
+      ujung.forEach((u) => {
+        const el = document.createElement('div');
+        el.innerHTML = `
+          <div style="display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.4));">
+            <div style="background:${u.warna};color:#FFFFFF;border-radius:6px;padding:2px 7px;font-size:9.5px;font-weight:800;letter-spacing:0.04em;white-space:nowrap;margin-bottom:3px;">
+              ${u.label}
+            </div>
+            <svg width="26" height="26" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="13" cy="13" r="11.5" fill="${u.warna}" stroke="#FFFFFF" stroke-width="3"/>
+              ${u.isi}
+            </svg>
+          </div>
+        `;
+        el.title = `${u.label}: ${String(u.nama).replace(/"/g, '&quot;')}`;
+
+        const m = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat(u.koordinat)
+          .addTo(mapRef.current!);
+        markersRef.current.push(m);
+      });
+    }
+
+    // =========================================================================
     // PENANDA TEMPAT YANG SEDANG DIBUKA
     //
     // Peta sudah mendekati titiknya, tetapi tanpa penanda pengguna harus menebak
@@ -1213,6 +1272,7 @@ export default function MapCanvas({
     titikFokus?.latitude,
     titikFokus?.longitude,
     titikFokus?.nama,
+    rute,
     locations,
     activities,
     economicPoints,

@@ -121,7 +121,7 @@ interface AiChatbotDrawerProps {
    */
   onSelectLocation?: (lokasi: any) => void;
   /** Meneruskan jalur rute dari jawaban Difa AI supaya digambar di peta. */
-  onRuteDitemukan?: (jalur: Array<[number, number]> | null) => void;
+  onRuteDitemukan?: (rute: { awal: string; tujuan: string; jalur: Array<[number, number]> } | null) => void;
   analysisTarget?: { lat: number; lng: number; name?: string } | null;
 }
 
@@ -232,7 +232,10 @@ export default function AiChatbotDrawer({
       // Jalur rute hanya ada bila pertanyaannya berbentuk perjalanan. Bila
       // tidak, peta dibersihkan supaya rute lama tidak tertinggal menempel di
       // layar saat pertanyaan sudah berganti topik.
-      onRuteDitemukan?.(response.data?.rute?.jalur ?? null);
+      const r = response.data?.rute;
+      onRuteDitemukan?.(
+        r?.jalur?.length > 1 ? { awal: r.awal, tujuan: r.tujuan, jalur: r.jalur } : null
+      );
     } catch (err) {
       setMessages((prev) => [
         ...prev,
