@@ -77,6 +77,9 @@ export default function HomePage() {
   const [isSiniGridVisible, setIsSiniGridVisible] = useState(false);
   const [siniGridSize, setSiniGridSize] = useState<number>(1000);
   const [siniGridModa, setSiniGridModa] = useState<string>('AKSESIBILITAS');
+  /** Sel grid yang sedang disorot dari daftar prioritas Site Selection. */
+  const [selSorotan, setSelSorotan] = useState<string | null>(null);
+  const [ringkasanGrid, setRingkasanGrid] = useState<string | null>(null);
   const [isochroneGeoJSON, setIsochroneGeoJSON] = useState<any>(null);
 
   // 7. Reset map camera trigger
@@ -392,6 +395,61 @@ export default function HomePage() {
         onToggleBufferVisible={setIsBufferVisible}
       />
 
+      {/* Legenda dan ringkasan grid, melayang di atas peta.
+          Warnanya selama ini tidak pernah dijelaskan di mana pun - pembaca
+          harus menebak sendiri apa arti merah, dan tidak ada yang memberi tahu
+          bahwa petak yang tidak berwarna sama sekali berarti belum disurvei,
+          bukan berarti baik. */}
+      {isSiniGridVisible && !isMobile && (
+        <div
+          style={{
+            position: 'fixed',
+            left: '96px',
+            bottom: '28px',
+            zIndex: 30,
+            width: '330px',
+            maxWidth: 'calc(100vw - 620px)',
+            backgroundColor: '#FFFFFF',
+            border: '1px solid #E2E8F0',
+            borderRadius: '12px',
+            boxShadow: '0 8px 28px rgba(0,0,0,0.16)',
+            padding: '12px 14px',
+          }}
+        >
+          <div style={{ fontSize: '11.5px', fontWeight: 800, color: '#0F172A', marginBottom: '7px' }}>
+            Prioritas Perbaikan
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '9px' }}>
+            {[
+              ['rgba(239, 68, 68, 0.75)', 'Mendesak (70-100)'],
+              ['rgba(245, 158, 11, 0.75)', 'Menengah (45-69)'],
+              ['rgba(16, 185, 129, 0.7)', 'Rendah (di bawah 45)'],
+            ].map(([warna, label]) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                <span style={{ width: '13px', height: '13px', borderRadius: '3px', backgroundColor: warna, border: '1px solid #334155', flexShrink: 0 }} />
+                <span style={{ fontSize: '11px', color: '#475569' }}>{label}</span>
+              </div>
+            ))}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+              <span style={{ width: '13px', height: '13px', borderRadius: '3px', backgroundColor: 'transparent', border: '1px dashed #94A3B8', flexShrink: 0 }} />
+              <span style={{ fontSize: '11px', color: '#475569' }}>Tidak digambar: belum disurvei</span>
+            </div>
+          </div>
+
+          {ringkasanGrid && (
+            <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '9px' }}>
+              <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#D97706', marginBottom: '4px' }}>
+                WAWASAN DIFA AI
+              </div>
+              <div style={{ fontSize: '11px', color: '#475569', lineHeight: '16px', maxHeight: '132px', overflowY: 'auto' }}>
+                {ringkasanGrid}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Floating Indicator: Mode Pilih Titik Analisis Spasial Difa AI */}
       {isPickingAnalysisTarget && (
         <div
@@ -451,6 +509,7 @@ export default function HomePage() {
         isSiniGridVisible={isSiniGridVisible}
         siniGridSize={siniGridSize}
         siniGridModa={siniGridModa}
+        selSorotan={selSorotan}
         isochroneGeoJSON={isochroneGeoJSON}
         titikFokus={
           selectedItem?.type === 'POI'
@@ -507,7 +566,10 @@ export default function HomePage() {
           setIsSiniGridVisible(show);
           if (size) setSiniGridSize(size);
           if (moda) setSiniGridModa(moda);
+          if (!show) setSelSorotan(null);
         }}
+        onSorotSel={setSelSorotan}
+        onWawasanGrid={setRingkasanGrid}
         onRunIsochroneAnalysis={handleRunIsochrone}
         onClearAnalysis={() => {
           setIsochroneGeoJSON(null);

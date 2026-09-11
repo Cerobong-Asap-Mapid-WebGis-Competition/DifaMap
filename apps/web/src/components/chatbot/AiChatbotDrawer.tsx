@@ -153,6 +153,10 @@ interface AiChatbotDrawerProps {
   onClose: () => void;
   selectedLocationId?: string;
   onToggleSiniGrid?: (show: boolean, gridSize?: number, moda?: string) => void;
+  /** Menyorot satu sel grid di peta, dipanggil dari daftar prioritas. */
+  onSorotSel?: (gridId: string | null) => void;
+  /** Meneruskan ringkasan Difa AI supaya bisa ditampilkan di atas peta. */
+  onWawasanGrid?: (ringkasan: string | null) => void;
   onRunIsochroneAnalysis?: (lat: number, lng: number, mode?: 'walking' | 'wheelchair') => void;
   onClearAnalysis?: () => void;
   onSelectCoordinateForAnalysis?: () => void;
@@ -176,6 +180,8 @@ export default function AiChatbotDrawer({
   onClose,
   selectedLocationId,
   onToggleSiniGrid,
+  onSorotSel,
+  onWawasanGrid,
   onRunIsochroneAnalysis,
   onClearAnalysis,
   onSelectCoordinateForAnalysis,
@@ -345,8 +351,13 @@ export default function AiChatbotDrawer({
               typeof lat === 'number' && typeof lng === 'number'
                 ? `${lat.toFixed(5)}, ${lng.toFixed(5)}`
                 : null,
+            lat,
+            lng,
             score: Math.round(p.priorityIndex ?? 0),
             issue: p.recommendedIntervention ?? 'Belum ada rekomendasi',
+            jumlahTitik: p.jumlahTitik ?? 0,
+            skorAkses: p.accessibilityScore,
+            hambatan: Array.isArray(p.hambatan) ? p.hambatan : [],
           };
         });
 
@@ -362,8 +373,14 @@ export default function AiChatbotDrawer({
       setSedangMenyusunWawasan(true);
       difaMapApi
         .getSiniGridInsight(gridSize, gridModa)
-        .then((w) => setWawasanGrid(w?.data ?? null))
-        .catch(() => setWawasanGrid(null))
+        .then((w) => {
+          setWawasanGrid(w?.data ?? null);
+          onWawasanGrid?.(w?.data?.ringkasan ?? null);
+        })
+        .catch(() => {
+          setWawasanGrid(null);
+          onWawasanGrid?.(null);
+        })
         .finally(() => setSedangMenyusunWawasan(false));
 
       setIsGridVisibleOnMap(true);
@@ -375,6 +392,48 @@ export default function AiChatbotDrawer({
     } finally {
       setIsComputingGrid(false);
     }
+  };
+
+  /**
+   * Menyimpan daftar kerja sebagai CSV.
+   *
+   * Titik koma sebagai pemisah, bukan koma: Excel berbahasa Indonesia membaca
+   * koma sebagai pemisah desimal, dan file berkoma mendarat menumpuk di satu
+   * kolom. Tanda BOM di depan supaya huruf beraksen tidak berubah jadi simbol.
+   */
+  const unduhDaftarKerja = () => {
+    const zona = gridResultSummary?.topPriorityZones ?? [];
+    if (zona.length === 0) return;
+
+    const aman = (nilai: unknown) => `"${String(nilai ?? '').replace(/"/g, '""')}"`;
+
+    const baris = [
+      ['No', 'Sel', 'Lintang', 'Bujur', 'Nilai Prioritas', 'Skor Aksesibilitas', 'Jumlah Titik Survei', 'Hambatan Tercatat', 'Tindakan'],
+      ...zona.map((z: any, i: number) => {
+        const w = wawasanGrid?.sel.find((x) => x.gridId === z.zone);
+        return [
+          i + 1,
+          z.zone,
+          typeof z.lat === 'number' ? z.lat.toFixed(6) : '',
+          typeof z.lng === 'number' ? z.lng.toFixed(6) : '',
+          z.score,
+          z.skorAkses ?? '',
+          z.jumlahTitik,
+          z.hambatan.join('; '),
+          w?.tindakan ?? '',
+        ];
+      }),
+    ]
+      .map((r) => r.map(aman).join(';'))
+      .join('\r\n');
+
+    const berkas = new Blob(['\ufeff' + baris], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(berkas);
+    const tautan = document.createElement('a');
+    tautan.href = url;
+    tautan.download = `difamap-prioritas-${gridModa.toLowerCase()}-${gridSize}m.csv`;
+    tautan.click();
+    URL.revokeObjectURL(url);
   };
 
   // Handler: Execute Site Analysis
@@ -952,7 +1011,12 @@ export default function AiChatbotDrawer({
                 </div>
               ) : (
                 gridResultSummary.topPriorityZones.map((z: any, idx: number) => (
-                  <div key={idx} style={{ backgroundColor: '#FFFFFF', padding: '8px 10px', borderRadius: '6px', border: '1px solid #E2E8F0', fontSize: '12px' }}>
+                  <button
+                    key={idx}
+                    onClick={() => onSorotSel?.(z.zone)}
+                    title="Tunjukkan sel ini di peta"
+                    style={{ textAlign: 'left', width: '100%', cursor: 'pointer', backgroundColor: '#FFFFFF', padding: '8px 10px', borderRadius: '6px', border: '1px solid #E2E8F0', fontSize: '12px' }}
+                  >
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700' }}>
                       <span>{idx + 1}. {z.zone}</span>
                       <span style={{ color: '#EF0004' }}>{z.score}/100</span>
@@ -961,7 +1025,7 @@ export default function AiChatbotDrawer({
                       <div style={{ color: '#94A3B8', fontSize: '10.5px', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>{z.koordinat}</div>
                     )}
                     <div style={{ color: '#64748B', fontSize: '11px', marginTop: '2px' }}>{z.issue}</div>
-                  </div>
+                  </button>
                 ))
               )}
 
@@ -1003,6 +1067,70 @@ export default function AiChatbotDrawer({
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Daftar kerja.
+                  Yang dibawa ke rapat anggaran bukan peta, melainkan daftar:
+                  urutan, koordinat, dasar penilaian, dan tindakan. Tanpa ini,
+                  seluruh analisis berhenti di layar. */}
+              {gridResultSummary.topPriorityZones.length > 0 && (
+                <div style={{ marginTop: '8px', backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '11px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 800, color: '#000000' }}>Daftar Kerja</span>
+                    <button
+                      onClick={() => unduhDaftarKerja()}
+                      style={{
+                        border: '1px solid #CBD5E1',
+                        backgroundColor: '#F8FAFC',
+                        borderRadius: '6px',
+                        padding: '4px 9px',
+                        fontSize: '10.5px',
+                        fontWeight: 700,
+                        color: '#334155',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Unduh CSV
+                    </button>
+                  </div>
+
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10.5px' }}>
+                      <thead>
+                        <tr style={{ color: '#64748B', textAlign: 'left' }}>
+                          <th style={{ padding: '4px 6px 4px 0', fontWeight: 700 }}>#</th>
+                          <th style={{ padding: '4px 6px', fontWeight: 700 }}>Sel</th>
+                          <th style={{ padding: '4px 6px', fontWeight: 700 }}>Nilai</th>
+                          <th style={{ padding: '4px 6px', fontWeight: 700 }}>Titik</th>
+                          <th style={{ padding: '4px 0 4px 6px', fontWeight: 700 }}>Tindakan</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {gridResultSummary.topPriorityZones.map((z: any, idx: number) => {
+                          const w = wawasanGrid?.sel.find((x) => x.gridId === z.zone);
+                          return (
+                            <tr key={z.zone} style={{ borderTop: '1px solid #F1F5F9', color: '#334155' }}>
+                              <td style={{ padding: '5px 6px 5px 0', fontWeight: 700 }}>{idx + 1}</td>
+                              <td style={{ padding: '5px 6px', fontFamily: 'var(--font-mono)', fontSize: '9.5px' }}>
+                                {z.koordinat ?? z.zone}
+                              </td>
+                              <td style={{ padding: '5px 6px', fontWeight: 700, color: '#EF0004' }}>{z.score}</td>
+                              <td style={{ padding: '5px 6px' }}>{z.jumlahTitik}</td>
+                              <td style={{ padding: '5px 0 5px 6px' }}>
+                                {w?.tindakan ?? (z.hambatan[0] ?? 'Menunggu wawasan Difa AI')}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '7px', lineHeight: '14px' }}>
+                    Kolom &quot;Titik&quot; adalah banyaknya titik survei yang mendasari penilaian sel.
+                    Angka kecil berarti kesimpulannya bersandar pada sedikit pengamatan.
+                  </div>
                 </div>
               )}
 

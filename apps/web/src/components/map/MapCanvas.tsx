@@ -27,6 +27,14 @@ interface MapCanvasProps {
   siniGridSize?: number;
   /** Sudut pandang penilaian grid: AKSESIBILITAS, HUNIAN, atau KOMERSIAL. */
   siniGridModa?: string;
+  /**
+   * Sel grid yang sedang disorot dari daftar prioritas.
+   *
+   * Tanpa ini, "MKSR-SINI-137" hanya sebuah kode: daftar prioritas menyebut
+   * nomornya, dan pembacanya harus mencari sendiri petak mana yang dimaksud di
+   * antara ratusan petak yang mirip semua.
+   */
+  selSorotan?: string | null;
   isochroneGeoJSON?: any;
   /**
    * Dipanggil saat pengguna mengklik label POI milik basemap MAPID - misalnya
@@ -83,6 +91,7 @@ export default function MapCanvas({
   isSiniGridVisible = false,
   siniGridSize = 1000,
   siniGridModa = 'AKSESIBILITAS',
+  selSorotan = null,
   isochroneGeoJSON = null,
   titikFokus = null,
   radiusTempat = 500,
@@ -101,6 +110,8 @@ export default function MapCanvas({
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
+  /** Fitur grid terakhir yang diambil, supaya sel bisa dicari saat disorot. */
+  const gridFiturRef = useRef<any[]>([]);
   const [styleId, setStyleId] = useState<string>(process.env.NEXT_PUBLIC_MAPID_STYLE_ID || 'satellite');
   // Dipantau khusus untuk petunjuk POI: lapisan poi_* pada tile MAPID baru ada
   // mulai zoom 14, jadi di bawah itu tidak ada tempat yang bisa diklik sama
@@ -189,6 +200,24 @@ export default function MapCanvas({
         paint: {
           'line-color': '#334155',
           'line-width': 1,
+        },
+      });
+    }
+
+    // Sorotan sel grid yang sedang dibuka dari daftar prioritas.
+    if (!map.getSource('sel-sorot-source')) {
+      map.addSource('sel-sorot-source', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      map.addLayer({
+        id: 'sel-sorot-garis',
+        type: 'line',
+        source: 'sel-sorot-source',
+        paint: {
+          'line-color': '#0F172A',
+          'line-width': 3.5,
         },
       });
     }
@@ -662,6 +691,48 @@ export default function MapCanvas({
       }
     };
   }, [titikFokus?.latitude, titikFokus?.longitude, radiusTempat, isMapLoaded, styleId]);
+
+  /**
+   * Mendekati sel grid yang dipilih dari daftar prioritas, lalu menegaskan
+   * batasnya dengan garis tebal.
+   *
+   * Peta berpindah ke petaknya, bukan sekadar menggambar kotak: pada zoom
+   * wilayah, satu sel 1 kilometer hanya sebesar kuku dan garis setebal apa pun
+   * tetap tidak menolong.
+   */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapLoaded) return;
+
+    const sumber = map.getSource('sel-sorot-source') as maplibregl.GeoJSONSource;
+    if (!sumber) return;
+
+    if (!selSorotan) {
+      sumber.setData({ type: 'FeatureCollection', features: [] });
+      return;
+    }
+
+    const fitur = gridFiturRef.current.find((f) => f?.properties?.gridId === selSorotan);
+    if (!fitur) return;
+
+    sumber.setData({ type: 'FeatureCollection', features: [fitur] } as any);
+
+    const cincin: Array<[number, number]> = fitur.geometry?.coordinates?.[0] ?? [];
+    if (cincin.length < 2) return;
+
+    const batas = cincin.reduce(
+      (b, [lng, lat]) => b.extend([lng, lat] as [number, number]),
+      new maplibregl.LngLatBounds(cincin[0], cincin[0])
+    );
+
+    map.fitBounds(batas, {
+      padding: isMobile
+        ? { top: 120, bottom: 320, left: 40, right: 40 }
+        : { top: 120, bottom: 60, left: 80, right: 520 },
+      duration: 900,
+      maxZoom: 15.5,
+    });
+  }, [selSorotan, isMapLoaded, isMobile]);
 
   /**
    * Warna sebuah jalur menurut skor aksesibilitas rata-ratanya.
@@ -1389,6 +1460,7 @@ export default function MapCanvas({
     if (siniSource) {
       if (isSiniGridVisible) {
         difaMapApi.getSiniGridPriority(siniGridSize, siniGridModa).then((res) => {
+          gridFiturRef.current = res?.data?.features ?? [];
           if (res.data) {
             // Sel tanpa titik survei kini bernilai null dari server, bukan 25.
             //
@@ -1438,6 +1510,7 @@ export default function MapCanvas({
     isSiniGridVisible,
     siniGridSize,
     siniGridModa,
+    selSorotan,
     isochroneGeoJSON,
     isMapLoaded,
     onSelectActivity,
