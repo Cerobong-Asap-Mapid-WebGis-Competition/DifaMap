@@ -45,6 +45,17 @@ export default function HomePage() {
   // 5. Map Coordinate Picking State
   const [isPickingLocation, setIsPickingLocation] = useState(false);
   const [isPickingAnalysisTarget, setIsPickingAnalysisTarget] = useState(false);
+
+  /**
+   * Menunggu pengguna menunjuk sebuah titik untuk dinilai aksesibilitasnya.
+   *
+   * Pencarian tempat tidak akan pernah lengkap. Basisnya OpenStreetMap, dan
+   * kafe atau toko yang belum didaftarkan siapa pun di sana memang tidak akan
+   * ketemu - "janji jiwa" misalnya, nol hasil. Jalan ini selalu berhasil:
+   * apa pun tujuannya, titiknya bisa ditunjuk langsung di peta, dan penilaian
+   * disusun dari survei di sekitarnya seperti biasa.
+   */
+  const [isPickingTempatManual, setIsPickingTempatManual] = useState(false);
   const [pickedCoordinate, setPickedCoordinate] = useState<{ latitude: number; longitude: number } | null>(null);
   const [analysisTarget, setAnalysisTarget] = useState<{ lat: number; lng: number; name?: string } | null>(null);
 
@@ -168,6 +179,23 @@ export default function HomePage() {
   };
 
   const handlePickCoordinate = (coord: { latitude: number; longitude: number }) => {
+    if (isPickingTempatManual) {
+      setIsPickingTempatManual(false);
+      setSelectedItem({
+        type: 'POI',
+        data: {
+          nama: 'Titik pilihan Anda',
+          kategori: 'OTHER',
+          latitude: coord.latitude,
+          longitude: coord.longitude,
+          // Kunci komentar dari koordinatnya, bukan dari namanya: seluruh titik
+          // manual bernama sama, dan tanpa ini komentarnya akan bercampur.
+          kunci: `titik-${coord.latitude.toFixed(5)}-${coord.longitude.toFixed(5)}`,
+        },
+      });
+      return;
+    }
+
     if (isPickingLocation) {
       setPickedCoordinate(coord);
       setIsPickingLocation(false);
@@ -300,6 +328,7 @@ export default function HomePage() {
         activities={activities}
         onResetToDefault={handleResetToDefault}
         onSelectTempatLuar={(poi) => setSelectedItem({ type: 'POI', data: poi })}
+        onMintaTunjukPeta={() => setIsPickingTempatManual(true)}
         onSelectSuggestion={(item) => {
           if (item.type === 'LOCATION') {
             handleSelectLocation(item.data);
@@ -382,7 +411,7 @@ export default function HomePage() {
         onSelectActivity={handleSelectActivity}
         onPickCoordinate={handlePickCoordinate}
         onMapClick={handleMapClick}
-        isPickingLocation={isPickingLocation || isPickingAnalysisTarget}
+        isPickingLocation={isPickingLocation || isPickingAnalysisTarget || isPickingTempatManual}
         resetMapTrigger={resetMapTrigger}
       />
 

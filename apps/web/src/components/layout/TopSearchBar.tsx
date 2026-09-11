@@ -11,6 +11,7 @@ import {
   UtensilsCrossed,
   Activity,
   BusFront,
+  Crosshair,
   MapPin,
   Layers,
   Bus,
@@ -61,6 +62,11 @@ interface TopSearchBarProps {
     latitude: number;
     longitude: number;
   }) => void;
+  /**
+   * Diminta ketika tempat yang dicari tidak ada di daftar mana pun. Pengguna
+   * lalu menunjuk titiknya sendiri di peta.
+   */
+  onMintaTunjukPeta?: () => void;
   onResetToDefault?: () => void;
 }
 
@@ -82,6 +88,7 @@ export default function TopSearchBar({
   activities = [],
   onSelectSuggestion,
   onSelectTempatLuar,
+  onMintaTunjukPeta,
   onResetToDefault,
 }: TopSearchBarProps) {
   const isMobile = useIsMobile(768);
@@ -673,6 +680,46 @@ export default function TopSearchBar({
                     <ChevronRight size={16} color="#CBD5E1" />
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Jalan keluar yang selalu tersedia.
+                Pencarian tempat tidak akan pernah lengkap - kafe yang belum
+                didaftarkan di OpenStreetMap tidak akan ketemu betapapun bagusnya
+                layanan pencarian. Menunjuk titik di peta melewati soal itu
+                sepenuhnya, dan penilaiannya tetap disusun dari survei sekitar. */}
+            {onMintaTunjukPeta && (
+              <div
+                onClick={() => {
+                  setIsInputFocused(false);
+                  onMintaTunjukPeta();
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '12px 16px',
+                  cursor: 'pointer',
+                  backgroundColor: '#F8FAFC',
+                  borderTop: '1px solid #E2E8F0',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#EFF6FF';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F8FAFC';
+                }}
+              >
+                <Crosshair size={17} color="#2563EB" />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#0F172A' }}>
+                    Tempatnya tidak ada di daftar?
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748B', marginTop: '1px' }}>
+                    Tunjuk titiknya langsung di peta, kondisi sekitarnya tetap bisa dinilai.
+                  </div>
+                </div>
+                <ChevronRight size={16} color="#CBD5E1" />
               </div>
             )}
 

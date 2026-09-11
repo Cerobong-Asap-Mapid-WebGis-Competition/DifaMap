@@ -24,6 +24,14 @@ export interface PoiTerpilih {
   kategori?: string;
   latitude: number;
   longitude: number;
+  /**
+   * Penanda komentar, bila pemanggil ingin menentukannya sendiri.
+   *
+   * Diperlukan untuk titik yang ditunjuk manual di peta: semuanya bernama
+   * "Titik pilihan Anda", sehingga tanpa kunci tersendiri seluruh komentar dari
+   * seluruh titik manual akan menumpuk menjadi satu percakapan.
+   */
+  kunci?: string;
 }
 
 interface Props {
@@ -240,7 +248,7 @@ export default function PanelTempat({ poi, onClose }: Props) {
    * berpindah induk begitu radius diubah atau pengamatan baru ditambahkan.
    * Kolom place_key ditambahkan lewat migrations_manual/02_komentar_tempat.sql.
    */
-  const kunciTempat = useMemo(() => slugTempat(poi.nama), [poi.nama]);
+  const kunciTempat = useMemo(() => poi.kunci ?? slugTempat(poi.nama), [poi.kunci, poi.nama]);
 
   const muatKomentar = async () => {
     try {
