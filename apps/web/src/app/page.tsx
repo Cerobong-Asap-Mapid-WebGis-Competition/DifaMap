@@ -339,7 +339,14 @@ export default function HomePage() {
         onResetToDefault={handleResetToDefault}
         onSelectTempatLuar={(poi) => setSelectedItem({ type: 'POI', data: poi })}
         onMintaTunjukPeta={() => setIsPickingTempatManual(true)}
-        semuaLokasi={locations}
+        semuaLokasi={
+          // Hanya hasil survei sungguhan. Empat belas baris data seed karangan
+          // sudah disaring dari peta, jadi menghitungnya di panel penyaring
+          // membuat panel menjanjikan titik yang tidak akan pernah muncul:
+          // "Ada toilet difabel: 7 titik", padahal ketujuhnya seed dan petanya
+          // berakhir kosong saat penyaring itu dicentang.
+          locations.filter((l: any) => l.aiConfidence != null)
+        }
         filterAktif={filterAktif}
         onFilterChange={setFilterAktif}
         onSelectSuggestion={(item) => {

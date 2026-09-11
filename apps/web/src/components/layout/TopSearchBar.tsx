@@ -600,7 +600,7 @@ export default function TopSearchBar({
                       </div>
                       <div style={{ fontSize: '10.5px', color: '#94A3B8', marginTop: '1px' }}>
                         {isi.lolos} titik memenuhi
-                        {isi.belumTeramati > 0 && ` \\u00b7 ${isi.belumTeramati} belum teramati`}
+                        {isi.belumTeramati > 0 && ` · ${isi.belumTeramati} belum teramati`}
                       </div>
                     </div>
                   </div>
@@ -620,6 +620,58 @@ export default function TopSearchBar({
               Memilih lebih dari satu menyisakan titik yang memenuhi{' '}
               <strong>semuanya</strong>. Titik yang parameternya belum teramati tidak ikut
               lolos &mdash; itu berarti belum disurvei, bukan berarti tidak ada.
+            </div>
+
+            {/* Tidak ada tombol "Terapkan".
+                Penyaring bekerja seketika saat dicentang, dan petanya ada tepat
+                di belakang panel ini - perubahannya langsung terlihat. Tombol
+                terapkan justru menunda satu-satunya umpan balik yang berguna,
+                dan memaksa pengguna menebak apa yang akan terjadi.
+
+                Yang benar-benar dibutuhkan dua: mengembalikan ke semula, dan
+                menutup panel supaya peta terlihat utuh. */}
+            <div
+              style={{
+                display: 'flex',
+                gap: '8px',
+                padding: '10px 16px 14px',
+                backgroundColor: '#F8FAFC',
+                borderTop: '1px solid #E2E8F0',
+              }}
+            >
+              <button
+                onClick={() => onFilterChange && onFilterChange([])}
+                disabled={filterAktif.length === 0}
+                style={{
+                  flex: 1,
+                  padding: '9px',
+                  borderRadius: '9px',
+                  border: '1px solid #CBD5E1',
+                  backgroundColor: '#FFFFFF',
+                  color: filterAktif.length === 0 ? '#CBD5E1' : '#334155',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: filterAktif.length === 0 ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Atur ulang
+              </button>
+              <button
+                onClick={() => setIsFilterDropdownOpen(false)}
+                style={{
+                  flex: 1,
+                  padding: '9px',
+                  borderRadius: '9px',
+                  border: 'none',
+                  backgroundColor: '#539BA9',
+                  color: '#FFFFFF',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                {filterAktif.length > 0 ? `Lihat ${filterAktif.length} penyaring di peta` : 'Selesai'}
+              </button>
             </div>
           </div>
         )}
