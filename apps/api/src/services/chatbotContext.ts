@@ -76,14 +76,29 @@ const KATA_UMUM = new Set([
   'yang', 'untuk', 'dari', 'pada', 'dengan', 'apakah', 'bagaimana', 'dimana', 'di', 'ke',
   'ada', 'saya', 'bisa', 'mana', 'itu', 'ini', 'dan', 'atau', 'kah', 'saja', 'juga',
   'tolong', 'apa', 'kondisi', 'tempat', 'lokasi', 'sekitar', 'dekat', 'paling',
+  // Kata tanya dan pengisi kalimat. Sejak kata tiga huruf ikut dibaca, kata
+  // semacam ini harus disebut satu per satu - dulu panjangnyalah yang
+  // menyingkirkannya, bukan daftar ini.
+  'gimana', 'kenapa', 'mengapa', 'berapa', 'seberapa', 'sebutkan', 'jelaskan',
+  'bandingkan', 'adakah', 'terdapat', 'nya', 'tak', 'gak', 'sih', 'kan', 'pun',
+  'yah', 'deh', 'dong', 'kok', 'bagi', 'akan', 'lebih', 'harus', 'punya',
 ]);
 
+/**
+ * Kata dari pertanyaan yang layak dijadikan dasar pencarian.
+ *
+ * Batasnya tiga huruf, bukan empat. Dengan empat, "Kantor Pos" menyusut
+ * menjadi "kantor" saja - dan kata itu juga ada di "Kemacetan Parah di Jl.
+ * Monginsidi Saat Jam Pulang Kantor", sehingga foto yang dilampirkan justru
+ * foto kemacetan, dijelaskan seolah itu trotoar depan Kantor Pos. Nama pendek
+ * yang bermakna cukup banyak di sini: Pos, RS, GOR, SMP, SMA.
+ */
 function kataKunci(pertanyaan: string): string[] {
   return pertanyaan
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
-    .filter((k) => k.length >= 4 && !KATA_UMUM.has(k));
+    .filter((k) => k.length >= 3 && !KATA_UMUM.has(k));
 }
 
 /** Memecah teks menjadi kata yang cukup panjang untuk berarti. */
@@ -92,7 +107,7 @@ function pecahKata(teks: string): string[] {
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
-    .filter((k) => k.length >= 4);
+    .filter((k) => k.length >= 3);
 }
 
 /**
@@ -411,7 +426,13 @@ export async function susunKonteks(
   const perbaikiEja = (k: string): string | null => {
     if (frekuensi.has(k)) return null;
 
-    const batas = k.length >= 7 ? 2 : 1;
+    // Kata pendek tidak dibetulkan. Pada kata tiga atau empat huruf, satu
+    // huruf berbeda sudah menjadikannya kata lain yang sah sama sekali -
+    // "pos" menjadi "pon", "gor" menjadi "gir" - dan pembetulan semacam itu
+    // menebak, bukan menolong.
+    if (k.length < 5) return null;
+
+    const batas = k.length >= 8 ? 2 : 1;
     let terbaik: string | null = null;
     let terdekat = batas + 1;
 

@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import type { RuteDigambar } from '../../data/rute';
+import TeksKaya from './TeksKaya';
 import {
   X,
   Sparkles,
@@ -149,7 +150,20 @@ export default function AiChatbotDrawer({
     {
       role: 'assistant',
       content:
-        'Halo! Saya **Difa AI**. Saya membaca hasil survei aksesibilitas DifaMap di atas basemap MAPID untuk membantu mencari rute ramah disabilitas, menemukan zona prioritas perbaikan (*Site Selection*), dan menilai daya jangkau sebuah titik (*Site Analysis*) di Kota Makassar dan Kabupaten Gowa.',
+        [
+          'Halo! Saya **Difa AI**.',
+          '',
+          'Saya tidak menebak dari peta jalan. Saya membaca **titik survei lapangan DifaMap** beserta fotonya, lalu menilai sendiri apa yang terlihat di sana.',
+          '',
+          '### Yang tidak bisa dilakukan aplikasi peta biasa',
+          '- **Menilai rute dari kondisi trotoarnya**, bukan dari jaraknya. Jalur terpendek kadang justru saya tolak, dan alasannya saya sebutkan.',
+          '- **Membaca foto lapangan** untuk menemukan hambatan yang belum tercatat, misalnya motor parkir di atas ubin pemandu.',
+          '- **Menunjukkan di mana survei berikutnya paling berguna**, dihitung dari petak wilayah yang masih kosong.',
+          '',
+          'Saya juga akan berterus terang bila sebuah tempat belum pernah disurvei. "Belum teramati" tidak pernah saya artikan "aman".',
+          '',
+          'Coba salah satu saran di bawah, atau tanyakan apa saja.',
+        ].join('\n'),
     },
   ]);
   const [inputText, setInputText] = useState('');
@@ -585,10 +599,12 @@ export default function AiChatbotDrawer({
                     border: msg.role === 'user' ? 'none' : '1px solid #E2E8F0',
                     borderBottomRightRadius: msg.role === 'user' ? '4px' : '14px',
                     borderBottomLeftRadius: msg.role === 'assistant' ? '4px' : '14px',
-                    whiteSpace: 'pre-line',
+                    // Pesan pengguna dicetak apa adanya; jawaban Difa AI lewat
+                    // TeksKaya, yang sudah mengatur jaraknya sendiri per baris.
+                    whiteSpace: msg.role === 'user' ? 'pre-line' : 'normal',
                   }}
                 >
-                  {msg.content}
+                  {msg.role === 'assistant' ? <TeksKaya teks={msg.content} /> : msg.content}
                 </div>
 
                 {/* Kartu titik survei yang menjadi dasar jawaban.
@@ -666,32 +682,43 @@ export default function AiChatbotDrawer({
           {/* Quick Chips */}
           <div
             style={{
-              padding: '8px 14px',
+              padding: '10px 14px',
               backgroundColor: '#FFFFFF',
               borderTop: '1px solid #EFEFEF',
               display: 'flex',
               gap: '6px',
-              overflowX: 'auto',
+              // Membungkus, bukan menggulir mendatar. Dengan gulir, empat dari
+              // enam saran tersembunyi di luar layar - dan saran yang tidak
+              // terlihat tidak memancing siapa pun.
+              flexWrap: 'wrap',
             }}
           >
+            {/* Saran pertanyaan.
+                Tiap saran memperagakan kemampuan yang BERBEDA, dan semuanya
+                sudah diuji lebih dulu - dua saran lama justru menghasilkan
+                jawaban yang keliru, dan itu tidak boleh terulang pada tombol
+                yang kami sodorkan sendiri kepada penilai. */}
             {[
+              'Rute kursi roda dari Pantai Losari ke Karebosi',
+              'Seberapa parah trotoar depan Kantor Pos?',
               'Halte paling ramah kursi roda',
-              'Kondisi guiding block Hertasning',
-              'Analisis zona prioritas',
+              'Trotoar mana yang paling parah?',
+              'Di mana sebaiknya survei berikutnya?',
+              'Seberapa lengkap data DifaMap?',
             ].map((q, i) => (
               <button
                 key={i}
                 onClick={() => handleSendMessage(q)}
                 style={{
-                  backgroundColor: '#F1F5F9',
-                  border: 'none',
+                  backgroundColor: '#F8FAFC',
+                  border: '1px solid #E2E8F0',
                   borderRadius: '20px',
-                  padding: '5px 10px',
+                  padding: '5px 11px',
                   fontSize: '11px',
                   fontWeight: '600',
                   color: '#334155',
                   cursor: 'pointer',
-                  flexShrink: 0,
+                  textAlign: 'left',
                 }}
               >
                 {q}
