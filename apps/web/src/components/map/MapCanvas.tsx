@@ -337,6 +337,38 @@ export default function MapCanvas({
 
   // 2. Render Markers Berdasarkan Mode (Aktivitas vs Tempat vs Urban Planner)
   useEffect(() => {
+    // Lambang per kategori tempat. Semua lokasi sebelumnya digambar sebagai
+    // penanda hitam yang sama, sehingga mall, puskesmas, halte, dan ruas trotoar
+    // tidak bisa dibedakan sebelum diklik satu per satu.
+    const LAMBANG_KATEGORI: Record<string, string> = {
+      MALL: '🛍️',
+      HEALTHCARE: '🏥',
+      EDUCATION: '🎓',
+      TOURISM: '🏖️',
+      BUS_STOP: '🚏',
+      PEDESTRIAN_PATH: '🚶',
+      OTHER: '📍',
+    };
+
+    const lambangUntuk = (loc: any): string => {
+      if (loc.entityType === 'TRANSIT_HUB') return LAMBANG_KATEGORI.BUS_STOP;
+      if (loc.entityType === 'SIDEWALK') return LAMBANG_KATEGORI.PEDESTRIAN_PATH;
+      return LAMBANG_KATEGORI[loc.category] ?? LAMBANG_KATEGORI.OTHER;
+    };
+
+    // Warna mengikuti skor aksesibilitas resmi. Lokasi yang belum pernah dinilai
+    // AI (aiConfidence kosong) diberi abu-abu, bukan hijau: skornya ada di basis
+    // data tetapi tidak berasal dari pengamatan foto, jadi belum layak dibaca
+    // sebagai kabar baik.
+    const warnaSkor = (loc: any): string => {
+      if (loc.aiConfidence == null) return '#94A3B8';
+      const s = loc.overallScore;
+      if (typeof s !== 'number') return '#94A3B8';
+      if (s < 2.5) return '#EF4444';
+      if (s < 3.5) return '#F59E0B';
+      return '#16A34A';
+    };
+
     if (!mapRef.current || !isMapLoaded) return;
 
     // Bersihkan semua marker sebelumnya
@@ -444,11 +476,25 @@ export default function MapCanvas({
 
     // =========================================================================
     // MODE 2: TEMPAT (Render Place & Transit Hub Location Pins)
-    const locsToRender = currentMode === 'TEMPAT'
-      ? locations
-      : (currentMode === 'NONE' && selectedLocationId
-          ? locations.filter((l) => l.id === selectedLocationId)
-          : []);
+    //
+    // "Tempat" sebelumnya menampilkan seluruh 108 lokasi, termasuk 47 ruas
+    // trotoar - sehingga tombolnya tidak menunjukkan tempat, melainkan seluruh
+    // hasil survei, dan peta jadi padat tanpa bisa dibaca.
+    //
+    // Sekarang Tempat hanya berisi tujuan yang orang tuju: 44 PLACE dan 17
+    // TRANSIT_HUB. Ruas trotoar pindah ke lapisan dasar, yaitu saat kedua
+    // tombol mode dimatikan.
+    const adalahTempat = (l: any) => l.entityType === 'PLACE' || l.entityType === 'TRANSIT_HUB';
+    const adalahTrotoar = (l: any) => l.entityType === 'SIDEWALK';
+
+    const locsToRender =
+      currentMode === 'TEMPAT'
+        ? locations.filter(adalahTempat)
+        : currentMode === 'NONE'
+          ? locations.filter(
+              (l) => adalahTrotoar(l) || (selectedLocationId ? l.id === selectedLocationId : false)
+            )
+          : [];
 
     if (locsToRender.length > 0) {
       locsToRender.forEach((loc) => {
@@ -457,6 +503,11 @@ export default function MapCanvas({
 
         const isSelected = loc.id === selectedLocationId;
         const isTransit = loc.entityType === 'TRANSIT_HUB' || loc.category === 'BUS_STOP';
+        const lambang = lambangUntuk(loc);
+        const warna = warnaSkor(loc);
+        const belumDinilai = loc.aiConfidence == null;
+        // Trotoar tampil lebih kecil: ia lapisan dasar, bukan tujuan yang dicari.
+        const ukuran = adalahTrotoar(loc) ? 0.78 : 1;
 
         el.innerHTML = isSelected ? `
           <div style="
@@ -481,9 +532,15 @@ export default function MapCanvas({
               font-weight: 800;
               white-space: nowrap;
             ">
-              <span>${isTransit ? '🚏' : '🏢'}</span>
+              <span>${lambang}</span>
               <span>${loc.name}</span>
-              <span style="color: #000000">${loc.overallScore ? loc.overallScore.toFixed(1) : '4.0'}★</span>
+              <span style="color: #000000">${
+                // Lokasi tanpa penilaian AI dulu ditampilkan "4.0★" - angka yang
+                // tidak pernah ada dasarnya. Sekarang ketiadaannya disebutkan.
+                belumDinilai || typeof loc.overallScore !== 'number'
+                  ? 'belum dinilai'
+                  : `${loc.overallScore.toFixed(1)}★`
+              }</span>
             </div>
             
             <div style="
@@ -498,16 +555,28 @@ export default function MapCanvas({
         ` : `
           <div style="
             cursor: pointer;
+            position: relative;
             display: flex;
             flex-direction: column;
             align-items: center;
+            transform: scale(${ukuran});
             transition: transform 0.15s ease;
-            filter: drop-shadow(0 2px 5px rgba(0,0,0,0.35));
-          " onmouseenter="this.style.transform='scale(1.2) translateY(-2px)'" onmouseleave="this.style.transform='scale(1) translateY(0)'" title="${loc.name}">
-            <svg width="24" height="32" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 0C5.373 0 0 5.373 0 12C0 20.5 10.5 30.75 11.08 31.33C11.58 31.83 12.42 31.83 12.92 31.33C13.5 30.75 24 20.5 24 12C24 5.373 18.627 0 12 0Z" fill="#000000"/>
-              <circle cx="12" cy="11" r="4.2" fill="#FFFFFF"/>
+            filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3));
+          " onmouseenter="this.style.transform='scale(${ukuran * 1.25}) translateY(-2px)'" onmouseleave="this.style.transform='scale(${ukuran}) translateY(0)'" title="${loc.name.replace(/"/g, '&quot;')} — ${belumDinilai ? 'belum dinilai AI' : `skor ${loc.overallScore?.toFixed(1)}`}">
+            <svg width="30" height="40" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 0C5.373 0 0 5.373 0 12C0 20.5 10.5 30.75 11.08 31.33C11.58 31.83 12.42 31.83 12.92 31.33C13.5 30.75 24 20.5 24 12C24 5.373 18.627 0 12 0Z" fill="${warna}"/>
+              <circle cx="12" cy="11.5" r="8.2" fill="#FFFFFF"/>
             </svg>
+            <span style="
+              position: absolute;
+              top: 4px;
+              left: 0;
+              right: 0;
+              text-align: center;
+              font-size: 13px;
+              line-height: 17px;
+              pointer-events: none;
+            ">${lambang}</span>
           </div>
         `;
 
