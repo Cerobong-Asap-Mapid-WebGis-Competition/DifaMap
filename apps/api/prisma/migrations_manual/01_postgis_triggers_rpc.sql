@@ -63,6 +63,22 @@ CREATE INDEX IF NOT EXISTS idx_economic_points_geom  ON public.economic_points U
 -- activities.geom sebelumnya tidak pernah diindeks maupun diisi.
 CREATE INDEX IF NOT EXISTS idx_activities_geom       ON public.activities      USING GIST (geom);
 
+-- Ketiga index di atas TIDAK terpakai oleh query jarak kita.
+--
+-- /locations/nearby memakai ST_DWithin(geom::geography, ...) supaya radiusnya
+-- dihitung dalam meter sungguhan, bukan derajat. Pengecoran ke geography
+-- membuat PostgreSQL menganggapnya ekspresi yang berbeda dari kolom geom,
+-- sehingga index GIST biasa dilewati dan kueri kembali memindai seluruh tabel -
+-- tanpa error, hanya pelan, jadi tidak ada yang menyadarinya. Dibuktikan lewat
+-- EXPLAIN: sebelum index ekspresi ini ada, rencana kueri tetap Seq Scan bahkan
+-- ketika enable_seqscan dimatikan.
+--
+-- Index ekspresi tidak bisa dinyatakan di schema.prisma, jadi hanya berkas ini
+-- yang menjaganya. Jalankan ulang skrip ini setiap sesudah `prisma db push`.
+CREATE INDEX IF NOT EXISTS idx_locations_geog        ON public.locations       USING GIST ((geom::geography));
+CREATE INDEX IF NOT EXISTS idx_economic_points_geog  ON public.economic_points USING GIST ((geom::geography));
+CREATE INDEX IF NOT EXISTS idx_activities_geog       ON public.activities      USING GIST ((geom::geography));
+
 
 -- ------------------------------------------------------------------------------
 -- 3. SINKRONISASI GEOMETRI DARI LATITUDE & LONGITUDE

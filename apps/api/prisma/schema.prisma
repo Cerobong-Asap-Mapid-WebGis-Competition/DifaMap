@@ -207,6 +207,19 @@ model Location {
   @@index([entityType])
   @@index([category])
   @@index([overallScore])
+
+  // Index spasial GIST dideklarasikan di sini, bukan hanya di skrip SQL manual.
+  // Kalau tidak, setiap `prisma db push` akan menghapusnya tanpa pesan apa pun -
+  // aplikasi tetap jalan, hanya pelan, jadi hilangnya tidak akan ketahuan.
+  //
+  // `map` menyebut nama index yang sudah ada di database supaya Prisma
+  // mengakuinya, bukan membuat index kembar bernama *_geom_idx.
+  //
+  // PERHATIAN: index ekspresi `idx_locations_geog` di atas kolom (geom::geography)
+  // tidak bisa dinyatakan di Prisma. Itulah yang sebenarnya dipakai oleh query
+  // ST_DWithin, dan `db push` bisa menghapusnya. Sesudah setiap `db push`,
+  // jalankan ulang prisma/migrations_manual/01_postgis_triggers_rpc.sql.
+  @@index([geom], type: Gist, map: "idx_locations_geom")
   @@map("locations")
 }
 
@@ -245,6 +258,19 @@ model Activity {
   @@index([userId])
   @@index([locationId])
   @@index([status])
+
+  // Index spasial GIST dideklarasikan di sini, bukan hanya di skrip SQL manual.
+  // Kalau tidak, setiap `prisma db push` akan menghapusnya tanpa pesan apa pun -
+  // aplikasi tetap jalan, hanya pelan, jadi hilangnya tidak akan ketahuan.
+  //
+  // `map` menyebut nama index yang sudah ada di database supaya Prisma
+  // mengakuinya, bukan membuat index kembar bernama *_geom_idx.
+  //
+  // PERHATIAN: index ekspresi `idx_activities_geog` di atas kolom (geom::geography)
+  // tidak bisa dinyatakan di Prisma. Itulah yang sebenarnya dipakai oleh query
+  // ST_DWithin, dan `db push` bisa menghapusnya. Sesudah setiap `db push`,
+  // jalankan ulang prisma/migrations_manual/01_postgis_triggers_rpc.sql.
+  @@index([geom], type: Gist, map: "idx_activities_geom")
   @@map("activities")
 }
 
@@ -284,6 +310,19 @@ model EconomicPoint {
 
   createdAt          DateTime           @default(now()) @map("created_at")
 
+
+  // Index spasial GIST dideklarasikan di sini, bukan hanya di skrip SQL manual.
+  // Kalau tidak, setiap `prisma db push` akan menghapusnya tanpa pesan apa pun -
+  // aplikasi tetap jalan, hanya pelan, jadi hilangnya tidak akan ketahuan.
+  //
+  // `map` menyebut nama index yang sudah ada di database supaya Prisma
+  // mengakuinya, bukan membuat index kembar bernama *_geom_idx.
+  //
+  // PERHATIAN: index ekspresi `idx_economic_points_geog` di atas kolom (geom::geography)
+  // tidak bisa dinyatakan di Prisma. Itulah yang sebenarnya dipakai oleh query
+  // ST_DWithin, dan `db push` bisa menghapusnya. Sesudah setiap `db push`,
+  // jalankan ulang prisma/migrations_manual/01_postgis_triggers_rpc.sql.
+  @@index([geom], type: Gist, map: "idx_economic_points_geom")
   @@map("economic_points")
 }
 
