@@ -12,6 +12,7 @@ import {
   Activity,
   BusFront,
   Crosshair,
+  Check,
   MapPin,
   Layers,
   Bus,
@@ -21,6 +22,7 @@ import {
 import { SidebarMode } from './AppSidebar';
 import { difaMapApi } from '../../lib/api';
 import { susunTempat } from '../../data/tempatPilihan';
+import { FILTER_PARAMETER, hitungFilter } from '../../data/filterParameter';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
 /**
@@ -67,6 +69,10 @@ interface TopSearchBarProps {
    * lalu menunjuk titiknya sendiri di peta.
    */
   onMintaTunjukPeta?: () => void;
+  /** Seluruh lokasi sebelum disaring, untuk menghitung isi tiap pilihan. */
+  semuaLokasi?: any[];
+  filterAktif?: string[];
+  onFilterChange?: (kunci: string[]) => void;
   onResetToDefault?: () => void;
 }
 
@@ -89,6 +95,9 @@ export default function TopSearchBar({
   onSelectSuggestion,
   onSelectTempatLuar,
   onMintaTunjukPeta,
+  semuaLokasi = [],
+  filterAktif = [],
+  onFilterChange,
   onResetToDefault,
 }: TopSearchBarProps) {
   const isMobile = useIsMobile(768);
@@ -102,6 +111,14 @@ export default function TopSearchBar({
    * Makassar. Padahal justru di situ orang ingin tahu kondisinya, dan jawaban
    * "belum ada data" adalah jawaban yang sah.
    */
+  /**
+   * Berapa titik yang lolos tiap penyaring, dan berapa yang parameternya belum
+   * pernah teramati. Ditampilkan di sebelah tiap pilihan supaya pengguna tahu
+   * sebelum memilih - tanpa itu, memilih "Ada toilet difabel" mengosongkan peta
+   * tanpa penjelasan, padahal sebabnya hanya satu titik yang pernah diamati.
+   */
+  const isiFilter = useMemo(() => hitungFilter(semuaLokasi), [semuaLokasi]);
+
   const [tempatLuar, setTempatLuar] = useState<any[]>([]);
   const [sedangCariLuar, setSedangCariLuar] = useState(false);
 
@@ -451,16 +468,161 @@ export default function TopSearchBar({
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
-              color: isFilterDropdownOpen ? '#FDC323' : '#539BA9',
+              color: isFilterDropdownOpen || filterAktif.length > 0 ? '#FDC323' : '#539BA9',
               padding: '4px',
               display: 'flex',
               alignItems: 'center',
               transition: 'color 0.2s ease',
+              // Lencana jumlah penyaring aktif diletakkan relatif terhadap tombol.
+              position: 'relative',
             }}
           >
             <SlidersHorizontal size={20} />
+            {filterAktif.length > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '-2px',
+                  right: '-2px',
+                  minWidth: '16px',
+                  height: '16px',
+                  borderRadius: '8px',
+                  backgroundColor: '#EF4444',
+                  color: '#FFFFFF',
+                  fontSize: '10px',
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {filterAktif.length}
+              </span>
+            )}
           </button>
         </div>
+
+        {/* Panel penyaring parameter.
+            Tombol slider ini sebelumnya tidak melakukan apa pun: keadaannya
+            di-toggle, tetapi tidak ada panel yang pernah digambar - yang
+            berubah hanya warna ikonnya.
+
+            Yang disaring adalah parameter yang tercatat apa adanya, bukan
+            label jenis disabilitas. "Ramah kursi roda" adalah tafsiran atas
+            beberapa parameter sekaligus, dan tafsiran itu bisa keliru: sebuah
+            titik bisa punya ramp bagus tetapi trotoar menujunya terputus. */}
+        {isFilterDropdownOpen && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 8px)',
+              right: 0,
+              width: isMobile ? '100%' : '340px',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '14px',
+              boxShadow: '0 12px 32px rgba(0,0,0,0.16)',
+              border: '1px solid #E2E8F0',
+              zIndex: 60,
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                padding: '12px 16px',
+                borderBottom: '1px solid #F1F5F9',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#0F172A' }}>
+                Saring menurut fasilitas
+              </span>
+              {filterAktif.length > 0 && (
+                <button
+                  onClick={() => onFilterChange && onFilterChange([])}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#2563EB',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Hapus semua
+                </button>
+              )}
+            </div>
+
+            <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+              {FILTER_PARAMETER.map((f) => {
+                const aktif = filterAktif.includes(f.kunci);
+                const isi = isiFilter[f.kunci] ?? { lolos: 0, belumTeramati: 0 };
+                return (
+                  <div
+                    key={f.kunci}
+                    onClick={() => {
+                      if (!onFilterChange) return;
+                      onFilterChange(
+                        aktif ? filterAktif.filter((k) => k !== f.kunci) : [...filterAktif, f.kunci]
+                      );
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '11px 16px',
+                      cursor: 'pointer',
+                      borderBottom: '1px solid #F8FAFC',
+                      backgroundColor: aktif ? '#EFF6FF' : '#FFFFFF',
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '5px',
+                        border: `2px solid ${aktif ? '#2563EB' : '#CBD5E1'}`,
+                        backgroundColor: aktif ? '#2563EB' : '#FFFFFF',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {aktif && <Check size={12} color="#FFFFFF" strokeWidth={3.5} />}
+                    </span>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>
+                        {f.label}
+                      </div>
+                      <div style={{ fontSize: '10.5px', color: '#94A3B8', marginTop: '1px' }}>
+                        {isi.lolos} titik memenuhi
+                        {isi.belumTeramati > 0 && ` \\u00b7 ${isi.belumTeramati} belum teramati`}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div
+              style={{
+                padding: '10px 16px',
+                backgroundColor: '#F8FAFC',
+                fontSize: '10.5px',
+                color: '#64748B',
+                lineHeight: '15px',
+              }}
+            >
+              Memilih lebih dari satu menyisakan titik yang memenuhi{' '}
+              <strong>semuanya</strong>. Titik yang parameternya belum teramati tidak ikut
+              lolos &mdash; itu berarti belum disurvei, bukan berarti tidak ada.
+            </div>
+          </div>
+        )}
 
         {/* Autocomplete / Search Suggestions Dropdown */}
         {isInputFocused && searchQuery.trim().length > 0 && (

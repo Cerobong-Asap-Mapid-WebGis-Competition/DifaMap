@@ -10,6 +10,7 @@ import CreateActivityModal from '../components/modals/CreateActivityModal';
 import AiChatbotDrawer from '../components/chatbot/AiChatbotDrawer';
 import InfoModal from '../components/modals/InfoModal';
 import { useLocations, useActivities } from '../hooks/useDifaMap';
+import { saringLokasi } from '../data/filterParameter';
 import { difaMapApi } from '../lib/api';
 import { useIsMobile } from '../hooks/useIsMobile';
 
@@ -56,6 +57,12 @@ export default function HomePage() {
    * disusun dari survei di sekitarnya seperti biasa.
    */
   const [isPickingTempatManual, setIsPickingTempatManual] = useState(false);
+
+  /**
+   * Penyaring parameter aksesibilitas yang sedang aktif, digabung dengan DAN.
+   * Kosong berarti tidak menyaring apa pun.
+   */
+  const [filterAktif, setFilterAktif] = useState<string[]>([]);
   const [pickedCoordinate, setPickedCoordinate] = useState<{ latitude: number; longitude: number } | null>(null);
   const [analysisTarget, setAnalysisTarget] = useState<{ lat: number; lng: number; name?: string } | null>(null);
 
@@ -109,15 +116,18 @@ export default function HomePage() {
   }, [activities, searchQuery]);
 
   const filteredLocations = useMemo(() => {
-    if (!searchQuery.trim()) return locations;
+    // Penyaring parameter berlaku lebih dulu, lalu pencarian teks.
+    const tersaring = saringLokasi(locations, filterAktif);
+
+    if (!searchQuery.trim()) return tersaring;
     const q = searchQuery.toLowerCase();
-    return locations.filter(
+    return tersaring.filter(
       (l) =>
         l.name?.toLowerCase().includes(q) ||
         l.specificLocation?.toLowerCase().includes(q) ||
         l.category?.toLowerCase().includes(q)
     );
-  }, [locations, searchQuery]);
+  }, [locations, filterAktif, searchQuery]);
 
   // Dynamic Economic Points from MAPID (Menu Go & Properti Go - khusus Urban Planner Mode)
   const [economicPoints, setEconomicPoints] = useState<any[]>([]);
@@ -329,6 +339,9 @@ export default function HomePage() {
         onResetToDefault={handleResetToDefault}
         onSelectTempatLuar={(poi) => setSelectedItem({ type: 'POI', data: poi })}
         onMintaTunjukPeta={() => setIsPickingTempatManual(true)}
+        semuaLokasi={locations}
+        filterAktif={filterAktif}
+        onFilterChange={setFilterAktif}
         onSelectSuggestion={(item) => {
           if (item.type === 'LOCATION') {
             handleSelectLocation(item.data);
