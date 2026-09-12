@@ -87,6 +87,14 @@ interface MapCanvasProps {
    * PanelTempat supaya hasil survei MAPID ikut terbawa utuh.
    */
   onSelectPoi?: (poi: PoiTerpilih) => void;
+  /**
+   * Titik Properti Go / Menu Go yang diklik, dikirim apa adanya.
+   *
+   * Dipisahkan dari onSelectPoi supaya panel surveinya punya state sendiri:
+   * beberapa jalur klik menulis ke state POI yang sama, dan hasil surveinya
+   * terus tertimpa oleh label basemap yang kebetulan berada di titik itu juga.
+   */
+  onSelectTitikEkonomi?: (titik: any) => void;
   onSelectLocation?: (location: any) => void;
   onSelectActivity?: (activity: any) => void;
   onPickCoordinate?: (coord: { latitude: number; longitude: number }) => void;
@@ -117,6 +125,7 @@ export default function MapCanvas({
   rute = null,
   onTutupRute,
   onSelectPoi,
+  onSelectTitikEkonomi,
   onSelectLocation,
   onSelectActivity,
   onPickCoordinate,
@@ -148,6 +157,8 @@ export default function MapCanvas({
   const onMapClickRef = useRef(onMapClick);
   onMapClickRef.current = onMapClick;
 
+  const onSelectTitikEkonomiRef = useRef(onSelectTitikEkonomi);
+  onSelectTitikEkonomiRef.current = onSelectTitikEkonomi;
   const onSelectPoiRef = useRef(onSelectPoi);
   onSelectPoiRef.current = onSelectPoi;
 
@@ -1589,16 +1600,10 @@ export default function MapCanvas({
            * untuk titik di luar basis data: skornya dihitung dari titik survei
            * di sekitarnya, dan hasil survei MAPID-nya ditampilkan apa adanya.
            */
-          if (onSelectPoiRef.current) {
-            onSelectPoiRef.current({
-              nama: pt.name,
-              kategori: isMenuGo ? 'RESTAURANT' : 'OTHER',
-              latitude: pt.latitude,
-              longitude: pt.longitude,
-              kunci: `eko:${pt.id}`,
-              survei: bacaSurveiEkonomi(pt),
-            });
-          }
+          // Dikirim ke panel surveinya sendiri, bukan ke state POI yang
+          // diperebutkan label basemap dan penanda tempat.
+          onSelectTitikEkonomiRef.current?.(pt);
+
           mapRef.current?.flyTo({
             center: [pt.longitude, pt.latitude],
             zoom: 16,

@@ -5,6 +5,7 @@ import AppSidebar, { SidebarMode } from '../components/layout/AppSidebar';
 import TopSearchBar, { PublicSubMode, UrbanPlannerFilter } from '../components/layout/TopSearchBar';
 import DetailDrawer, { SelectedItemState } from '../components/drawer/DetailDrawer';
 import PanelTempat from '../components/drawer/PanelTempat';
+import PanelSurvei from '../components/drawer/PanelSurvei';
 import MapCanvas, { MapDisplayMode } from '../components/map/MapCanvas';
 import CreateActivityModal from '../components/modals/CreateActivityModal';
 import AiChatbotDrawer from '../components/chatbot/AiChatbotDrawer';
@@ -76,6 +77,8 @@ export default function HomePage() {
   const [pickedCoordinate, setPickedCoordinate] = useState<{ latitude: number; longitude: number } | null>(null);
   const [analysisTarget, setAnalysisTarget] = useState<{ lat: number; lng: number; name?: string } | null>(null);
   const [compareTarget, setCompareTarget] = useState<{ lat: number; lng: number } | null>(null);
+  /** Titik Properti Go / Menu Go yang sedang dibuka panel surveinya. */
+  const [titikEkonomi, setTitikEkonomi] = useState<any>(null);
   const [isochronePembanding, setIsochronePembanding] = useState<any>(null);
   /** Koordinat titik yang sedang dianalisis, untuk ditandai sebagai "A". */
   const [titikAnalisisAktif, setTitikAnalisisAktif] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -174,6 +177,7 @@ export default function HomePage() {
    * yang utama, bukan percakapan.
    */
   useEffect(() => {
+    setTitikEkonomi(null);
     setIsAiChatOpen(sidebarMode === 'URBAN_PLANNER');
     if (sidebarMode !== 'URBAN_PLANNER') {
       setIsochroneGeoJSON(null);
@@ -230,6 +234,9 @@ export default function HomePage() {
   const handleMapClick = () => {
     if (selectedItem) {
       setSelectedItem(null);
+    }
+    if (titikEkonomi) {
+      setTitikEkonomi(null);
     }
     if (isAiChatOpen) {
       setIsAiChatOpen(false);
@@ -422,7 +429,12 @@ export default function HomePage() {
         publicSubMode={publicSubMode}
         onSelectPublicSubMode={setPublicSubMode}
         urbanFilter={urbanFilter}
-        onChangeUrbanFilter={setUrbanFilter}
+        onChangeUrbanFilter={(f) => {
+          // Panel survei menutup saat berpindah antara Properti Go dan Menu Go:
+          // titik yang sedang dibuka tidak lagi tergambar di peta setelahnya.
+          setTitikEkonomi(null);
+          setUrbanFilter(f);
+        }}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         locations={locations}
@@ -642,6 +654,11 @@ export default function HomePage() {
         rute={rute}
         onTutupRute={() => setRute(null)}
         onSelectPoi={(poi) => setSelectedItem({ type: 'POI', data: poi })}
+        onSelectTitikEkonomi={(t) => {
+          // Panel POI ditutup supaya keduanya tidak tampil bertumpuk.
+          setSelectedItem(null);
+          setTitikEkonomi(t);
+        }}
         onSelectLocation={handleSelectLocation}
         onSelectActivity={handleSelectActivity}
         onPickCoordinate={handlePickCoordinate}
@@ -653,7 +670,11 @@ export default function HomePage() {
       {/* 4. Left Detail Drawer (Automatically slides in when a pin / polaroid is clicked) */}
       {/* Panel tempat MAPID - dipakai saat yang diklik adalah POI basemap,
           bukan baris di basis data DifaMap. */}
-      {selectedItem?.type === 'POI' && (
+      {titikEkonomi && (
+        <PanelSurvei titik={titikEkonomi} onClose={() => setTitikEkonomi(null)} />
+      )}
+
+      {selectedItem?.type === 'POI' && !titikEkonomi && (
         <PanelTempat
           poi={poiDenganSurvei}
           onClose={() => setSelectedItem(null)}
