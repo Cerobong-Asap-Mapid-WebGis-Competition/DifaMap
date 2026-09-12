@@ -23,7 +23,9 @@ export default function HomePage() {
   // Default on load: Tampilan map biasa (NONE) tanpa marker bertumpuk
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>('PUBLIC');
   const [publicSubMode, setPublicSubMode] = useState<PublicSubMode>('NONE');
-  const [urbanFilter, setUrbanFilter] = useState<UrbanPlannerFilter>('PROPERTI_GO');
+  // Bawaannya menampilkan seluruh titik ekonomi, bukan hanya properti -
+  // sejalan dengan mode bawaan di sisi disabilitas.
+  const [urbanFilter, setUrbanFilter] = useState<UrbanPlannerFilter>('NONE');
   const [bufferRadius, setBufferRadius] = useState<number>(500);
   const [isBufferVisible, setIsBufferVisible] = useState<boolean>(true);
 
@@ -99,7 +101,7 @@ export default function HomePage() {
   const handleResetToDefault = useCallback(() => {
     setSidebarMode('PUBLIC');
     setPublicSubMode('NONE');
-    setUrbanFilter('PROPERTI_GO');
+    setUrbanFilter('NONE');
     setBufferRadius(500);
     setIsBufferVisible(true);
     setSearchQuery('');

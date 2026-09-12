@@ -1545,11 +1545,41 @@ export default function MapCanvas({
         });
       }
 
-      // Render HANYA Economic Points sesuai tab aktif (Properti Go / Menu Go)
+      /**
+       * Label pendek untuk penanda titik ekonomi.
+       *
+       * Kolom `name` titik Properti Go berisi alamat lengkapnya - "Komplek
+       * Minasa Indah Residence Blok C/2, Gn.Sari, Rappocini, Indonesia" - dan
+       * pada tampilan bawaan yang memuat seluruh titik sekaligus, dua puluh
+       * lima alamat sepanjang itu menutupi petanya sendiri.
+       *
+       * Yang dipakai karena itu keterangan surveinya: nama tempat untuk kuliner,
+       * dan kategori beserta statusnya untuk properti - "Ruko · Dijual" jauh
+       * lebih berguna bagi orang yang sedang memindai peta daripada penggalan
+       * alamat yang terpotong di tengah.
+       */
+      const labelEkonomi = (pt: any): string => {
+        const m = (pt?.metadata ?? {}) as Record<string, any>;
+        const isi = (v: any) => String(v ?? '').trim();
+
+        if (isi(m.nama_tempat)) return isi(m.nama_tempat);
+
+        if (isi(m.kategori_properti)) {
+          const status = isi(m.jenis_properti);
+          return status ? `${isi(m.kategori_properti)} · ${status}` : isi(m.kategori_properti);
+        }
+
+        const nama = isi(pt?.name) || 'Titik ekonomi';
+        return nama.length > 26 ? `${nama.slice(0, 25)}…` : nama;
+      };
+
+      // Render Economic Points sesuai tab aktif; bila tidak ada tab yang
+      // aktif, keduanya tampil bersamaan.
       economicPoints.forEach((pt) => {
         const isMenuGo = pt.type === 'MENU_GO';
 
-        // Filter ketat sesuai tab yang dipilih
+        // Saringan mengikuti tombol yang ditekan. Bila tidak ada yang aktif
+        // ('NONE'), keduanya tampil bersamaan - itulah tampilan bawaannya.
         if (urbanFilter === 'MENU_GO' && !isMenuGo) return;
         if (urbanFilter === 'PROPERTI_GO' && isMenuGo) return;
 
@@ -1582,7 +1612,7 @@ export default function MapCanvas({
             transition: transform 0.15s ease;
           " onmouseenter="this.style.transform='scale(1.1)'" onmouseleave="this.style.transform='scale(1)'">
             <span>${isMenuGo ? '🍴' : '🏢'}</span>
-            <span>${pt.name}</span>
+            <span>${labelEkonomi(pt)}</span>
           </div>
         `;
 

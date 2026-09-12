@@ -34,7 +34,15 @@ import { useIsMobile } from '../../hooks/useIsMobile';
  * yang hendak dicapai, dan simpul transit untuk mencapainya.
  */
 export type PublicSubMode = 'HALTE' | 'TEMPAT' | 'NONE';
-export type UrbanPlannerFilter = 'PROPERTI_GO' | 'MENU_GO';
+/**
+ * Saringan titik ekonomi di mode Urban Planner.
+ *
+ * 'NONE' adalah tampilan bawaan: seluruh titik properti DAN kuliner tampil
+ * bersamaan, sama seperti mode bawaan di sisi disabilitas yang menampilkan
+ * seluruh titik survei sekaligus. Menekan salah satu tombol menyaring ke satu
+ * jenis saja; menekannya lagi kembali ke tampilan penuh.
+ */
+export type UrbanPlannerFilter = 'PROPERTI_GO' | 'MENU_GO' | 'NONE';
 
 interface TopSearchBarProps {
   sidebarMode: SidebarMode;
@@ -1027,7 +1035,7 @@ export default function TopSearchBar({
           <>
             {/* Tab: Properti Go */}
             <button
-              onClick={() => onChangeUrbanFilter('PROPERTI_GO')}
+              onClick={() => onChangeUrbanFilter(urbanFilter === 'PROPERTI_GO' ? 'NONE' : 'PROPERTI_GO')}
               className={urbanFilter === 'PROPERTI_GO' ? 'btn-yellow-pill' : 'btn-white-pill'}
               style={{
                 backgroundColor: urbanFilter === 'PROPERTI_GO' ? '#FDC323' : '#FFFFFF',
@@ -1044,7 +1052,7 @@ export default function TopSearchBar({
 
             {/* Tab: Menu Go */}
             <button
-              onClick={() => onChangeUrbanFilter('MENU_GO')}
+              onClick={() => onChangeUrbanFilter(urbanFilter === 'MENU_GO' ? 'NONE' : 'MENU_GO')}
               className={urbanFilter === 'MENU_GO' ? 'btn-yellow-pill' : 'btn-white-pill'}
               style={{
                 backgroundColor: urbanFilter === 'MENU_GO' ? '#FDC323' : '#FFFFFF',
