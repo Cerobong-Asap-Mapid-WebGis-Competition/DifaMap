@@ -112,6 +112,36 @@ export default function CreateActivityModal({
     }
   };
 
+  /** Mengembalikan seluruh isian ke keadaan awal. */
+  const kosongkanIsian = () => {
+    setTitle('');
+    setDescription('');
+    setSpecificLocation('');
+    setImageUrl('');
+    setAuthorName('');
+    setGalatFoto(null);
+    setErrorMsg(null);
+
+    // Alamat objek dilepas supaya berkas yang sudah tidak dipakai tidak terus
+    // tertahan di memori peramban.
+    setPratinjau((lama) => {
+      if (lama) URL.revokeObjectURL(lama);
+      return null;
+    });
+
+    setRampStatus('NOT_VISIBLE');
+    setGuidingBlockStatus('NOT_VISIBLE');
+    setLightingLevel('NOT_VISIBLE');
+    setSidewalkCondition('NOT_VISIBLE');
+    setTingkatKeramaian('NOT_VISIBLE');
+
+    const n = new Date();
+    const pad = (x: number) => String(x).padStart(2, '0');
+    setWaktuKunjungan(
+      `${n.getFullYear()}-${pad(n.getMonth() + 1)}-${pad(n.getDate())}T${pad(n.getHours())}:${pad(n.getMinutes())}`
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !description.trim()) {
@@ -159,6 +189,20 @@ export default function CreateActivityModal({
       };
 
       const res = await difaMapApi.createActivity(payload);
+
+      /**
+       * Isian dikosongkan SETELAH berhasil, bukan saat modal ditutup.
+       *
+       * Komponennya tetap terpasang ketika ditutup - `isOpen` hanya membuatnya
+       * mengembalikan null - jadi seluruh isian bertahan sampai halaman dimuat
+       * ulang, dan laporan berikutnya dibuka dengan isi laporan sebelumnya.
+       *
+       * Melepas komponennya saat ditutup memang menyelesaikan itu, tetapi
+       * menimbulkan yang lebih buruk: tombol "Pilih di Peta" ikut menutup modal,
+       * sehingga judul dan deskripsi yang sudah diketik akan lenyap setiap kali
+       * pelapor memilih titiknya di peta.
+       */
+      kosongkanIsian();
       onSuccessCreated(res.data);
       onClose();
     } catch (err: any) {

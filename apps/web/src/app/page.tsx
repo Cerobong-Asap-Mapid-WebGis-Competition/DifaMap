@@ -748,6 +748,10 @@ export default function HomePage() {
         onSuccessCreated={(newAct) => {
           refetchActivities();
           refetchLocations();
+          // Koordinat ikut dilepas: tanpa ini laporan berikutnya terbuka dengan
+          // titik laporan sebelumnya sudah terpilih, dan pelapor yang lupa
+          // menggantinya akan menaruh pengamatan baru di tempat yang lama.
+          setPickedCoordinate(null);
           setSelectedItem({
             type: 'ACTIVITY',
             data: newAct,
