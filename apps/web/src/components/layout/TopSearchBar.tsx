@@ -1079,7 +1079,7 @@ export default function TopSearchBar({
               }}
             >
               <Building size={18} strokeWidth={2.4} />
-              <span>Properti Go</span>
+              <span>Properti</span>
             </button>
 
             {/* Tab: Menu Go */}
@@ -1096,7 +1096,7 @@ export default function TopSearchBar({
               }}
             >
               <UtensilsCrossed size={18} strokeWidth={2.4} />
-              <span>Menu Go</span>
+              <span>{isMobile ? 'Kuliner' : 'Restoran & Kafe'}</span>
             </button>
           </>
         )}
@@ -1159,7 +1159,12 @@ export default function TopSearchBar({
           </button>
         </div>
 
-        {/* 4. Bagikan Laporan / Ulasan Button */}
+        {/* 4. Bagikan Laporan.
+            Disembunyikan di mode Urban Planner: yang melapor adalah pengguna
+            jalan yang sedang berada di lokasi, sementara mode ini untuk
+            membaca data yang sudah terkumpul. Menaruh keduanya berdampingan
+            hanya memadati bilah tanpa ada yang memakainya. */}
+        {sidebarMode !== 'URBAN_PLANNER' && (
         <button
           onClick={onOpenCreateModal}
           className="btn-yellow-pill"
@@ -1175,6 +1180,7 @@ export default function TopSearchBar({
           <Plus size={18} strokeWidth={3} />
           <span>{isMobile ? 'Lapor' : 'Bagikan Laporan'}</span>
         </button>
+        )}
       </div>
     </header>
   );
