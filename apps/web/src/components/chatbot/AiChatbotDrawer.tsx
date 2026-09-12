@@ -63,8 +63,17 @@ const MODA_GRID: Array<{ kunci: ModaGrid; label: string; jelas: string }> = [
 ];
 
 /** Hasil analisis satu titik dari server, termasuk wawasan Difa AI. */
+interface PutusanBanding {
+  unggul: 'A' | 'B' | 'SEIMBANG';
+  ringkasan: string;
+  alasan: string[];
+  catatan: string;
+}
+
 interface AnalisisTitik {
   namaWilayah: string | null;
+  koordinat?: { latitude: number; longitude: number };
+  cakupanIsokron: { persen: number; petakBerdata: number; petakTotal: number; radiusUjiMeter: number } | null;
   isokronNyata: boolean;
   pita: Array<{ menit: number; jumlahTitik: number; skorRata: number | null; luasKm2: number | null }>;
   terjangkau: Array<{ nama: string; skor: number | null; jenis: string; jarakMeter: number; menit: number | null }>;
@@ -184,6 +193,10 @@ interface AiChatbotDrawerProps {
   /** Isi panel: percakapan saja, atau kedua alat perencanaan sekaligus. */
   tampilan?: TampilanPanel;
   analysisTarget?: { lat: number; lng: number; name?: string } | null;
+  /** Titik kedua yang dipilih pengguna untuk dibandingkan. */
+  compareTarget?: { lat: number; lng: number } | null;
+  onSelectCoordinateForCompare?: () => void;
+  onClearCompare?: () => void;
 }
 
 export default function AiChatbotDrawer({
@@ -200,6 +213,9 @@ export default function AiChatbotDrawer({
   onRuteDitemukan,
   tampilan = 'CHAT',
   analysisTarget,
+  compareTarget,
+  onSelectCoordinateForCompare,
+  onClearCompare,
 }: AiChatbotDrawerProps) {
   const isMobile = useIsMobile(768);
   // Sidebar menentukan ISI panel; di dalam panel Urban Planner, dua alatnya
@@ -240,6 +256,8 @@ export default function AiChatbotDrawer({
   const [gridModa, setGridModa] = useState<ModaGrid>('AKSESIBILITAS');
   const [wawasanGrid, setWawasanGrid] = useState<WawasanGrid | null>(null);
   const [analisisTitik, setAnalisisTitik] = useState<AnalisisTitik | null>(null);
+  const [banding, setBanding] = useState<{ a: AnalisisTitik; b: AnalisisTitik; putusan: PutusanBanding | null } | null>(null);
+  const [sedangMembandingkan, setSedangMembandingkan] = useState(false);
   const [sedangMenyusunWawasan, setSedangMenyusunWawasan] = useState(false);
   const [isComputingGrid, setIsComputingGrid] = useState(false);
   const [gridResultSummary, setGridResultSummary] = useState<any>(null);
@@ -287,6 +305,33 @@ export default function AiChatbotDrawer({
       handleRunSiteAnalysis(analysisTarget.lat, analysisTarget.lng, analysisTarget.name);
     }
   }, [analysisTarget]);
+
+  /**
+   * Menjalankan pembandingan begitu titik kedua dipilih di peta.
+   *
+   * Titik pertamanya diambil dari analisis yang sedang terbuka, jadi urutannya
+   * selalu: analisis satu titik dulu, baru pilih pembandingnya.
+   */
+  useEffect(() => {
+    if (!compareTarget || !analisisTitik?.koordinat) return;
+
+    const a = analisisTitik.koordinat;
+    setSedangMembandingkan(true);
+    setBanding(null);
+
+    difaMapApi
+      .compareSites(
+        { lat: a.latitude, lng: a.longitude },
+        { lat: compareTarget.lat, lng: compareTarget.lng },
+        isochroneMode
+      )
+      .then((r) => setBanding(r?.data ?? null))
+      .catch(() => setBanding(null))
+      .finally(() => setSedangMembandingkan(false));
+    // Sengaja hanya bergantung pada titik kedua: mengubah moda tidak boleh
+    // memicu perbandingan ulang tanpa diminta.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compareTarget]);
 
   if (!isOpen) return null;
 
@@ -469,6 +514,8 @@ export default function AiChatbotDrawer({
       // wawasan Difa AI. Dimulai lebih dulu supaya berjalan bersamaan dengan
       // permintaan lain yang dipakai kartu ringkasan lama.
       setAnalisisTitik(null);
+      setBanding(null);
+      onClearCompare?.();
       const janjiTitik = difaMapApi
         .getSiteInsight(lat, lng, isochroneMode, [5, 10, isochroneMinutes > 10 ? isochroneMinutes : 15])
         .then((r) => setAnalisisTitik(r?.data ?? null))
@@ -1422,6 +1469,38 @@ export default function AiChatbotDrawer({
                           Layanan isokron tidak tersedia - angka di atas memakai lingkaran radius, bukan jaringan jalan.
                         </div>
                       )}
+
+                      {/* Cakupan data di dalam jangkauan.
+                          Skor 4,5 dari satu titik di dalam 1,1 km persegi bukan
+                          hal yang sama dengan skor 4,5 dari dua belas titik -
+                          dan tanpa baris ini keduanya tampil identik. */}
+                      {analisisTitik.cakupanIsokron && (
+                        <div style={{ marginTop: '7px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px 10px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
+                            <span style={{ color: '#64748B' }}>Cakupan survei di dalam jangkauan</span>
+                            <span style={{
+                              fontWeight: 800,
+                              color: analisisTitik.cakupanIsokron.persen < 40 ? '#EF4444'
+                                : analisisTitik.cakupanIsokron.persen < 70 ? '#D97706' : '#16A34A',
+                            }}>
+                              {analisisTitik.cakupanIsokron.persen}%
+                            </span>
+                          </div>
+                          <div style={{ height: '5px', borderRadius: '3px', backgroundColor: '#E2E8F0', marginTop: '5px', overflow: 'hidden' }}>
+                            <div style={{
+                              width: `${Math.min(100, analisisTitik.cakupanIsokron.persen)}%`,
+                              height: '100%',
+                              backgroundColor: analisisTitik.cakupanIsokron.persen < 40 ? '#EF4444'
+                                : analisisTitik.cakupanIsokron.persen < 70 ? '#D97706' : '#16A34A',
+                            }} />
+                          </div>
+                          <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '4px', lineHeight: '14px' }}>
+                            {analisisTitik.cakupanIsokron.petakBerdata} dari {analisisTitik.cakupanIsokron.petakTotal} petak
+                            di dalam jangkauan punya titik survei dalam {analisisTitik.cakupanIsokron.radiusUjiMeter} m.
+                            Sisanya belum pernah didatangi surveyor.
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Titik terdekat per kebutuhan, termasuk yang di luar jangkauan.
@@ -1479,6 +1558,130 @@ export default function AiChatbotDrawer({
                         </div>
                       </details>
                     )}
+
+                    {/* Bandingkan dengan titik lain.
+                        Memilih antara dua ruko atau dua calon lokasi halte
+                        adalah keputusan yang sesungguhnya - dan satu-satunya
+                        cara menjawabnya adalah menaruh keduanya berdampingan. */}
+                    <div>
+                      {!banding && !sedangMembandingkan && (
+                        <button
+                          onClick={() => onSelectCoordinateForCompare?.()}
+                          style={{
+                            width: '100%',
+                            padding: '9px',
+                            borderRadius: '8px',
+                            border: '1px solid #0F766E',
+                            backgroundColor: '#FFFFFF',
+                            color: '#0F766E',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Bandingkan dengan titik lain
+                        </button>
+                      )}
+
+                      {sedangMembandingkan && (
+                        <div style={{ textAlign: 'center', padding: '10px', border: '1px dashed #CBD5E1', borderRadius: '8px', fontSize: '11.5px', color: '#64748B' }}>
+                          Menganalisis kedua titik dan menimbangnya...
+                        </div>
+                      )}
+
+                      {banding && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#000000' }}>
+                              Perbandingan Dua Titik
+                            </span>
+                            <button
+                              onClick={() => { setBanding(null); onClearCompare?.(); }}
+                              style={{ border: 'none', background: '#F1F5F9', borderRadius: '6px', padding: '3px 9px', fontSize: '10.5px', fontWeight: 700, color: '#334155', cursor: 'pointer' }}
+                            >
+                              Tutup
+                            </button>
+                          </div>
+
+                          <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10.5px' }}>
+                              <thead>
+                                <tr style={{ color: '#64748B', textAlign: 'left' }}>
+                                  <th style={{ padding: '4px 6px 4px 0', fontWeight: 700 }}>&nbsp;</th>
+                                  <th style={{ padding: '4px 6px', fontWeight: 700, color: banding.putusan?.unggul === 'A' ? '#15803D' : '#64748B' }}>
+                                    A {banding.putusan?.unggul === 'A' && '\u2713'}
+                                  </th>
+                                  <th style={{ padding: '4px 0 4px 6px', fontWeight: 700, color: banding.putusan?.unggul === 'B' ? '#15803D' : '#64748B' }}>
+                                    B {banding.putusan?.unggul === 'B' && '\u2713'}
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr style={{ borderTop: '1px solid #F1F5F9' }}>
+                                  <td style={{ padding: '5px 6px 5px 0', color: '#64748B' }}>Daerah</td>
+                                  <td style={{ padding: '5px 6px', fontWeight: 700 }}>{banding.a.namaWilayah ?? '-'}</td>
+                                  <td style={{ padding: '5px 0 5px 6px', fontWeight: 700 }}>{banding.b.namaWilayah ?? '-'}</td>
+                                </tr>
+                                {banding.a.pita.map((q, i) => (
+                                  <tr key={q.menit} style={{ borderTop: '1px solid #F1F5F9' }}>
+                                    <td style={{ padding: '5px 6px 5px 0', color: '#64748B' }}>{q.menit} menit</td>
+                                    <td style={{ padding: '5px 6px' }}>{q.jumlahTitik} titik &middot; {q.skorRata ?? '-'}</td>
+                                    <td style={{ padding: '5px 0 5px 6px' }}>
+                                      {banding.b.pita[i]?.jumlahTitik ?? '-'} titik &middot; {banding.b.pita[i]?.skorRata ?? '-'}
+                                    </td>
+                                  </tr>
+                                ))}
+                                {banding.a.terdekat.map((t, i) => (
+                                  <tr key={t.kebutuhan} style={{ borderTop: '1px solid #F1F5F9' }}>
+                                    <td style={{ padding: '5px 6px 5px 0', color: '#64748B' }}>{t.kebutuhan.replace(' (skor 3,5 ke atas)', '')}</td>
+                                    {[t, banding.b.terdekat[i]].map((x, k) => (
+                                      <td key={k} style={{ padding: k === 0 ? '5px 6px' : '5px 0 5px 6px', color: x?.didalamJangkauan ? '#15803D' : '#B45309' }}>
+                                        {x?.jarakMeter == null
+                                          ? 'tidak ada'
+                                          : `${x.jarakMeter >= 1000 ? `${(x.jarakMeter / 1000).toFixed(1)} km` : `${x.jarakMeter} m`}${x.didalamJangkauan ? '' : ' (luar)'}`}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                ))}
+                                <tr style={{ borderTop: '1px solid #E2E8F0' }}>
+                                  <td style={{ padding: '5px 6px 5px 0', color: '#64748B' }}>Cakupan data</td>
+                                  {[banding.a, banding.b].map((x, k) => (
+                                    <td key={k} style={{ padding: k === 0 ? '5px 6px' : '5px 0 5px 6px', fontWeight: 700 }}>
+                                      {x.cakupanIsokron ? `${x.cakupanIsokron.persen}%` : '-'}
+                                    </td>
+                                  ))}
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {banding.putusan && (
+                            <div style={{ backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '8px', padding: '11px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '5px' }}>
+                                <Sparkles size={14} color="#D97706" />
+                                <span style={{ fontSize: '12px', fontWeight: 800, color: '#000000' }}>
+                                  Putusan Difa AI &middot;{' '}
+                                  {banding.putusan.unggul === 'SEIMBANG' ? 'Seimbang' : `Titik ${banding.putusan.unggul} unggul`}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '11.5px', color: '#475569', lineHeight: '17px' }}>
+                                {banding.putusan.ringkasan}
+                              </div>
+                              {banding.putusan.alasan.length > 0 && (
+                                <ul style={{ margin: '7px 0 0 0', paddingLeft: '16px', fontSize: '11.5px', color: '#475569', lineHeight: '17px' }}>
+                                  {banding.putusan.alasan.map((x, i) => (
+                                    <li key={i} style={{ marginTop: '2px' }}>{x}</li>
+                                  ))}
+                                </ul>
+                              )}
+                              <div style={{ fontSize: '10.5px', color: '#92400E', marginTop: '7px', paddingTop: '6px', borderTop: '1px solid #FDE68A' }}>
+                                {banding.putusan.catatan}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
 
                     {/* Wawasan Difa AI */}
                     {analisisTitik.wawasan && (

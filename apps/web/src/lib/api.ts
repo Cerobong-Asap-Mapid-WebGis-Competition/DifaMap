@@ -218,6 +218,22 @@ export const difaMapApi = {
     return res.json();
   },
 
+  /**
+   * Membandingkan dua calon lokasi berdampingan, beserta putusan Difa AI.
+   */
+  async compareSites(
+    a: { lat: number; lng: number },
+    b: { lat: number; lng: number },
+    mode: 'walking' | 'wheelchair' = 'wheelchair',
+    intervals = [5, 10, 15]
+  ) {
+    const res = await fetch(
+      `${API_BASE_URL}/api/mapid/analysis/site-compare?latA=${a.lat}&lngA=${a.lng}&latB=${b.lat}&lngB=${b.lng}&mode=${mode}&intervals=${intervals.join(',')}`
+    );
+    if (!res.ok) throw new Error('Failed to compare sites');
+    return res.json();
+  },
+
   async getIsochrone(lat: number, lng: number, intervals = [5, 10, 15], mode: 'walking' | 'wheelchair' = 'wheelchair') {
     const res = await fetch(`${API_BASE_URL}/api/mapid/analysis/isochrone?lat=${lat}&lng=${lng}&intervals=${intervals.join(',')}&mode=${mode}`);
     if (!res.ok) throw new Error('Failed to calculate isochrone');

@@ -47,6 +47,8 @@ export default function HomePage() {
   // 5. Map Coordinate Picking State
   const [isPickingLocation, setIsPickingLocation] = useState(false);
   const [isPickingAnalysisTarget, setIsPickingAnalysisTarget] = useState(false);
+  /** Mode memilih titik KEDUA untuk dibandingkan dengan titik analisis. */
+  const [isPickingCompareTarget, setIsPickingCompareTarget] = useState(false);
 
   /**
    * Menunggu pengguna menunjuk sebuah titik untuk dinilai aksesibilitasnya.
@@ -72,6 +74,7 @@ export default function HomePage() {
   const [rute, setRute] = useState<RuteDigambar | null>(null);
   const [pickedCoordinate, setPickedCoordinate] = useState<{ latitude: number; longitude: number } | null>(null);
   const [analysisTarget, setAnalysisTarget] = useState<{ lat: number; lng: number; name?: string } | null>(null);
+  const [compareTarget, setCompareTarget] = useState<{ lat: number; lng: number } | null>(null);
 
   // 6. Lapisan Site Selection & Site Analysis Difa AI
   const [isSiniGridVisible, setIsSiniGridVisible] = useState(false);
@@ -245,6 +248,12 @@ export default function HomePage() {
         name: `Titik Terpilih (${coord.latitude.toFixed(4)}, ${coord.longitude.toFixed(4)})`,
       });
       setIsPickingAnalysisTarget(false);
+      setIsAiChatOpen(true);
+    } else if (isPickingCompareTarget) {
+      // Titik pembanding tidak menggantikan titik analisis - keduanya hidup
+      // berdampingan, sebab itulah inti fiturnya.
+      setCompareTarget({ lat: coord.latitude, lng: coord.longitude });
+      setIsPickingCompareTarget(false);
       setIsAiChatOpen(true);
     }
   };
@@ -450,6 +459,51 @@ export default function HomePage() {
         </div>
       )}
 
+      {/* Penanda saat memilih titik pembanding. */}
+      {isPickingCompareTarget && (
+        <div
+          style={{
+            position: 'fixed',
+            top: isMobile ? '118px' : '84px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 60,
+            backgroundColor: '#0F766E',
+            color: '#FFFFFF',
+            padding: isMobile ? '8px 14px' : '10px 20px',
+            borderRadius: '50px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            fontSize: isMobile ? '12px' : '13px',
+            fontWeight: '600',
+            maxWidth: '92vw',
+            width: 'max-content',
+          }}
+        >
+          <span>Klik titik KEDUA di peta untuk dibandingkan</span>
+          <button
+            onClick={() => {
+              setIsPickingCompareTarget(false);
+              setIsAiChatOpen(true);
+            }}
+            style={{
+              backgroundColor: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              borderRadius: '20px',
+              padding: '4px 12px',
+              color: '#FFFFFF',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Batal
+          </button>
+        </div>
+      )}
+
       {/* Floating Indicator: Mode Pilih Titik Analisis Spasial Difa AI */}
       {isPickingAnalysisTarget && (
         <div
@@ -529,7 +583,7 @@ export default function HomePage() {
         onSelectActivity={handleSelectActivity}
         onPickCoordinate={handlePickCoordinate}
         onMapClick={handleMapClick}
-        isPickingLocation={isPickingLocation || isPickingAnalysisTarget || isPickingTempatManual}
+        isPickingLocation={isPickingLocation || isPickingAnalysisTarget || isPickingCompareTarget || isPickingTempatManual}
         resetMapTrigger={resetMapTrigger}
       />
 
@@ -586,6 +640,12 @@ export default function HomePage() {
           setIsAiChatOpen(false);
         }}
         analysisTarget={analysisTarget}
+        compareTarget={compareTarget}
+        onSelectCoordinateForCompare={() => {
+          setIsPickingCompareTarget(true);
+          setIsAiChatOpen(false);
+        }}
+        onClearCompare={() => setCompareTarget(null)}
       />
 
       {/* 6. Create Activity / Report Modal (Community Crowdsource) */}

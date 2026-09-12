@@ -94,6 +94,19 @@ export interface AnalisisTitik {
   terjangkau: TitikTerjangkau[];
   terdekat: TitikTerdekat[];
   cakupan: { didalam: number; diluar: number };
+  /**
+   * Seberapa luas isokron ini yang benar-benar tersentuh survei.
+   *
+   * Skor 4,5 dari satu titik di dalam 1,1 km persegi bukan hal yang sama dengan
+   * skor 4,5 dari dua belas titik. Tanpa angka ini, keduanya tampil identik di
+   * panel - dan yang pertama terbaca jauh lebih meyakinkan daripada seharusnya.
+   */
+  cakupanIsokron: {
+    persen: number;
+    petakBerdata: number;
+    petakTotal: number;
+    radiusUjiMeter: number;
+  } | null;
   wawasan: { ringkasan: string; temuan: string[]; catatan: string } | null;
 }
 
@@ -185,7 +198,8 @@ export async function analisisTitik(
   latitude: number,
   longitude: number,
   moda: ModaJalan = 'wheelchair',
-  menitPita: number[] = [5, 10, 15]
+  menitPita: number[] = [5, 10, 15],
+  opsi?: { wawasan?: boolean }
 ): Promise<AnalisisTitik> {
   const urut = [...menitPita].sort((a, b) => a - b);
   const menitTerbesar = urut[urut.length - 1];
@@ -292,6 +306,57 @@ export async function analisisTitik(
     };
   });
 
+  /**
+   * Cakupan survei di dalam isokron terbesar.
+   *
+   * Wilayahnya ditaburi titik uji berjarak sekitar 150 meter; yang jatuh di
+   * dalam poligon dihitung sebagai petak, dan petak dianggap "berdata" bila ada
+   * titik survei dalam 250 meter darinya. Angka kasar, tetapi jauh lebih jujur
+   * daripada diam - dan perbandingannya antar titik analisis tetap sahih karena
+   * cara hitungnya sama persis.
+   */
+  const hitungCakupan = (): AnalisisTitik['cakupanIsokron'] => {
+    const luar = poligon[poligon.length - 1];
+    const RADIUS_UJI = 250;
+
+    // Tanpa poligon nyata, batasnya lingkaran radius dan hasilnya akan
+    // menyesatkan - lebih baik tidak melaporkan apa pun.
+    if (!luar) return null;
+
+    const lngs = luar.cincin.map((c) => c[0]);
+    const lats = luar.cincin.map((c) => c[1]);
+    const langkahLat = 150 / 111320;
+    const langkahLng = langkahLat / Math.cos((latitude * Math.PI) / 180);
+
+    let petakTotal = 0;
+    let petakBerdata = 0;
+
+    for (let la = Math.min(...lats); la <= Math.max(...lats); la += langkahLat) {
+      for (let ln = Math.min(...lngs); ln <= Math.max(...lngs); ln += langkahLng) {
+        if (!didalamPoligon(la, ln, luar.cincin)) continue;
+        petakTotal++;
+
+        const ada = semua.some(
+          (l) =>
+            typeof l.latitude === 'number' &&
+            jarakMeter(la, ln, l.latitude, l.longitude) <= RADIUS_UJI
+        );
+        if (ada) petakBerdata++;
+      }
+    }
+
+    if (petakTotal === 0) return null;
+
+    return {
+      persen: parseFloat(((petakBerdata / petakTotal) * 100).toFixed(1)),
+      petakBerdata,
+      petakTotal,
+      radiusUjiMeter: RADIUS_UJI,
+    };
+  };
+
+  const cakupanIsokron = hitungCakupan();
+
   const namaWilayah = await namaiKoordinat(latitude, longitude);
 
   const hasil: AnalisisTitik = {
@@ -306,10 +371,17 @@ export async function analisisTitik(
       didalam: didalam.length,
       diluar: berjarak.filter((x) => x.menit === null && x.jarak <= radiusTerbesar).length,
     },
+    cakupanIsokron,
     wawasan: null,
   };
 
-  hasil.wawasan = await susunWawasan(hasil);
+  // Dilewati saat titik ini hanya dipakai sebagai bahan perbandingan: di sana
+  // yang dibutuhkan satu putusan atas KEDUANYA, bukan dua uraian terpisah yang
+  // masing-masing tidak tahu ada pembandingnya.
+  if (opsi?.wawasan !== false) {
+    hasil.wawasan = await susunWawasan(hasil);
+  }
+
   return hasil;
 }
 
@@ -348,6 +420,9 @@ async function susunWawasan(a: AnalisisTitik) {
     '',
     'Titik terdekat untuk tiap kebutuhan:',
     barisTerdekat,
+    a.cakupanIsokron
+      ? `\nCakupan survei di dalam jangkauan: ${a.cakupanIsokron.persen}% wilayahnya punya titik survei dalam ${a.cakupanIsokron.radiusUjiMeter} meter. Bila angka ini rendah, katakan bahwa sebagian besar jangkauan ini belum pernah didatangi surveyor.`
+      : '',
   ].join('\n');
 
   try {
@@ -372,3 +447,153 @@ async function susunWawasan(a: AnalisisTitik) {
   }
 }
 
+
+/* ========================================================================== */
+/* PEMBANDINGAN DUA TITIK                                                     */
+/* ========================================================================== */
+
+const SKEMA_BANDING = {
+  name: 'putusan_banding',
+  strict: true,
+  schema: {
+    type: 'object',
+    properties: {
+      unggul: {
+        type: 'string',
+        enum: ['A', 'B', 'SEIMBANG'],
+        description:
+          'Titik mana yang lebih baik untuk penyandang disabilitas. SEIMBANG bila selisihnya tidak berarti atau datanya terlalu tipis untuk memutuskan.',
+      },
+      ringkasan: {
+        type: 'string',
+        description:
+          'Dua sampai empat kalimat: mana yang dipilih dan mengapa, dengan angka. Bila SEIMBANG, katakan apa yang membuatnya tidak bisa diputuskan.',
+      },
+      alasan: {
+        type: 'array',
+        description: 'Dua sampai empat perbandingan pendek, masing-masing menyebut kedua titik.',
+        items: { type: 'string' },
+      },
+      catatan: {
+        type: 'string',
+        description:
+          'Satu kalimat tentang batas kesimpulan ini: berapa titik survei yang mendasari masing-masing, dan berapa cakupan datanya.',
+      },
+    },
+    required: ['unggul', 'ringkasan', 'alasan', 'catatan'],
+    additionalProperties: false,
+  },
+} as const;
+
+const ATURAN_BANDING = `
+Anda membandingkan dua calon lokasi memakai data survei aksesibilitas DifaMap
+di Kota Makassar dan Kabupaten Gowa.
+
+ATURAN YANG TIDAK BOLEH DILANGGAR
+
+1. Hanya pakai angka dan nama yang diberikan.
+
+2. Cakupan survei menentukan seberapa jauh kesimpulan boleh melangkah. Titik
+   dengan skor bagus dari dua pengamatan TIDAK otomatis mengalahkan titik
+   berskor sedang dari dua belas pengamatan - sebutkan ketimpangan itu, dan
+   pilih SEIMBANG bila memang belum bisa diputuskan.
+
+3. Yang menentukan bukan hanya skor rata-rata, melainkan apa yang benar-benar
+   terjangkau. Titik yang punya halte layak dalam sepuluh menit lebih berguna
+   daripada titik berskor sedikit lebih tinggi tetapi terkurung tanpa transit.
+
+4. Bahasa Indonesia, lugas. Sebut titiknya "Titik A" dan "Titik B", dan
+   sertakan nama daerahnya bila ada.
+`.trim();
+
+export interface PutusanBanding {
+  unggul: 'A' | 'B' | 'SEIMBANG';
+  ringkasan: string;
+  alasan: string[];
+  catatan: string;
+}
+
+export interface HasilBanding {
+  a: AnalisisTitik;
+  b: AnalisisTitik;
+  putusan: PutusanBanding | null;
+}
+
+/** Merangkum satu titik menjadi beberapa baris untuk bahan perbandingan. */
+function ringkasUntukBanding(label: string, a: AnalisisTitik): string {
+  const pita = a.pita
+    .map((q) => `    ${q.menit} menit: ${q.jumlahTitik} titik, skor rata-rata ${q.skorRata ?? 'belum ada'}${q.luasKm2 != null ? `, luas ${q.luasKm2.toFixed(2)} km2` : ''}`)
+    .join('\n');
+
+  const terdekat = a.terdekat
+    .map((t) =>
+      t.nama === null
+        ? `    ${t.kebutuhan}: tidak ada di seluruh data survei`
+        : `    ${t.kebutuhan}: ${t.nama} (skor ${t.skor ?? '-'}), ${t.jarakMeter} m, ${
+            t.didalamJangkauan ? 'DI DALAM jangkauan' : 'DI LUAR jangkauan'
+          }`
+    )
+    .join('\n');
+
+  return [
+    `Titik ${label}${a.namaWilayah ? ` - daerah ${a.namaWilayah}` : ''}, koordinat ${a.koordinat.latitude.toFixed(5)},${a.koordinat.longitude.toFixed(5)}`,
+    `  Jangkauan${a.isokronNyata ? ' (jaringan jalan)' : ' (lingkaran radius, layanan isokron tidak tersedia)'}:`,
+    pita,
+    `  Terdekat per kebutuhan:`,
+    terdekat,
+    a.cakupanIsokron
+      ? `  Cakupan survei di dalam jangkauan: ${a.cakupanIsokron.persen}% wilayahnya punya titik survei terdekat dalam ${a.cakupanIsokron.radiusUjiMeter} m.`
+      : `  Cakupan survei di dalam jangkauan: tidak dapat dihitung.`,
+  ].join('\n');
+}
+
+/**
+ * Menganalisis dua titik lalu memutuskan mana yang lebih layak.
+ *
+ * Uraian per titik sengaja dilewati - yang dibutuhkan satu putusan atas
+ * KEDUANYA, bukan dua paragraf terpisah yang masing-masing tidak tahu ada
+ * pembandingnya. Itu juga menghemat satu panggilan model dari tiga menjadi satu.
+ */
+export async function bandingkanTitik(
+  a: { latitude: number; longitude: number },
+  b: { latitude: number; longitude: number },
+  moda: ModaJalan = 'wheelchair',
+  menitPita: number[] = [5, 10, 15]
+): Promise<HasilBanding> {
+  const [hasilA, hasilB] = await Promise.all([
+    analisisTitik(a.latitude, a.longitude, moda, menitPita, { wawasan: false }),
+    analisisTitik(b.latitude, b.longitude, moda, menitPita, { wawasan: false }),
+  ]);
+
+  const pesan = [
+    `Moda: ${moda === 'walking' ? 'jalan kaki' : 'kursi roda'}.`,
+    '',
+    ringkasUntukBanding('A', hasilA),
+    '',
+    ringkasUntukBanding('B', hasilB),
+  ].join('\n');
+
+  let putusan: PutusanBanding | null = null;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      response_format: { type: 'json_schema', json_schema: SKEMA_BANDING as any },
+      messages: [
+        { role: 'system', content: ATURAN_BANDING },
+        { role: 'user', content: pesan },
+      ],
+      temperature: 0.3,
+      max_tokens: 900,
+    });
+
+    catatPemakaian('banding-titik', response.usage);
+
+    const isi = response.choices[0]?.message?.content;
+    if (isi) putusan = JSON.parse(isi) as PutusanBanding;
+  } catch (err: any) {
+    console.warn('[titik] putusan banding gagal disusun:', err.message);
+  }
+
+  return { a: hasilA, b: hasilB, putusan };
+}

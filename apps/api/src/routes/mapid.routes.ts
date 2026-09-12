@@ -9,6 +9,7 @@ import {
   getSiniGridPriorityController,
   getSiniGridInsightController,
   getSiteInsightController,
+  getSiteCompareController,
   genericMapIdProxyController,
 } from '../controllers/mapid.controller.js';
 import {
@@ -41,6 +42,7 @@ router.post('/analysis/elevation-slope', getElevationSlopeController);
 router.get('/analysis/sini-grid', getSiniGridPriorityController);
 router.get('/analysis/sini-grid/wawasan', getSiniGridInsightController);
 router.get('/analysis/site-insight', getSiteInsightController);
+router.get('/analysis/site-compare', getSiteCompareController);
 
 // 8. MAPID Competition API - Community Maps (data survei aksesibilitas)
 router.post('/competition/activities', getCompetitionActivitiesController);

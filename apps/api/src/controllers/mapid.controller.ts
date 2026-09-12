@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { mapIdService } from '../services/mapid.service.js';
 import { hitungIsokron } from '../services/rute.service.js';
 import { susunWawasanGrid } from '../services/gridInsight.service.js';
-import { analisisTitik } from '../services/siteInsight.service.js';
+import { analisisTitik, bandingkanTitik } from '../services/siteInsight.service.js';
 import type { ModaPenilaian } from '../services/mapid.service.js';
 
 export async function getMapStyleController(req: Request, res: Response): Promise<void> {
@@ -212,6 +212,40 @@ export async function getSiteInsightController(req: Request, res: Response): Pro
     res.json({ success: true, data: hasil });
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to analyse site', message: error.message });
+  }
+}
+
+/**
+ * Membandingkan dua calon lokasi berdampingan.
+ */
+export async function getSiteCompareController(req: Request, res: Response): Promise<void> {
+  try {
+    const latA = parseFloat(req.query.latA as string);
+    const lngA = parseFloat(req.query.lngA as string);
+    const latB = parseFloat(req.query.latB as string);
+    const lngB = parseFloat(req.query.lngB as string);
+
+    if ([latA, lngA, latB, lngB].some((n) => isNaN(n))) {
+      res.status(400).json({ error: 'Parameter latA, lngA, latB, dan lngB wajib diisi angka.' });
+      return;
+    }
+
+    const moda = req.query.mode === 'walking' ? 'walking' : 'wheelchair';
+    const menit = String(req.query.intervals ?? '5,10,15')
+      .split(',')
+      .map((n) => parseInt(n.trim(), 10))
+      .filter((n) => !isNaN(n) && n > 0 && n <= 60);
+
+    const hasil = await bandingkanTitik(
+      { latitude: latA, longitude: lngA },
+      { latitude: latB, longitude: lngB },
+      moda,
+      menit.length > 0 ? menit : [5, 10, 15]
+    );
+
+    res.json({ success: true, data: hasil });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to compare sites', message: error.message });
   }
 }
 
