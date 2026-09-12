@@ -477,7 +477,7 @@ export default function PanelTempat({ poi, onClose, onRadiusChange }: Props) {
                   href={f.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ flexShrink: 0, width: '112px', textDecoration: 'none' }}
+                  style={{ flexShrink: 0, width: '132px', textDecoration: 'none' }}
                   title={`Buka ${f.label} ukuran penuh`}
                 >
                   <img
@@ -485,8 +485,8 @@ export default function PanelTempat({ poi, onClose, onRadiusChange }: Props) {
                     alt={f.label}
                     loading="lazy"
                     style={{
-                      width: '112px',
-                      height: '84px',
+                      width: '132px',
+                      height: '99px',
                       objectFit: 'cover',
                       borderRadius: '8px',
                       border: '1px solid #E2E8F0',
@@ -532,6 +532,21 @@ export default function PanelTempat({ poi, onClose, onRadiusChange }: Props) {
             Dari survei lapangan tim lewat aplikasi MAPID. Parameter disabilitas di
             bawah TIDAK berasal dari titik ini - melainkan dihitung dari titik survei
             DifaMap di sekitarnya.
+          </div>
+        </div>
+      )}
+
+      {/* Judul bagian kedua.
+          Tanpa pembatas, pemilih radius terbaca seperti lanjutan hasil survei -
+          padahal seluruh angka di bawahnya bukan tentang tempat ini, melainkan
+          tentang trotoar dan halte di sekelilingnya. */}
+      {poi.survei && (poi.survei.rincian.length > 0 || poi.survei.foto.length > 0) && (
+        <div style={{ marginBottom: '8px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 800, color: '#0F172A' }}>
+            Aksesibilitas di Sekitarnya
+          </div>
+          <div style={{ fontSize: '10.5px', color: '#94A3B8', lineHeight: '15px', marginTop: '2px' }}>
+            Dihitung dari titik survei DifaMap dalam radius terpilih, bukan dari tempat ini sendiri.
           </div>
         </div>
       )}

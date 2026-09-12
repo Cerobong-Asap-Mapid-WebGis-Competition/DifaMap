@@ -11,6 +11,7 @@ import AiChatbotDrawer from '../components/chatbot/AiChatbotDrawer';
 import InfoModal from '../components/modals/InfoModal';
 import { useLocations, useActivities } from '../hooks/useDifaMap';
 import { saringLokasi } from '../data/filterParameter';
+import { bacaSurveiEkonomi, cariTitikEkonomi } from '../data/surveiEkonomi';
 import type { RuteDigambar } from '../data/rute';
 import { difaMapApi } from '../lib/api';
 import { useIsMobile } from '../hooks/useIsMobile';
@@ -179,6 +180,27 @@ export default function HomePage() {
       setAnalysisTarget(null);
     }
   }, [sidebarMode]);
+
+  /**
+   * POI yang sedang dibuka, dilengkapi hasil survei bila titiknya memang titik
+   * ekonomi kami.
+   *
+   * Panel POI bisa terbuka lewat dua jalan: menekan pin Properti Go / Menu Go,
+   * atau menekan label basemap MAPID yang kebetulan menempati bangunan yang
+   * sama. Jalan pertama membawa data surveinya, jalan kedua tidak - sehingga
+   * foto menu Kedai Lawas muncul atau hilang tergantung piksel mana yang
+   * kebetulan tertekan. Dicocokkan ulang di sini supaya jalannya tidak lagi
+   * menentukan isinya.
+   */
+  const poiDenganSurvei = useMemo(() => {
+    if (selectedItem?.type !== 'POI') return null;
+
+    const data = selectedItem.data;
+    if (data?.survei) return data;
+
+    const eko = cariTitikEkonomi(data, economicPoints);
+    return eko ? { ...data, survei: bacaSurveiEkonomi(eko) } : data;
+  }, [selectedItem, economicPoints]);
 
   // Handlers for Map Marker Interactions
   const handleSelectActivity = (activity: any) => {
@@ -633,7 +655,7 @@ export default function HomePage() {
           bukan baris di basis data DifaMap. */}
       {selectedItem?.type === 'POI' && (
         <PanelTempat
-          poi={selectedItem.data}
+          poi={poiDenganSurvei}
           onClose={() => setSelectedItem(null)}
           onRadiusChange={setRadiusTempat}
         />

@@ -10,6 +10,7 @@ import { MapPin, Layers } from 'lucide-react';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { susunTempat } from '../../data/tempatPilihan';
 import type { PoiTerpilih } from '../drawer/PanelTempat';
+import { bacaSurveiEkonomi } from '../../data/surveiEkonomi';
 import type { RuteDigambar } from '../../data/rute';
 
 export type MapDisplayMode = 'HALTE' | 'TEMPAT' | 'URBAN_PLANNER' | 'NONE';
@@ -146,55 +147,6 @@ export default function MapCanvas({
 
   const onMapClickRef = useRef(onMapClick);
   onMapClickRef.current = onMapClick;
-
-  /**
-   * Menyusun hasil survei MAPID sebuah titik ekonomi menjadi rincian dan foto.
-   *
-   * Nama kolomnya mengikuti formulir survei MAPID apa adanya - foto_menu_1,
-   * kondisi_tempat, foto_tampak_depan - dan hanya yang benar-benar terisi yang
-   * ditampilkan. Empat dari sebelas titik Menu Go dan tujuh dari sepuluh titik
-   * Properti Go punya metadata; sisanya hanya koordinat bernama, dan panelnya
-   * akan menampilkan bagian ini kosong alih-alih mengarang isinya.
-   */
-  const bacaSurvei = (pt: any) => {
-    const m = (pt?.metadata ?? {}) as Record<string, any>;
-    const teks = (nilai: any) => String(nilai ?? '').trim();
-
-    const KOLOM_RINCIAN: Array<[string, string]> = [
-      ['nama_tempat', 'Nama tempat'],
-      ['jenis_tempat', 'Jenis tempat'],
-      ['menu_utama', 'Menu utama'],
-      ['harga_rata_rata', 'Harga rata-rata'],
-      ['kondisi_tempat', 'Kondisi saat disurvei'],
-      ['mobilitas', 'Mobilitas'],
-      ['kategori_properti', 'Kategori properti'],
-      ['jenis_properti', 'Status properti'],
-      ['alamat', 'Alamat'],
-    ];
-
-    const KOLOM_FOTO: Array<[string, string]> = [
-      ['foto_tempat', 'Tampak tempat'],
-      ['foto_menu_1', 'Menu 1'],
-      ['foto_menu_2', 'Menu 2'],
-      ['foto_tampak_depan', 'Tampak depan'],
-      ['foto_spanduk', 'Spanduk'],
-    ];
-
-    const rincian = KOLOM_RINCIAN.filter(([k]) => teks(m[k]).length > 0).map(([k, label]) => ({
-      label,
-      nilai:
-        k === 'harga_rata_rata'
-          ? `Rp${Number(m[k]).toLocaleString('id-ID')}`
-          : teks(m[k]),
-    }));
-
-    const foto = KOLOM_FOTO.filter(([k]) => /^https?:\/\//.test(teks(m[k]))).map(([k, label]) => ({
-      label,
-      url: teks(m[k]),
-    }));
-
-    return { jenis: pt?.type ?? 'COMMERCIAL', rincian, foto };
-  };
 
   const onSelectPoiRef = useRef(onSelectPoi);
   onSelectPoiRef.current = onSelectPoi;
@@ -1618,7 +1570,7 @@ export default function MapCanvas({
               latitude: pt.latitude,
               longitude: pt.longitude,
               kunci: `eko:${pt.id}`,
-              survei: bacaSurvei(pt),
+              survei: bacaSurveiEkonomi(pt),
             });
           }
           mapRef.current?.flyTo({
