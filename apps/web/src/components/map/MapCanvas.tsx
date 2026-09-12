@@ -587,10 +587,34 @@ export default function MapCanvas({
      * menggelembung. Memeriksa asal elemennya jauh lebih pasti daripada
      * menebak urutan peristiwa.
      */
-    const dariPenanda = (ev: any): boolean => {
-      const sasaran = ev?.originalEvent?.target;
-      return Boolean(sasaran?.closest?.('.maplibregl-marker'));
+    const didalamPenanda = (sasaran: any): boolean =>
+      Boolean(sasaran?.closest?.('.maplibregl-marker'));
+
+    /**
+     * Asal sentuhan dicatat pada mousedown, bukan pada click.
+     *
+     * Memeriksanya saat click saja tidak cukup, dan kegagalannya halus: klik
+     * pada penanda memperbarui state React, React menggambar ulang penandanya -
+     * kadang menghapusnya sama sekali - lalu MapLibre baru mengirim peristiwa
+     * click. Pada saat itu elemen sasarannya sudah lepas dari DOM, closest()
+     * mengembalikan null, dan peta menganggap kliknya datang dari kanvas kosong.
+     *
+     * Akibatnya kasat mata: panel Kedai Lawas terbuka dengan foto menunya, lalu
+     * seketika berganti menjadi panel POI basemap tanpa hasil survei. Pada
+     * mousedown, elemennya dijamin masih menempel.
+     */
+    let mulaiDariPenanda = false;
+    const wadah = map.getCanvasContainer();
+
+    const catatAsal = (ev: any) => {
+      mulaiDariPenanda = didalamPenanda(ev?.target);
     };
+
+    wadah.addEventListener('mousedown', catatAsal, true);
+    wadah.addEventListener('touchstart', catatAsal, true);
+
+    const dariPenanda = (ev: any): boolean =>
+      mulaiDariPenanda || didalamPenanda(ev?.originalEvent?.target);
 
     map.on('click', (e: any) => {
       if (dariPenanda(e)) return;
@@ -631,6 +655,8 @@ export default function MapCanvas({
 
     return () => {
       clearTimeout(timeoutId);
+      wadah.removeEventListener('mousedown', catatAsal, true);
+      wadah.removeEventListener('touchstart', catatAsal, true);
       map.remove();
       mapRef.current = null;
     };
