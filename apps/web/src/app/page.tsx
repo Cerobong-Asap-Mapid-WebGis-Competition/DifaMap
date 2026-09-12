@@ -75,6 +75,9 @@ export default function HomePage() {
   const [pickedCoordinate, setPickedCoordinate] = useState<{ latitude: number; longitude: number } | null>(null);
   const [analysisTarget, setAnalysisTarget] = useState<{ lat: number; lng: number; name?: string } | null>(null);
   const [compareTarget, setCompareTarget] = useState<{ lat: number; lng: number } | null>(null);
+  const [isochronePembanding, setIsochronePembanding] = useState<any>(null);
+  /** Koordinat titik yang sedang dianalisis, untuk ditandai sebagai "A". */
+  const [titikAnalisisAktif, setTitikAnalisisAktif] = useState<{ latitude: number; longitude: number } | null>(null);
 
   // 6. Lapisan Site Selection & Site Analysis Difa AI
   const [isSiniGridVisible, setIsSiniGridVisible] = useState(false);
@@ -269,6 +272,35 @@ export default function HomePage() {
       console.error('Failed to get isochrone:', err);
     }
   };
+
+  /**
+   * Isokron titik pembanding diambil terpisah.
+   *
+   * Endpoint perbandingan hanya mengembalikan angkanya, bukan poligonnya -
+   * cukup untuk tabel, tetapi peta perlu bentuknya. Kalau panggilan ini gagal,
+   * yang hilang hanya bayangan jangkauan B; penandanya tetap tergambar.
+   */
+  useEffect(() => {
+    if (!compareTarget) {
+      setIsochronePembanding(null);
+      return;
+    }
+
+    let batal = false;
+
+    difaMapApi
+      .getIsochrone(compareTarget.lat, compareTarget.lng, [5, 10, 15], 'wheelchair')
+      .then((res) => {
+        if (!batal) setIsochronePembanding(res?.data ?? null);
+      })
+      .catch(() => {
+        if (!batal) setIsochronePembanding(null);
+      });
+
+    return () => {
+      batal = true;
+    };
+  }, [compareTarget]);
 
   // Global ESC key handler: navigasi ke langkah/halaman sebelumnya & menutup popup/drawer yang sedang aktif
   useEffect(() => {
@@ -565,6 +597,15 @@ export default function HomePage() {
         siniGridModa={siniGridModa}
         selSorotan={selSorotan}
         isochroneGeoJSON={isochroneGeoJSON}
+        isochronePembanding={isochronePembanding}
+        titikBanding={
+          compareTarget
+            ? {
+                a: titikAnalisisAktif,
+                b: { latitude: compareTarget.lat, longitude: compareTarget.lng },
+              }
+            : null
+        }
         titikFokus={
           selectedItem?.type === 'POI'
             ? {
@@ -628,6 +669,8 @@ export default function HomePage() {
         onClearAnalysis={() => {
           setIsochroneGeoJSON(null);
           setAnalysisTarget(null);
+          setCompareTarget(null);
+          setTitikAnalisisAktif(null);
         }}
         onSelectLocation={(lokasi) => {
           setIsAiChatOpen(false);
@@ -646,6 +689,7 @@ export default function HomePage() {
           setIsAiChatOpen(false);
         }}
         onClearCompare={() => setCompareTarget(null)}
+        onTitikAnalisis={setTitikAnalisisAktif}
       />
 
       {/* 6. Create Activity / Report Modal (Community Crowdsource) */}

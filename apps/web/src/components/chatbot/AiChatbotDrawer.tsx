@@ -197,6 +197,8 @@ interface AiChatbotDrawerProps {
   compareTarget?: { lat: number; lng: number } | null;
   onSelectCoordinateForCompare?: () => void;
   onClearCompare?: () => void;
+  /** Meneruskan koordinat titik yang sedang dianalisis, untuk ditandai di peta. */
+  onTitikAnalisis?: (koordinat: { latitude: number; longitude: number } | null) => void;
 }
 
 export default function AiChatbotDrawer({
@@ -216,6 +218,7 @@ export default function AiChatbotDrawer({
   compareTarget,
   onSelectCoordinateForCompare,
   onClearCompare,
+  onTitikAnalisis,
 }: AiChatbotDrawerProps) {
   const isMobile = useIsMobile(768);
   // Sidebar menentukan ISI panel; di dalam panel Urban Planner, dua alatnya
@@ -518,7 +521,10 @@ export default function AiChatbotDrawer({
       onClearCompare?.();
       const janjiTitik = difaMapApi
         .getSiteInsight(lat, lng, isochroneMode, [5, 10, isochroneMinutes > 10 ? isochroneMinutes : 15])
-        .then((r) => setAnalisisTitik(r?.data ?? null))
+        .then((r) => {
+          setAnalisisTitik(r?.data ?? null);
+          onTitikAnalisis?.(r?.data?.koordinat ?? null);
+        })
         .catch(() => setAnalisisTitik(null));
 
       void janjiTitik;
@@ -1609,9 +1615,11 @@ export default function AiChatbotDrawer({
                                 <tr style={{ color: '#64748B', textAlign: 'left' }}>
                                   <th style={{ padding: '4px 6px 4px 0', fontWeight: 700 }}>&nbsp;</th>
                                   <th style={{ padding: '4px 6px', fontWeight: 700, color: banding.putusan?.unggul === 'A' ? '#15803D' : '#64748B' }}>
+                                    <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#0F766E', marginRight: '4px' }} />
                                     A {banding.putusan?.unggul === 'A' && '\u2713'}
                                   </th>
                                   <th style={{ padding: '4px 0 4px 6px', fontWeight: 700, color: banding.putusan?.unggul === 'B' ? '#15803D' : '#64748B' }}>
+                                    <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#6D28D9', marginRight: '4px' }} />
                                     B {banding.putusan?.unggul === 'B' && '\u2713'}
                                   </th>
                                 </tr>

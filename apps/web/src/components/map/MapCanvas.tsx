@@ -36,6 +36,16 @@ interface MapCanvasProps {
    */
   selSorotan?: string | null;
   isochroneGeoJSON?: any;
+  /** Isokron titik pembanding, digambar berdampingan dengan warna lain. */
+  isochronePembanding?: any;
+  /**
+   * Kedua titik yang sedang dibandingkan.
+   *
+   * Tanpa penanda, tabel perbandingan menyebut "Titik B unggul" sementara di
+   * peta tidak ada apa pun yang menunjukkan B itu di mana - dan bahkan titik A
+   * pun hanya tersirat dari pusat cincin isokronnya.
+   */
+  titikBanding?: { a?: { latitude: number; longitude: number } | null; b?: { latitude: number; longitude: number } | null } | null;
   /**
    * Dipanggil saat pengguna mengklik label POI milik basemap MAPID - misalnya
    * "Trans Studio Mall". POI ini berasal dari tile MAPID, bukan dari basis data
@@ -93,6 +103,8 @@ export default function MapCanvas({
   siniGridModa = 'AKSESIBILITAS',
   selSorotan = null,
   isochroneGeoJSON = null,
+  isochronePembanding = null,
+  titikBanding = null,
   titikFokus = null,
   radiusTempat = 500,
   rute = null,
@@ -378,6 +390,38 @@ export default function MapCanvas({
           'line-color': '#539BA9',
           'line-width': 2,
         },
+      });
+    }
+
+    // Isokron titik pembanding. Warnanya ungu, jauh dari teal milik titik A,
+    // supaya keduanya tidak pernah tertukar walau saling bertumpang tindih.
+    if (!map.getSource('isokron-banding-source')) {
+      map.addSource('isokron-banding-source', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      map.addLayer({
+        id: 'isokron-banding-fill',
+        type: 'fill',
+        source: 'isokron-banding-source',
+        paint: {
+          'fill-color': [
+            'case',
+            ['<=', ['coalesce', ['get', 'menit'], ['get', 'minutes'], 99], 5],
+            'rgba(109, 40, 217, 0.38)',
+            ['<=', ['coalesce', ['get', 'menit'], ['get', 'minutes'], 99], 10],
+            'rgba(139, 92, 246, 0.26)',
+            'rgba(196, 181, 253, 0.20)',
+          ],
+        },
+      });
+
+      map.addLayer({
+        id: 'isokron-banding-line',
+        type: 'line',
+        source: 'isokron-banding-source',
+        paint: { 'line-color': '#6D28D9', 'line-width': 2, 'line-dasharray': [2, 1.4] },
       });
     }
   }, []);
@@ -1352,6 +1396,41 @@ export default function MapCanvas({
     }
 
     // =========================================================================
+    // PENANDA TITIK A DAN B YANG SEDANG DIBANDINGKAN
+    //
+    // Tabel perbandingan menyimpulkan "Titik B unggul", tetapi tanpa penanda
+    // tidak ada apa pun di peta yang menunjukkan B itu di mana - dan titik A
+    // pun hanya tersirat dari pusat cincin isokronnya. Huruf dipakai, bukan
+    // warna saja, supaya tetap terbaca bagi pengguna buta warna.
+    // =========================================================================
+    if (titikBanding?.a || titikBanding?.b) {
+      const pasangan: Array<{ huruf: string; warna: string; titik?: { latitude: number; longitude: number } | null }> = [
+        { huruf: 'A', warna: '#0F766E', titik: titikBanding?.a },
+        { huruf: 'B', warna: '#6D28D9', titik: titikBanding?.b },
+      ];
+
+      pasangan.forEach(({ huruf, warna, titik }) => {
+        if (!titik || typeof titik.latitude !== 'number') return;
+
+        const el = document.createElement('div');
+        el.innerHTML = `
+          <div style="display:flex;flex-direction:column;align-items:center;pointer-events:none;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.4));">
+            <svg width="30" height="30" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="15" cy="15" r="13" fill="${warna}" stroke="#FFFFFF" stroke-width="3"/>
+              <text x="15" y="20.5" text-anchor="middle" font-size="15" font-weight="800" fill="#FFFFFF" font-family="system-ui, sans-serif">${huruf}</text>
+            </svg>
+          </div>
+        `;
+        el.title = `Titik ${huruf}`;
+
+        const m = new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([titik.longitude, titik.latitude])
+          .addTo(mapRef.current!);
+        markersRef.current.push(m);
+      });
+    }
+
+    // =========================================================================
     // PENANDA TEMPAT YANG SEDANG DIBUKA
     //
     // Peta sudah mendekati titiknya, tetapi tanpa penanda pengguna harus menebak
@@ -1507,6 +1586,20 @@ export default function MapCanvas({
         isochroneSource.setData({ type: 'FeatureCollection', features: [] });
       }
     }
+
+    const sumberBanding = mapRef.current?.getSource('isokron-banding-source') as maplibregl.GeoJSONSource;
+    if (sumberBanding) {
+      if (isochronePembanding) {
+        const fitur = [...(isochronePembanding.features ?? [])].sort(
+          (a: any, b: any) =>
+            (b?.properties?.menit ?? b?.properties?.minutes ?? 0) -
+            (a?.properties?.menit ?? a?.properties?.minutes ?? 0)
+        );
+        sumberBanding.setData({ ...isochronePembanding, features: fitur } as any);
+      } else {
+        sumberBanding.setData({ type: 'FeatureCollection', features: [] });
+      }
+    }
   }, [
     // Pengelompokan tempat memakai queryRenderedFeatures, yang hanya mengenal
     // POI di layar saat ini. Tanpa ikut memantau pergeseran peta, pin induk
@@ -1530,6 +1623,11 @@ export default function MapCanvas({
     siniGridModa,
     selSorotan,
     isochroneGeoJSON,
+    isochronePembanding,
+    titikBanding?.a?.latitude,
+    titikBanding?.a?.longitude,
+    titikBanding?.b?.latitude,
+    titikBanding?.b?.longitude,
     isMapLoaded,
     onSelectActivity,
     onSelectLocation,
