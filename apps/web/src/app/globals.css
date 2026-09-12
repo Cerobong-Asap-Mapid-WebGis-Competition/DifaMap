@@ -345,20 +345,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   animation: difa-cincin 2.1s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
 }
 
-@keyframes difa-muncul {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.difa-muncul {
-  animation: difa-muncul 0.32s ease-out both;
-}
-
 /* Menghormati pengguna yang meminta gerak dikurangi - termasuk sebagian
    penyandang disabilitas vestibular, yang justru sasaran aplikasi ini. */
 @media (prefers-reduced-motion: reduce) {
   .difa-cincin,
-  .difa-muncul,
   .difa-denyut,
   .difa-geser,
   .difa-titik {

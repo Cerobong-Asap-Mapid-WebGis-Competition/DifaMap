@@ -1157,64 +1157,6 @@ export default function TopSearchBar({
               {sidebarMode === 'URBAN_PLANNER' ? 'Analisis' : isMobile ? 'Difa AI' : 'Tanya Difa AI'}
             </span>
           </button>
-
-          {/* Ajakan sekali pakai.
-              Tombol yang menonjol memberi tahu ada sesuatu di sini; kalimat ini
-              memberi tahu APA - dan tanpa itu, banyak yang menduganya sekadar
-              pencarian biasa. */}
-          {!sudahCobaAI && !isMobile && sidebarMode !== 'URBAN_PLANNER' && (
-            <div
-              className="difa-muncul"
-              style={{
-                position: 'absolute',
-                top: 'calc(100% + 10px)',
-                right: 0,
-                width: '246px',
-                backgroundColor: '#0F172A',
-                color: '#FFFFFF',
-                borderRadius: '12px',
-                padding: '11px 13px',
-                boxShadow: '0 10px 28px rgba(0,0,0,0.28)',
-                zIndex: 5,
-              }}
-            >
-              <div
-                aria-hidden
-                style={{
-                  position: 'absolute',
-                  top: '-5px',
-                  right: '26px',
-                  width: '10px',
-                  height: '10px',
-                  backgroundColor: '#0F172A',
-                  transform: 'rotate(45deg)',
-                }}
-              />
-              <div style={{ fontSize: '12.5px', fontWeight: 800, marginBottom: '3px' }}>
-                Baru: tanya langsung ke Difa AI
-              </div>
-              <div style={{ fontSize: '11.5px', lineHeight: '16px', color: '#CBD5E1' }}>
-                &quot;Rute kursi roda dari Pantai Losari ke Karebosi&quot; &mdash; dijawab dari
-                titik survei sungguhan, bukan tebakan.
-              </div>
-              <button
-                onClick={tandaiCobaAI}
-                style={{
-                  marginTop: '8px',
-                  border: 'none',
-                  background: 'rgba(255,255,255,0.12)',
-                  color: '#FFFFFF',
-                  borderRadius: '7px',
-                  padding: '4px 10px',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                }}
-              >
-                Mengerti
-              </button>
-            </div>
-          )}
         </div>
 
         {/* 4. Bagikan Laporan / Ulasan Button */}
