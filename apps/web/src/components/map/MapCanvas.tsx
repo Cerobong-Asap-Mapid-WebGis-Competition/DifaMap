@@ -751,14 +751,25 @@ export default function MapCanvas({
 
       mapRef.current.fitBounds(batas, {
         // Sisi kiri disisakan untuk panel tempat yang sedang terbuka; tanpa itu
-        // separuh lingkarannya mendarat di baliknya.
+        // separuh lingkarannya mendarat di baliknya. Ruang atas dilebihkan
+        // karena pada pandangan miring, tepi lingkaran yang jauh terdorong naik
+        // dan paling mudah terpotong.
         padding: isMobile
-          ? { top: 90, bottom: 320, left: 30, right: 30 }
-          : { top: 90, bottom: 60, left: 540, right: 80 },
-        // Dikembalikan datar: lingkaran yang dilihat miring bukan lagi lingkaran.
-        pitch: 0,
-        duration: 900,
-        maxZoom: 17,
+          ? { top: 150, bottom: 320, left: 30, right: 30 }
+          : { top: 170, bottom: 60, left: 540, right: 80 },
+        /**
+         * Miring, tetapi tidak securam titik survei.
+         *
+         * Empat puluh derajat, bukan lima puluh lima: di kemiringan penuh
+         * lingkaran radius menjadi elips yang terlalu pipih untuk dibaca sebagai
+         * jangkauan, padahal lingkaran itulah yang menjelaskan dari mana skor di
+         * panel berasal. Segini masih terbaca bulat sekaligus memberi kedalaman.
+         */
+        pitch: 40,
+        duration: 1100,
+        // Radius kecil boleh mendekat sampai bangunan tiga dimensinya ikut
+        // menyembul; radius besar tetap ditahan lebar oleh bingkainya sendiri.
+        maxZoom: 17.5,
       });
       return;
     }
