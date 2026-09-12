@@ -127,6 +127,29 @@ export const difaMapApi = {
   /**
    * Membuat postingan aktivitas baru (Bisa publik / guest)
    */
+  /**
+   * Mengunggah satu foto laporan, mengembalikan URL publiknya.
+   *
+   * Berkasnya dikirim sebagai badan mentah, bukan multipart: server membacanya
+   * dengan express.raw bawaan, sehingga tidak ada pustaka tambahan yang harus
+   * dipasang seluruh anggota tim.
+   */
+  async uploadFotoLaporan(berkas: File): Promise<string> {
+    const res = await fetch(`${API_BASE_URL}/api/uploads/foto`, {
+      method: 'POST',
+      headers: { 'Content-Type': berkas.type },
+      body: berkas,
+    });
+
+    const isi = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(isi.error || 'Foto gagal diunggah.');
+    }
+
+    return isi.data.url as string;
+  },
+
   async createActivity(payload: CreateActivityPayload, token?: string) {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',

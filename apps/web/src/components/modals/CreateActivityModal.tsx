@@ -35,6 +35,9 @@ export default function CreateActivityModal({
   const [description, setDescription] = useState('');
   const [specificLocation, setSpecificLocation] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [pratinjau, setPratinjau] = useState<string | null>(null);
+  const [sedangUnggah, setSedangUnggah] = useState(false);
+  const [galatFoto, setGalatFoto] = useState<string | null>(null);
   const [authorName, setAuthorName] = useState('');
   
   // Physical Observed Hints
@@ -81,6 +84,33 @@ export default function CreateActivityModal({
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
+
+  /**
+   * Memilih foto dari perangkat, lalu mengunggahnya saat itu juga.
+   *
+   * Diunggah seketika, bukan saat laporan dikirim: pelapor jadi tahu fotonya
+   * berhasil masuk sebelum menekan kirim, dan bila gagal ia masih di halaman
+   * yang sama dengan seluruh isian utuh. Mengunggah bersamaan dengan pengiriman
+   * berarti satu kegagalan jaringan menjatuhkan keduanya sekaligus.
+   */
+  const pilihFoto = async (berkas: File | null) => {
+    if (!berkas) return;
+
+    setGalatFoto(null);
+    setSedangUnggah(true);
+
+    try {
+      const url = await difaMapApi.uploadFotoLaporan(berkas);
+      setImageUrl(url);
+      setPratinjau(URL.createObjectURL(berkas));
+    } catch (err: any) {
+      setGalatFoto(err.message || 'Foto gagal diunggah.');
+      setImageUrl('');
+      setPratinjau(null);
+    } finally {
+      setSedangUnggah(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -354,31 +384,106 @@ export default function CreateActivityModal({
           {/* Photo URL */}
           <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#000000', marginBottom: '6px' }}>
-              URL Foto Dokumentasi Lapangan
+              Foto Dokumentasi Lapangan
             </label>
-            <input
-              type="url"
-              placeholder="https://... (boleh dikosongkan)"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              aria-describedby="catatan-foto"
-              style={{
-                width: '100%',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                border: '1px solid #CBD5E1',
-                fontSize: '14px',
-                outline: 'none',
-              }}
-            />
+
+            {/* Berkas, bukan tautan.
+                Pelapor di lapangan memegang foto di galeri ponselnya - untuk
+                mengisi kolom URL ia harus mengunggahnya dulu ke layanan lain,
+                menyalin tautannya, lalu kembali. Praktis tidak ada yang
+                melakukannya, dan laporan pun selalu datang tanpa foto. */}
+            {pratinjau ? (
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                <img
+                  src={pratinjau}
+                  alt="Pratinjau foto laporan"
+                  style={{
+                    width: '104px',
+                    height: '78px',
+                    objectFit: 'cover',
+                    borderRadius: '8px',
+                    border: '1px solid #E2E8F0',
+                    flexShrink: 0,
+                  }}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#15803D' }}>
+                    Foto berhasil diunggah
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px', lineHeight: '15px' }}>
+                    Difa AI akan ikut melihat foto ini saat menilai.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImageUrl('');
+                      setPratinjau(null);
+                      setGalatFoto(null);
+                    }}
+                    style={{
+                      marginTop: '6px',
+                      border: '1px solid #CBD5E1',
+                      background: '#FFFFFF',
+                      borderRadius: '6px',
+                      padding: '4px 10px',
+                      fontSize: '11.5px',
+                      fontWeight: 700,
+                      color: '#334155',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Ganti foto
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '18px 14px',
+                  borderRadius: '10px',
+                  border: '1px dashed #CBD5E1',
+                  backgroundColor: sedangUnggah ? '#F8FAFC' : '#FFFFFF',
+                  cursor: sedangUnggah ? 'wait' : 'pointer',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  color: '#475569',
+                }}
+              >
+                <Camera size={17} />
+                <span>{sedangUnggah ? 'Mengunggah foto...' : 'Pilih foto dari perangkat'}</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  disabled={sedangUnggah}
+                  onChange={(e) => {
+                    pilihFoto(e.target.files?.[0] ?? null);
+                    // Dikosongkan supaya memilih berkas yang sama dua kali
+                    // tetap memicu perubahan - tanpa ini, mencoba ulang setelah
+                    // gagal tidak melakukan apa-apa sama sekali.
+                    e.target.value = '';
+                  }}
+                  style={{ display: 'none' }}
+                />
+              </label>
+            )}
+
+            {galatFoto && (
+              <div role="alert" style={{ fontSize: '11.5px', color: '#B91C1C', marginTop: '6px' }}>
+                {galatFoto} Laporan tetap bisa dikirim tanpa foto.
+              </div>
+            )}
             {/* Konsekuensinya disebutkan, bukan sekadar "boleh dikosongkan".
                 Difa AI menilai dengan MELIHAT fotonya; tanpa foto ia hanya
                 punya deskripsi dan isian parameter, dan penilaiannya wajar
                 saja lebih ragu. Pelapor berhak tahu itu sebelum memutuskan. */}
-            <div id="catatan-foto" style={{ fontSize: '11px', color: '#64748B', marginTop: '5px', lineHeight: '16px' }}>
-              Boleh dikosongkan. Bila diisi, Difa AI ikut melihat fotonya untuk menilai
-              kondisi lapangan - tanpa foto, penilaian hanya bersandar pada deskripsi
-              dan isian parameter di bawah.
+            <div id="catatan-foto" style={{ fontSize: '11px', color: '#64748B', marginTop: '6px', lineHeight: '16px' }}>
+              Boleh dikosongkan. JPG, PNG, atau WebP, maksimal 5 MB. Bila diisi, Difa AI
+              ikut melihat fotonya untuk menilai kondisi lapangan - tanpa foto, penilaian
+              hanya bersandar pada deskripsi dan isian parameter di bawah.
             </div>
           </div>
 
