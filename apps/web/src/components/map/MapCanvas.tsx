@@ -9,6 +9,7 @@ import { UrbanPlannerFilter, PublicSubMode } from '../layout/TopSearchBar';
 import { MapPin, Layers } from 'lucide-react';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { susunTempat } from '../../data/tempatPilihan';
+import type { PoiTerpilih } from '../drawer/PanelTempat';
 import type { RuteDigambar } from '../../data/rute';
 
 export type MapDisplayMode = 'HALTE' | 'TEMPAT' | 'URBAN_PLANNER' | 'NONE';
@@ -79,7 +80,12 @@ interface MapCanvasProps {
   rute?: RuteDigambar | null;
   /** Menutup jalur rute yang sedang tergambar. */
   onTutupRute?: () => void;
-  onSelectPoi?: (poi: { nama: string; kategori?: string; latitude: number; longitude: number }) => void;
+  /**
+   * Titik di luar basis data DifaMap - POI basemap MAPID, titik yang ditunjuk
+   * manual, dan titik ekonomi Properti Go / Menu Go. Bentuknya mengikuti
+   * PanelTempat supaya hasil survei MAPID ikut terbawa utuh.
+   */
+  onSelectPoi?: (poi: PoiTerpilih) => void;
   onSelectLocation?: (location: any) => void;
   onSelectActivity?: (activity: any) => void;
   onPickCoordinate?: (coord: { latitude: number; longitude: number }) => void;
@@ -140,6 +146,55 @@ export default function MapCanvas({
 
   const onMapClickRef = useRef(onMapClick);
   onMapClickRef.current = onMapClick;
+
+  /**
+   * Menyusun hasil survei MAPID sebuah titik ekonomi menjadi rincian dan foto.
+   *
+   * Nama kolomnya mengikuti formulir survei MAPID apa adanya - foto_menu_1,
+   * kondisi_tempat, foto_tampak_depan - dan hanya yang benar-benar terisi yang
+   * ditampilkan. Empat dari sebelas titik Menu Go dan tujuh dari sepuluh titik
+   * Properti Go punya metadata; sisanya hanya koordinat bernama, dan panelnya
+   * akan menampilkan bagian ini kosong alih-alih mengarang isinya.
+   */
+  const bacaSurvei = (pt: any) => {
+    const m = (pt?.metadata ?? {}) as Record<string, any>;
+    const teks = (nilai: any) => String(nilai ?? '').trim();
+
+    const KOLOM_RINCIAN: Array<[string, string]> = [
+      ['nama_tempat', 'Nama tempat'],
+      ['jenis_tempat', 'Jenis tempat'],
+      ['menu_utama', 'Menu utama'],
+      ['harga_rata_rata', 'Harga rata-rata'],
+      ['kondisi_tempat', 'Kondisi saat disurvei'],
+      ['mobilitas', 'Mobilitas'],
+      ['kategori_properti', 'Kategori properti'],
+      ['jenis_properti', 'Status properti'],
+      ['alamat', 'Alamat'],
+    ];
+
+    const KOLOM_FOTO: Array<[string, string]> = [
+      ['foto_tempat', 'Tampak tempat'],
+      ['foto_menu_1', 'Menu 1'],
+      ['foto_menu_2', 'Menu 2'],
+      ['foto_tampak_depan', 'Tampak depan'],
+      ['foto_spanduk', 'Spanduk'],
+    ];
+
+    const rincian = KOLOM_RINCIAN.filter(([k]) => teks(m[k]).length > 0).map(([k, label]) => ({
+      label,
+      nilai:
+        k === 'harga_rata_rata'
+          ? `Rp${Number(m[k]).toLocaleString('id-ID')}`
+          : teks(m[k]),
+    }));
+
+    const foto = KOLOM_FOTO.filter(([k]) => /^https?:\/\//.test(teks(m[k]))).map(([k, label]) => ({
+      label,
+      url: teks(m[k]),
+    }));
+
+    return { jenis: pt?.type ?? 'COMMERCIAL', rincian, foto };
+  };
 
   const onSelectPoiRef = useRef(onSelectPoi);
   onSelectPoiRef.current = onSelectPoi;
@@ -1512,16 +1567,26 @@ export default function MapCanvas({
 
         ptEl.addEventListener('click', (e) => {
           e.stopPropagation();
-          if (onSelectLocation) {
-            onSelectLocation({
-              id: pt.id,
-              name: pt.name,
-              specificLocation: pt.address || 'Kawasan Kota Makassar',
-              category: isMenuGo ? 'Kuliner & UMKM (Menu Go)' : 'Properti & Hunian (Properti Go)',
+
+          /**
+           * Dulu titik ini dikirim lewat onSelectLocation sebagai baris lokasi
+           * DifaMap palsu, lengkap dengan `overallScore: 4.5` yang ditulis mati
+           * di sini - angka yang tidak pernah diamati siapa pun. DetailDrawer
+           * lalu mencoba mengambil aktivitas dan komentar memakai id titik
+           * ekonomi yang tidak ada di tabel locations, dan panelnya gagal.
+           *
+           * Sekarang ia dikirim sebagai POI ke PanelTempat, yang memang dibuat
+           * untuk titik di luar basis data: skornya dihitung dari titik survei
+           * di sekitarnya, dan hasil survei MAPID-nya ditampilkan apa adanya.
+           */
+          if (onSelectPoiRef.current) {
+            onSelectPoiRef.current({
+              nama: pt.name,
+              kategori: isMenuGo ? 'RESTAURANT' : 'OTHER',
               latitude: pt.latitude,
               longitude: pt.longitude,
-              overallScore: 4.5,
-              description: pt.description || (isMenuGo ? 'Titik kuliner & sentra ekonomi UMKM terverifikasi MAPID.' : 'Titik kawasan properti dan hunian terverifikasi MAPID.'),
+              kunci: `eko:${pt.id}`,
+              survei: bacaSurvei(pt),
             });
           }
           mapRef.current?.flyTo({

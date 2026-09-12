@@ -32,6 +32,22 @@ export interface PoiTerpilih {
    * seluruh titik manual akan menumpuk menjadi satu percakapan.
    */
   kunci?: string;
+  /**
+   * Hasil survei MAPID untuk titik Properti Go dan Menu Go.
+   *
+   * Titik-titik ini datang dari survei lapangan tim - foto tampak depan rumah,
+   * foto menu kafe, harga rata-rata, ramai atau tidaknya - dan sebelumnya
+   * seluruhnya hilang begitu pinnya diklik. Yang tampil malah objek karangan
+   * dengan skor 4,5 yang ditulis mati di kode peta.
+   *
+   * Parameter disabilitasnya tetap dihitung dari titik survei DifaMap di
+   * sekitarnya, sebab titik ekonomi sendiri tidak pernah mencatatnya.
+   */
+  survei?: {
+    jenis: 'MENU_GO' | 'PROPERTI_GO' | 'COMMERCIAL';
+    rincian: Array<{ label: string; nilai: string }>;
+    foto: Array<{ label: string; url: string }>;
+  };
 }
 
 interface Props {
@@ -421,6 +437,104 @@ export default function PanelTempat({ poi, onClose, onRadiusChange }: Props) {
           <X size={20} />
         </button>
       </div>
+
+      {/* Hasil survei lapangan MAPID.
+          Ditaruh paling atas karena inilah yang membedakan titik ini dari
+          sekadar koordinat: foto dan catatan yang benar-benar diambil surveyor
+          di tempatnya, bukan hitungan dari radius sekitarnya. */}
+      {poi.survei && (poi.survei.rincian.length > 0 || poi.survei.foto.length > 0) && (
+        <div
+          style={{
+            margin: '0 0 14px 0',
+            border: '1px solid #E2E8F0',
+            borderRadius: '10px',
+            overflow: 'hidden',
+            backgroundColor: '#FFFFFF',
+          }}
+        >
+          <div
+            style={{
+              padding: '9px 12px',
+              backgroundColor: poi.survei.jenis === 'MENU_GO' ? '#FEF9EC' : '#F0F9FB',
+              borderBottom: '1px solid #E2E8F0',
+              fontSize: '11.5px',
+              fontWeight: 800,
+              color: '#0F172A',
+            }}
+          >
+            {poi.survei.jenis === 'MENU_GO'
+              ? 'Hasil Survei Menu Go'
+              : poi.survei.jenis === 'PROPERTI_GO'
+                ? 'Hasil Survei Properti Go'
+                : 'Hasil Survei MAPID'}
+          </div>
+
+          {poi.survei.foto.length > 0 && (
+            <div style={{ display: 'flex', gap: '6px', padding: '10px', overflowX: 'auto' }}>
+              {poi.survei.foto.map((f) => (
+                <a
+                  key={f.url}
+                  href={f.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ flexShrink: 0, width: '112px', textDecoration: 'none' }}
+                  title={`Buka ${f.label} ukuran penuh`}
+                >
+                  <img
+                    src={f.url}
+                    alt={f.label}
+                    loading="lazy"
+                    style={{
+                      width: '112px',
+                      height: '84px',
+                      objectFit: 'cover',
+                      borderRadius: '8px',
+                      border: '1px solid #E2E8F0',
+                      display: 'block',
+                    }}
+                    onError={(e) => {
+                      // Tautan foto MAPID bisa kedaluwarsa. Bingkai kosong yang
+                      // rusak lebih buruk daripada tidak ada foto sama sekali.
+                      const bungkus = e.currentTarget.parentElement;
+                      if (bungkus) bungkus.style.display = 'none';
+                    }}
+                  />
+                  <div style={{ fontSize: '9.5px', color: '#64748B', marginTop: '3px', textAlign: 'center' }}>
+                    {f.label}
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+
+          {poi.survei.rincian.length > 0 && (
+            <div style={{ padding: '4px 12px 10px 12px' }}>
+              {poi.survei.rincian.map((r) => (
+                <div
+                  key={r.label}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: '10px',
+                    fontSize: '11.5px',
+                    padding: '5px 0',
+                    borderTop: '1px solid #F8FAFC',
+                  }}
+                >
+                  <span style={{ color: '#64748B', flexShrink: 0 }}>{r.label}</span>
+                  <span style={{ color: '#0F172A', fontWeight: 600, textAlign: 'right' }}>{r.nilai}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ padding: '8px 12px', backgroundColor: '#F8FAFC', fontSize: '10px', color: '#94A3B8', lineHeight: '14px' }}>
+            Dari survei lapangan tim lewat aplikasi MAPID. Parameter disabilitas di
+            bawah TIDAK berasal dari titik ini - melainkan dihitung dari titik survei
+            DifaMap di sekitarnya.
+          </div>
+        </div>
+      )}
 
       {/* Pemilih radius */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
