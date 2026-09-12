@@ -725,8 +725,41 @@ export default function MapCanvas({
       ...(bangunan3D ? { pitch: PITCH_3D } : {}),
     });
 
+    /**
+     * Pin tempat TIDAK ikut mendekat sampai bangunan tiga dimensi.
+     *
+     * Yang harus terlihat di sini bukan bangunannya, melainkan lingkaran
+     * radiusnya - ia yang menjelaskan dari mana skor dan daftar pengamatan di
+     * panel berasal. Mendekat sampai zoom 17,6 membuat lingkaran 500 meter
+     * terpotong di luar layar, dan kemiringan 55 derajat membuat lingkaran itu
+     * terbaca sebagai elips - dua-duanya justru mengaburkan yang ingin
+     * dijelaskan.
+     *
+     * Bingkainya dihitung dari radius yang sedang dipilih, bukan dipatok pada
+     * satu tingkat zoom: radius 800 meter perlu pandangan yang lebih lebar
+     * daripada 150 meter, dan memakai angka yang sama untuk keduanya berarti
+     * salah satunya pasti tidak muat.
+     */
     if (titikFokus) {
-      mapRef.current.flyTo(mendekat(titikFokus.longitude, titikFokus.latitude, 16));
+      const dLat = radiusTempat / 111320;
+      const dLng = radiusTempat / (111320 * Math.cos((titikFokus.latitude * Math.PI) / 180));
+
+      const batas = new maplibregl.LngLatBounds(
+        [titikFokus.longitude - dLng, titikFokus.latitude - dLat],
+        [titikFokus.longitude + dLng, titikFokus.latitude + dLat]
+      );
+
+      mapRef.current.fitBounds(batas, {
+        // Sisi kiri disisakan untuk panel tempat yang sedang terbuka; tanpa itu
+        // separuh lingkarannya mendarat di baliknya.
+        padding: isMobile
+          ? { top: 90, bottom: 320, left: 30, right: 30 }
+          : { top: 90, bottom: 60, left: 540, right: 80 },
+        // Dikembalikan datar: lingkaran yang dilihat miring bukan lagi lingkaran.
+        pitch: 0,
+        duration: 900,
+        maxZoom: 17,
+      });
       return;
     }
 
@@ -741,7 +774,7 @@ export default function MapCanvas({
         mapRef.current.flyTo(mendekat(act.longitude, act.latitude, 16));
       }
     }
-  }, [titikFokus?.latitude, titikFokus?.longitude, selectedLocationId, selectedActivityId, isMapLoaded, isMobile, locations, activities]);
+  }, [titikFokus?.latitude, titikFokus?.longitude, radiusTempat, selectedLocationId, selectedActivityId, isMapLoaded, isMobile, locations, activities]);
 
   // Reset map camera and basemap style to default Makassar & Gowa overview & satellite mode
   useEffect(() => {
