@@ -233,12 +233,25 @@ export async function createActivityController(req: AuthenticatedRequest, res: R
 
     // Jika user mengisi specificLocation tetapi tidak menyertakan locationId secara eksplisit,
     // cocokkan dengan nama tempat / alamat di database
-    if (!targetLocationId && validated.specificLocation && validated.specificLocation.trim() !== '') {
+    /**
+     * Nama kawasan yang terlalu umum tidak boleh dipakai mencocokkan.
+     *
+     * Pencocokannya memakai "contains", jadi pelapor yang menulis "Makassar"
+     * pada kolom patokan akan tersambung ke titik survei mana pun yang
+     * kebetulan ditemukan lebih dulu - persis kesalahan yang sama dengan radius
+     * 80 meter, hanya lewat pintu yang berbeda.
+     */
+    const NAMA_TERLALU_UMUM = /^(makassar|kota makassar|gowa|kabupaten gowa|sulawesi selatan|sulsel|indonesia)$/i;
+
+    const patokan = (validated.specificLocation ?? '').trim();
+    const patokanLayak = patokan.length >= 5 && !NAMA_TERLALU_UMUM.test(patokan);
+
+    if (!targetLocationId && patokanLayak) {
       const matchedLocation = await prisma.location.findFirst({
         where: {
           OR: [
-            { name: { contains: validated.specificLocation.trim(), mode: 'insensitive' } },
-            { specificLocation: { contains: validated.specificLocation.trim(), mode: 'insensitive' } },
+            { name: { contains: patokan, mode: 'insensitive' } },
+            { specificLocation: { contains: patokan, mode: 'insensitive' } },
           ],
         },
       });
@@ -275,11 +288,29 @@ export async function createActivityController(req: AuthenticatedRequest, res: R
         });
       }
     } else {
-      // Cari apakah ada lokasi dalam radius ~80 meter (~0.0008 deg)
+      /**
+       * Penggabungan hanya untuk titik yang benar-benar sama, bukan sekadar
+       * berdekatan.
+       *
+       * Sebelumnya radiusnya 80 meter, dan itu terlalu longgar: laporan
+       * "Tidak Tersedia Trotoar di Jalan Pajonga Daeng Ngalle" tersedot ke
+       * titik survei 84 meter darinya yang bernama "Trotoar Depan SD Labuang
+       * Baji" - ruas jalan yang lain sama sekali. Laporannya masuk dengan
+       * selamat tetapi tidak pernah muncul sebagai titik, dan pelapornya wajar
+       * menyimpulkan laporannya hilang.
+       *
+       * Seluruh 94 aktivitas hasil impor MAPID memiliki lokasinya sendiri,
+       * berjarak di bawah satu meter. Itulah bentuk data yang sebenarnya dianut
+       * aplikasi ini: satu pengamatan, satu titik. Radius 15 meter yang tersisa
+       * hanya menjaga dari kiriman ganda - tombol yang tertekan dua kali - dan
+       * bukan lagi menyatukan dua ruas jalan yang berbeda.
+       */
+      const AMBANG_SAMA = 0.00014; // ~15 meter
+
       const nearbyLocation = await prisma.location.findFirst({
         where: {
-          latitude: { gte: validated.latitude - 0.0008, lte: validated.latitude + 0.0008 },
-          longitude: { gte: validated.longitude - 0.0008, lte: validated.longitude + 0.0008 },
+          latitude: { gte: validated.latitude - AMBANG_SAMA, lte: validated.latitude + AMBANG_SAMA },
+          longitude: { gte: validated.longitude - AMBANG_SAMA, lte: validated.longitude + AMBANG_SAMA },
         },
       });
 
@@ -331,7 +362,14 @@ export async function createActivityController(req: AuthenticatedRequest, res: R
 
         const autoCreatedLoc = await prisma.location.create({
           data: {
-            name: validated.specificLocation || validated.title,
+            // Judul dulu, bukan patokan.
+            //
+            // Titik hasil impor MAPID bernama deskriptif - "Trotoar Depan TVRI
+            // Makassar Belum Dilengkapi Guiding Block" - sementara aturan lama
+            // menamai titik baru dengan isi kolom patokan, sehingga lahir titik
+            // bernama "Jalan Pajonga Dg Ngale" yang tidak memberi tahu apa pun
+            // tentang kondisinya. Patokan tetap disimpan, tetapi sebagai alamat.
+            name: validated.title,
             specificLocation: validated.specificLocation || 'Kota Makassar',
             description: validated.description || 'Titik survei aksesibilitas fasilitas publik.',
             coverImageUrl: primaryPhoto,
