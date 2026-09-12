@@ -694,35 +694,51 @@ export default function MapCanvas({
     // Di layar sempit panel menempati bagian bawah, jadi yang digeser tingginya.
     const gesekan: [number, number] = isMobile ? [0, -110] : [258, 0];
 
+    /**
+     * Mendekat sampai bangunan tiga dimensinya benar-benar menyembul.
+     *
+     * Lapisan building-3d milik gaya Street MAPID ber-minzoom 17, sementara
+     * pendekatan sebelumnya berhenti di 16 dan 16,5 - tepat di bawah ambangnya,
+     * sehingga bangunannya tidak pernah sempat muncul. Kemiringan ikut dinaikkan
+     * karena bangunan setinggi apa pun tampak datar bila dilihat tegak lurus
+     * dari atas.
+     *
+     * Keberadaan lapisannya diperiksa langsung, bukan ditebak dari nama gaya:
+     * satelit, light, dan dark sama sekali tidak punya bangunan tiga dimensi,
+     * dan memiringkan peta di sana hanya membuat labelnya miring tanpa ada yang
+     * menyembul. Bila suatu saat MAPID menambahkan lapisan itu ke gaya lain,
+     * pemeriksaan ini ikut benar dengan sendirinya.
+     */
+    const bangunan3D = Boolean(mapRef.current.getLayer('building-3d'));
+    const ZOOM_3D = 17.6;
+    const PITCH_3D = 55;
+
+    const mendekat = (
+      lng: number,
+      lat: number,
+      zoomBiasa: number
+    ): maplibregl.FlyToOptions => ({
+      center: [lng, lat],
+      zoom: bangunan3D ? ZOOM_3D : zoomBiasa,
+      duration: bangunan3D ? 1400 : 900,
+      offset: gesekan,
+      ...(bangunan3D ? { pitch: PITCH_3D } : {}),
+    });
+
     if (titikFokus) {
-      mapRef.current.flyTo({
-        center: [titikFokus.longitude, titikFokus.latitude],
-        zoom: 16,
-        duration: 900,
-        offset: gesekan,
-      });
+      mapRef.current.flyTo(mendekat(titikFokus.longitude, titikFokus.latitude, 16));
       return;
     }
 
     if (selectedLocationId) {
       const loc = locations.find((l) => l.id === selectedLocationId);
       if (loc && typeof loc.longitude === 'number' && typeof loc.latitude === 'number') {
-        mapRef.current.flyTo({
-          center: [loc.longitude, loc.latitude],
-          zoom: 16.5,
-          duration: 900,
-          offset: gesekan,
-        });
+        mapRef.current.flyTo(mendekat(loc.longitude, loc.latitude, 16.5));
       }
     } else if (selectedActivityId) {
       const act = activities.find((a) => a.id === selectedActivityId);
       if (act && typeof act.longitude === 'number' && typeof act.latitude === 'number') {
-        mapRef.current.flyTo({
-          center: [act.longitude, act.latitude],
-          zoom: 16,
-          duration: 900,
-          offset: gesekan,
-        });
+        mapRef.current.flyTo(mendekat(act.longitude, act.latitude, 16));
       }
     }
   }, [titikFokus?.latitude, titikFokus?.longitude, selectedLocationId, selectedActivityId, isMapLoaded, isMobile, locations, activities]);
