@@ -296,3 +296,32 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   outline: 2.5px solid var(--brand-teal);
   outline-offset: 2px;
 }
+
+/* ==========================================================================
+   Penanda "Difa AI sedang menyusun"
+
+   Menyusun jawaban AI bisa memakan belasan detik. Tanpa gerak apa pun di
+   layar, jeda selama itu tidak bisa dibedakan dari aplikasi yang macet - dan
+   pengguna menekan tombolnya lagi, atau pergi.
+   ========================================================================== */
+
+@keyframes difa-denyut {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(0.88); }
+}
+
+/* Bilah tak tentu: bergerak terus tanpa menjanjikan persentase apa pun,
+   sebab kita memang tidak tahu berapa lama model akan menjawab. */
+@keyframes difa-geser {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(320%); }
+}
+
+@keyframes difa-titik {
+  0%, 80%, 100% { opacity: 0.25; }
+  40%           { opacity: 1; }
+}
+
+.difa-denyut { animation: difa-denyut 1.4s ease-in-out infinite; }
+.difa-geser  { animation: difa-geser 1.25s ease-in-out infinite; }
+.difa-titik  { animation: difa-titik 1.2s ease-in-out infinite; }

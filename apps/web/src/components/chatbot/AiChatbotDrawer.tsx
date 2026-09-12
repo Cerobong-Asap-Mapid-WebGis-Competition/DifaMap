@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { RuteDigambar } from '../../data/rute';
 import TeksKaya from './TeksKaya';
+import MemuatAI from '../common/MemuatAI';
 import {
   X,
   Sparkles,
@@ -259,6 +260,7 @@ export default function AiChatbotDrawer({
   const [gridModa, setGridModa] = useState<ModaGrid>('AKSESIBILITAS');
   const [wawasanGrid, setWawasanGrid] = useState<WawasanGrid | null>(null);
   const [analisisTitik, setAnalisisTitik] = useState<AnalisisTitik | null>(null);
+  const [sedangMenyusunTitik, setSedangMenyusunTitik] = useState(false);
   const [banding, setBanding] = useState<{ a: AnalisisTitik; b: AnalisisTitik; putusan: PutusanBanding | null } | null>(null);
   const [sedangMembandingkan, setSedangMembandingkan] = useState(false);
   const [sedangMenyusunWawasan, setSedangMenyusunWawasan] = useState(false);
@@ -517,6 +519,7 @@ export default function AiChatbotDrawer({
       // wawasan Difa AI. Dimulai lebih dulu supaya berjalan bersamaan dengan
       // permintaan lain yang dipakai kartu ringkasan lama.
       setAnalisisTitik(null);
+      setSedangMenyusunTitik(true);
       setBanding(null);
       onClearCompare?.();
       const janjiTitik = difaMapApi
@@ -525,7 +528,8 @@ export default function AiChatbotDrawer({
           setAnalisisTitik(r?.data ?? null);
           onTitikAnalisis?.(r?.data?.koordinat ?? null);
         })
-        .catch(() => setAnalisisTitik(null));
+        .catch(() => setAnalisisTitik(null))
+        .finally(() => setSedangMenyusunTitik(false));
 
       void janjiTitik;
 
@@ -802,12 +806,7 @@ export default function AiChatbotDrawer({
               </div>
             ))}
 
-            {isSending && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#767676', fontSize: '12px' }}>
-                <Sparkles size={15} className="animate-spin" color="#539BA9" />
-                <span>AI sedang menganalisis koridor spasial Makassar...</span>
-              </div>
-            )}
+            {isSending && <MemuatAI ringkas pesan="Difa AI menyusun jawaban" />}
 
             <div ref={messagesEndRef} />
           </div>
@@ -1113,8 +1112,8 @@ export default function AiChatbotDrawer({
                   angka - kalimat yang sama muncul di tiap sel, dan menyuruh
                   memperbaiki ramp bahkan di sel yang tidak punya data ramp. */}
               {sedangMenyusunWawasan && (
-                <div style={{ backgroundColor: '#FFFFFF', padding: '10px', borderRadius: '8px', border: '1px dashed #CBD5E1', fontSize: '11.5px', color: '#64748B', marginTop: '6px' }}>
-                  Difa AI sedang membaca pola antar sel...
+                <div style={{ marginTop: '6px' }}>
+                  <MemuatAI pesan="Difa AI membaca pola antar sel" />
                 </div>
               )}
 
@@ -1448,6 +1447,12 @@ export default function AiChatbotDrawer({
                 <div style={{ fontSize: '12px', color: '#334155', lineHeight: '18px' }}>
                   {siteAnalysisData.accessibilityRecommendation.action}
                 </div>
+                {sedangMenyusunTitik && !analisisTitik && (
+                  <div style={{ marginTop: '10px', borderTop: '1px solid #E2E8F0', paddingTop: '10px' }}>
+                    <MemuatAI pesan="Difa AI menelusuri jangkauan titik ini" />
+                  </div>
+                )}
+
                 {analisisTitik && (
                   <div style={{ marginTop: '10px', borderTop: '1px solid #E2E8F0', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '9px' }}>
 
@@ -1590,9 +1595,7 @@ export default function AiChatbotDrawer({
                       )}
 
                       {sedangMembandingkan && (
-                        <div style={{ textAlign: 'center', padding: '10px', border: '1px dashed #CBD5E1', borderRadius: '8px', fontSize: '11.5px', color: '#64748B' }}>
-                          Menganalisis kedua titik dan menimbangnya...
-                        </div>
+                        <MemuatAI pesan="Difa AI menimbang kedua titik" />
                       )}
 
                       {banding && (

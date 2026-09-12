@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { bacaSurveiEkonomi } from '../../data/surveiEkonomi';
 import { difaMapApi } from '../../lib/api';
+import MemuatAI from '../common/MemuatAI';
 
 /**
  * Lambang tiap parameter disabilitas.
@@ -321,8 +322,8 @@ export default function PanelSurvei({ titik, onClose }: Props) {
 
       {/* Wawasan Difa AI */}
       {sedangMemuat && (
-        <div style={{ marginTop: '12px', padding: '10px', border: '1px dashed #CBD5E1', borderRadius: '9px', fontSize: '11.5px', color: '#64748B' }}>
-          Difa AI sedang membaca sekitar tempat ini...
+        <div style={{ marginTop: '12px' }}>
+          <MemuatAI pesan="Difa AI membaca sekitar tempat ini" />
         </div>
       )}
 
