@@ -621,7 +621,28 @@ export default function MapCanvas({
       return fitur.find((f: any) => f.properties?.name) ?? null;
     };
 
+    /**
+     * Apakah klik ini berasal dari sebuah penanda, bukan dari peta itu sendiri.
+     *
+     * Penanda adalah elemen DOM yang diletakkan di dalam wadah kanvas, jadi
+     * klik padanya ikut sampai ke penangan klik peta - dan peta lalu mencari POI
+     * basemap di bawah kursor lalu MENIMPA pilihan yang baru saja dibuat
+     * penanda. Akibatnya panel Kedai Lawas terbuka sesaat lalu berganti menjadi
+     * POI basemap biasa, lengkap tanpa hasil survei Menu Go-nya.
+     *
+     * stopPropagation pada penanda tidak cukup: MapLibre menyusun peristiwa
+     * kliknya sendiri dari mousedown dan mouseup, bukan dari click yang
+     * menggelembung. Memeriksa asal elemennya jauh lebih pasti daripada
+     * menebak urutan peristiwa.
+     */
+    const dariPenanda = (ev: any): boolean => {
+      const sasaran = ev?.originalEvent?.target;
+      return Boolean(sasaran?.closest?.('.maplibregl-marker'));
+    };
+
     map.on('click', (e: any) => {
+      if (dariPenanda(e)) return;
+
       if (isPickingLocationRef.current && onPickCoordinateRef.current && e.lngLat) {
         onPickCoordinateRef.current({ latitude: e.lngLat.lat, longitude: e.lngLat.lng });
         return;
@@ -649,6 +670,8 @@ export default function MapCanvas({
     // tidak ada isyarat apa pun bahwa label basemap punya fungsi.
     map.on('mousemove', (e: any) => {
       if (isPickingLocationRef.current) return;
+      // Di atas penanda, kursornya diatur penanda itu sendiri.
+      if (dariPenanda(e)) return;
       map.getCanvas().style.cursor = poiDiTitik(e.point) ? 'pointer' : '';
     });
 
@@ -1540,6 +1563,15 @@ export default function MapCanvas({
         // Filter ketat sesuai tab yang dipilih
         if (urbanFilter === 'MENU_GO' && !isMenuGo) return;
         if (urbanFilter === 'PROPERTI_GO' && isMenuGo) return;
+
+        // Titik yang sedang dibuka sudah punya penandanya sendiri, dan keduanya
+        // menuliskan nama yang sama persis - tanpa ini, "Kedai Lawas" tampil dua
+        // kali bertumpuk di koordinat yang sama.
+        const sedangDibuka =
+          titikFokus &&
+          Math.abs(titikFokus.latitude - pt.latitude) < 1e-6 &&
+          Math.abs(titikFokus.longitude - pt.longitude) < 1e-6;
+        if (sedangDibuka) return;
 
         const ptEl = document.createElement('div');
         ptEl.className = 'economic-poi-wrapper';
