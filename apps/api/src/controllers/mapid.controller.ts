@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { mapIdService } from '../services/mapid.service.js';
 import { hitungIsokron } from '../services/rute.service.js';
 import { susunWawasanGrid } from '../services/gridInsight.service.js';
+import { analisisTitik } from '../services/siteInsight.service.js';
 import type { ModaPenilaian } from '../services/mapid.service.js';
 
 export async function getMapStyleController(req: Request, res: Response): Promise<void> {
@@ -184,6 +185,33 @@ export async function getSiniGridPriorityController(req: Request, res: Response)
     });
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to compute SINI grid analysis', message: error.message });
+  }
+}
+
+/**
+ * Analisis satu titik: jangkauan nyata, apa yang terjangkau, dan wawasan AI.
+ */
+export async function getSiteInsightController(req: Request, res: Response): Promise<void> {
+  try {
+    const lat = parseFloat(req.query.lat as string);
+    const lng = parseFloat(req.query.lng as string);
+
+    if (isNaN(lat) || isNaN(lng)) {
+      res.status(400).json({ error: 'Parameter lat dan lng wajib diisi angka.' });
+      return;
+    }
+
+    const moda = req.query.mode === 'walking' ? 'walking' : 'wheelchair';
+    const menit = String(req.query.intervals ?? '5,10,15')
+      .split(',')
+      .map((n) => parseInt(n.trim(), 10))
+      .filter((n) => !isNaN(n) && n > 0 && n <= 60);
+
+    const hasil = await analisisTitik(lat, lng, moda, menit.length > 0 ? menit : [5, 10, 15]);
+
+    res.json({ success: true, data: hasil });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to analyse site', message: error.message });
   }
 }
 

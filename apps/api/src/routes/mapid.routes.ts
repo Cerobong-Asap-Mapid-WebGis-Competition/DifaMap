@@ -8,6 +8,7 @@ import {
   getElevationSlopeController,
   getSiniGridPriorityController,
   getSiniGridInsightController,
+  getSiteInsightController,
   genericMapIdProxyController,
 } from '../controllers/mapid.controller.js';
 import {
@@ -39,6 +40,7 @@ router.post('/analysis/elevation-slope', getElevationSlopeController);
 // 7. Grid prioritas aksesibilitas Difa AI (multi-kriteria)
 router.get('/analysis/sini-grid', getSiniGridPriorityController);
 router.get('/analysis/sini-grid/wawasan', getSiniGridInsightController);
+router.get('/analysis/site-insight', getSiteInsightController);
 
 // 8. MAPID Competition API - Community Maps (data survei aksesibilitas)
 router.post('/competition/activities', getCompetitionActivitiesController);

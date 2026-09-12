@@ -154,12 +154,33 @@ export async function hitungIsokron(
   menit: number[],
   moda: ModaJalan = 'wheelchair'
 ): Promise<any | null> {
-  const hasil = await panggil(`/v2/isochrones/${profilDari(moda)}`, {
+  const badan = {
     locations: [[pusat.longitude, pusat.latitude]],
     range: menit.map((m) => m * 60),
     range_type: 'time',
+  };
+
+  // Luas tiap pita ikut diminta. Tanpa ini, "8 titik terjangkau" tidak bisa
+  // dibandingkan antar titik analisis: delapan titik di dalam 0,4 km persegi
+  // jauh lebih rapat daripada delapan titik di dalam 1,8 km persegi.
+  const hasil = await panggil(`/v2/isochrones/${profilDari(moda)}`, {
+    ...badan,
+    attributes: ['area'],
   });
 
-  if (!hasil?.features?.length) return null;
-  return hasil;
+  if (hasil?.features?.length) return hasil;
+
+  /**
+   * Coba sekali lagi tanpa atribut tambahan.
+   *
+   * Luas hanyalah pelengkap, sedangkan poligonnya inti. Bila suatu saat server
+   * menolak permintaan hanya karena atribut ini - versi API berganti, atau
+   * atributnya tidak tersedia untuk profil kursi roda - jangan sampai seluruh
+   * isokronnya ikut hilang dan panel jatuh ke lingkaran radius. Percobaan kedua
+   * ini murah: ia hanya berjalan ketika yang pertama sudah gagal.
+   */
+  const tanpaAtribut = await panggil(`/v2/isochrones/${profilDari(moda)}`, badan);
+
+  if (!tanpaAtribut?.features?.length) return null;
+  return tanpaAtribut;
 }

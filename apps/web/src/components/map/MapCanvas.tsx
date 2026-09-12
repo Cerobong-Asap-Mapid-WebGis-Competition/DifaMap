@@ -355,8 +355,18 @@ export default function MapCanvas({
         type: 'fill',
         source: 'isochrone-source',
         paint: {
-          'fill-color': 'rgba(83, 155, 169, 0.35)',
-          'fill-outline-color': '#539BA9',
+          // Tiap pita waktu berwarna sendiri. Sebelumnya ketiganya sewarna,
+          // sehingga yang terlihat hanya satu bercak yang makin pekat di
+          // tengah - dan tidak ada yang bisa membaca di mana batas lima menit
+          // berakhir dan sepuluh menit dimulai.
+          'fill-color': [
+            'case',
+            ['<=', ['coalesce', ['get', 'menit'], ['get', 'minutes'], 99], 5],
+            'rgba(15, 118, 110, 0.42)',
+            ['<=', ['coalesce', ['get', 'menit'], ['get', 'minutes'], 99], 10],
+            'rgba(83, 155, 169, 0.30)',
+            'rgba(147, 197, 214, 0.22)',
+          ],
         },
       });
 
@@ -1484,7 +1494,15 @@ export default function MapCanvas({
     const isochroneSource = mapRef.current?.getSource('isochrone-source') as maplibregl.GeoJSONSource;
     if (isochroneSource) {
       if (isochroneGeoJSON) {
-        isochroneSource.setData(isochroneGeoJSON);
+        // Pita terbesar digambar lebih dulu supaya yang terkecil berada di
+        // atasnya. Tanpa pengurutan ini, pita lima menit tertimbun pita lima
+        // belas menit dan lenyap sama sekali.
+        const fitur = [...(isochroneGeoJSON.features ?? [])].sort(
+          (a: any, b: any) =>
+            (b?.properties?.menit ?? b?.properties?.minutes ?? 0) -
+            (a?.properties?.menit ?? a?.properties?.minutes ?? 0)
+        );
+        isochroneSource.setData({ ...isochroneGeoJSON, features: fitur } as any);
       } else {
         isochroneSource.setData({ type: 'FeatureCollection', features: [] });
       }

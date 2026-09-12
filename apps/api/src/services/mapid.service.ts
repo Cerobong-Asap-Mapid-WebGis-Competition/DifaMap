@@ -525,7 +525,22 @@ class MapIdService {
           ) {
             return 'transit';
           }
-          if (l.category === 'HEALTHCARE') return 'kesehatan';
+
+          // Kolom category tidak dipakai sendirian untuk kesehatan: dari enam
+          // baris bercategory HEALTHCARE hanya SATU yang benar-benar fasilitas
+          // kesehatan, sisanya pengamatan guiding block dan halte bus. Karena
+          // bobot kesehatan paling berat di formula ini, kesalahannya paling
+          // mahal - satu pengamatan trotoar yang salah label menaikkan nilai
+          // sel sebanyak lima belas poin.
+          if (
+            l.entityType === 'PLACE' &&
+            /rumah sakit|\brsud\b|\brsia\b|\brs\b|puskesmas|klinik|apotek|posyandu/i.test(
+              String(l.name)
+            )
+          ) {
+            return 'kesehatan';
+          }
+
           return 'umum';
         };
 

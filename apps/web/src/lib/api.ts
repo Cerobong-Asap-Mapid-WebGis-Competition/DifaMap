@@ -201,6 +201,23 @@ export const difaMapApi = {
   /**
    * MAP Analysis: Menghitung Poligon Isokron (5, 10, 15 menit)
    */
+  /**
+   * Analisis satu titik: jangkauan nyata per pita waktu, apa yang terjangkau,
+   * titik terdekat per kebutuhan, dan wawasan Difa AI.
+   */
+  async getSiteInsight(
+    lat: number,
+    lng: number,
+    mode: 'walking' | 'wheelchair' = 'wheelchair',
+    intervals = [5, 10, 15]
+  ) {
+    const res = await fetch(
+      `${API_BASE_URL}/api/mapid/analysis/site-insight?lat=${lat}&lng=${lng}&mode=${mode}&intervals=${intervals.join(',')}`
+    );
+    if (!res.ok) throw new Error('Failed to analyse site');
+    return res.json();
+  },
+
   async getIsochrone(lat: number, lng: number, intervals = [5, 10, 15], mode: 'walking' | 'wheelchair' = 'wheelchair') {
     const res = await fetch(`${API_BASE_URL}/api/mapid/analysis/isochrone?lat=${lat}&lng=${lng}&intervals=${intervals.join(',')}&mode=${mode}`);
     if (!res.ok) throw new Error('Failed to calculate isochrone');

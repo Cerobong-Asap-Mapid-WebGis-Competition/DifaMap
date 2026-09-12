@@ -225,10 +225,11 @@ export async function namaiKoordinat(
       { headers: { 'User-Agent': 'DifaMap/1.0 (WebGIS aksesibilitas Makassar)' } }
     );
 
-    if (!res.ok) {
-      simpananBalik.set(kunci, null);
-      return null;
-    }
+    // Kegagalan TIDAK disimpan. Simpanan ini tanpa kedaluwarsa, jadi satu
+    // gangguan jaringan sesaat akan mengunci koordinat itu sebagai "tanpa nama"
+    // selama proses hidup - dan nama daerahnya tidak akan pernah muncul lagi
+    // walau layanannya sudah pulih semenit kemudian.
+    if (!res.ok) return null;
 
     const data: any = await res.json();
     const p = data?.features?.[0]?.properties ?? {};
@@ -240,7 +241,6 @@ export async function namaiKoordinat(
     simpananBalik.set(kunci, nama);
     return nama;
   } catch {
-    simpananBalik.set(kunci, null);
     return null;
   }
 }

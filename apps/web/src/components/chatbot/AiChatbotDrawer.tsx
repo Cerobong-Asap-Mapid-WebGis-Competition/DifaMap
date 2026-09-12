@@ -62,6 +62,17 @@ const MODA_GRID: Array<{ kunci: ModaGrid; label: string; jelas: string }> = [
   },
 ];
 
+/** Hasil analisis satu titik dari server, termasuk wawasan Difa AI. */
+interface AnalisisTitik {
+  namaWilayah: string | null;
+  isokronNyata: boolean;
+  pita: Array<{ menit: number; jumlahTitik: number; skorRata: number | null; luasKm2: number | null }>;
+  terjangkau: Array<{ nama: string; skor: number | null; jenis: string; jarakMeter: number; menit: number | null }>;
+  terdekat: Array<{ kebutuhan: string; nama: string | null; skor: number | null; jarakMeter: number | null; didalamJangkauan: boolean }>;
+  cakupan: { didalam: number; diluar: number };
+  wawasan: { ringkasan: string; temuan: string[]; catatan: string } | null;
+}
+
 interface WawasanGrid {
   ringkasan: string;
   sel: Array<{ gridId: string; judul: string; alasan: string; tindakan: string }>;
@@ -228,6 +239,7 @@ export default function AiChatbotDrawer({
   const [gridSize, setGridSize] = useState<number>(1000);
   const [gridModa, setGridModa] = useState<ModaGrid>('AKSESIBILITAS');
   const [wawasanGrid, setWawasanGrid] = useState<WawasanGrid | null>(null);
+  const [analisisTitik, setAnalisisTitik] = useState<AnalisisTitik | null>(null);
   const [sedangMenyusunWawasan, setSedangMenyusunWawasan] = useState(false);
   const [isComputingGrid, setIsComputingGrid] = useState(false);
   const [gridResultSummary, setGridResultSummary] = useState<any>(null);
@@ -451,6 +463,18 @@ export default function AiChatbotDrawer({
       if (onRunIsochroneAnalysis) {
         onRunIsochroneAnalysis(lat, lng, isochroneMode);
       }
+
+      // Analisis titik lengkap dari server - jangkauan per pita waktu, apa yang
+      // benar-benar terjangkau lewat jalan, titik terdekat per kebutuhan, dan
+      // wawasan Difa AI. Dimulai lebih dulu supaya berjalan bersamaan dengan
+      // permintaan lain yang dipakai kartu ringkasan lama.
+      setAnalisisTitik(null);
+      const janjiTitik = difaMapApi
+        .getSiteInsight(lat, lng, isochroneMode, [5, 10, isochroneMinutes > 10 ? isochroneMinutes : 15])
+        .then((r) => setAnalisisTitik(r?.data ?? null))
+        .catch(() => setAnalisisTitik(null));
+
+      void janjiTitik;
 
       // Tiga sumber data nyata, diminta bersamaan supaya tidak menunggu berantai.
       const [isokron, sekitar, ekonomi] = await Promise.all([
@@ -1371,6 +1395,118 @@ export default function AiChatbotDrawer({
                 <div style={{ fontSize: '12px', color: '#334155', lineHeight: '18px' }}>
                   {siteAnalysisData.accessibilityRecommendation.action}
                 </div>
+                {analisisTitik && (
+                  <div style={{ marginTop: '10px', borderTop: '1px solid #E2E8F0', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '9px' }}>
+
+                    {/* Jangkauan per pita waktu.
+                        Satu cincin hanya menjawab "berapa banyak"; tiga cincin
+                        menjawab "berapa lama sampai menemukan yang layak". */}
+                    <div>
+                      <div style={{ fontSize: '11.5px', fontWeight: 800, color: '#000000', marginBottom: '5px' }}>
+                        Jangkauan per Pita Waktu
+                      </div>
+                      {analisisTitik.pita.map((q) => (
+                        <div key={q.menit} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: '#475569', padding: '3px 0' }}>
+                          <span style={{ width: '54px', fontWeight: 700, color: '#0F172A' }}>{q.menit} menit</span>
+                          <span style={{ flex: 1 }}>
+                            {q.jumlahTitik} titik survei
+                            {q.luasKm2 != null && ` \u00b7 ${q.luasKm2.toFixed(2)} km\u00b2`}
+                          </span>
+                          <span style={{ fontWeight: 700, color: q.skorRata == null ? '#94A3B8' : q.skorRata < 2.5 ? '#EF4444' : q.skorRata < 3.5 ? '#D97706' : '#16A34A' }}>
+                            {q.skorRata != null ? q.skorRata.toFixed(2) : 'belum ada'}
+                          </span>
+                        </div>
+                      ))}
+                      {!analisisTitik.isokronNyata && (
+                        <div style={{ fontSize: '10px', color: '#B45309', marginTop: '3px' }}>
+                          Layanan isokron tidak tersedia - angka di atas memakai lingkaran radius, bukan jaringan jalan.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Titik terdekat per kebutuhan, termasuk yang di luar jangkauan.
+                        "Tidak ada halte dalam 10 menit" adalah temuan, bukan
+                        kolom kosong - jadi jaraknya tetap ditulis. */}
+                    <div>
+                      <div style={{ fontSize: '11.5px', fontWeight: 800, color: '#000000', marginBottom: '5px' }}>
+                        Terdekat per Kebutuhan
+                      </div>
+                      {analisisTitik.terdekat.map((t) => (
+                        <div key={t.kebutuhan} style={{ padding: '5px 0', borderTop: '1px solid #F8FAFC' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '11px' }}>
+                            <span style={{ color: '#64748B' }}>{t.kebutuhan}</span>
+                            <span style={{
+                              flexShrink: 0,
+                              fontWeight: 700,
+                              fontSize: '9.5px',
+                              padding: '1px 6px',
+                              borderRadius: '8px',
+                              backgroundColor: t.nama === null ? '#F1F5F9' : t.didalamJangkauan ? '#DCFCE7' : '#FEF3C7',
+                              color: t.nama === null ? '#64748B' : t.didalamJangkauan ? '#15803D' : '#B45309',
+                            }}>
+                              {t.nama === null ? 'tidak ada data' : t.didalamJangkauan ? 'terjangkau' : 'di luar jangkauan'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#0F172A', marginTop: '1px' }}>
+                            {t.nama ?? 'Tidak ada satu pun di seluruh data survei'}
+                            {t.jarakMeter != null && (
+                              <span style={{ color: '#94A3B8' }}>
+                                {' '}&middot; {t.jarakMeter >= 1000 ? `${(t.jarakMeter / 1000).toFixed(1)} km` : `${t.jarakMeter} m`}
+                                {t.skor != null && ` \u00b7 skor ${t.skor}`}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Daftar yang terjangkau - bisa ditelusuri, bukan dipercaya. */}
+                    {analisisTitik.terjangkau.length > 0 && (
+                      <details>
+                        <summary style={{ fontSize: '11.5px', fontWeight: 800, color: '#000000', cursor: 'pointer' }}>
+                          Titik yang Terjangkau ({analisisTitik.terjangkau.length})
+                        </summary>
+                        <div style={{ marginTop: '6px', maxHeight: '190px', overflowY: 'auto' }}>
+                          {analisisTitik.terjangkau.map((t, i) => (
+                            <div key={i} style={{ display: 'flex', gap: '7px', fontSize: '10.5px', padding: '3px 0', borderTop: i === 0 ? 'none' : '1px solid #F8FAFC' }}>
+                              <span style={{ width: '42px', flexShrink: 0, color: '#94A3B8' }}>{t.menit} mnt</span>
+                              <span style={{ flex: 1, color: '#334155' }}>{t.nama}</span>
+                              <span style={{ flexShrink: 0, fontWeight: 700, color: t.skor == null ? '#94A3B8' : t.skor < 2.5 ? '#EF4444' : t.skor < 3.5 ? '#D97706' : '#16A34A' }}>
+                                {t.skor ?? '-'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+
+                    {/* Wawasan Difa AI */}
+                    {analisisTitik.wawasan && (
+                      <div style={{ backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '8px', padding: '11px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '5px' }}>
+                          <Sparkles size={14} color="#D97706" />
+                          <span style={{ fontSize: '12px', fontWeight: 800, color: '#000000' }}>
+                            Wawasan Difa AI{analisisTitik.namaWilayah ? ` \u00b7 ${analisisTitik.namaWilayah}` : ''}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '11.5px', color: '#475569', lineHeight: '17px' }}>
+                          {analisisTitik.wawasan.ringkasan}
+                        </div>
+                        {analisisTitik.wawasan.temuan.length > 0 && (
+                          <ul style={{ margin: '7px 0 0 0', paddingLeft: '16px', fontSize: '11.5px', color: '#475569', lineHeight: '17px' }}>
+                            {analisisTitik.wawasan.temuan.map((t, i) => (
+                              <li key={i} style={{ marginTop: '2px' }}>{t}</li>
+                            ))}
+                          </ul>
+                        )}
+                        <div style={{ fontSize: '10.5px', color: '#92400E', marginTop: '7px', paddingTop: '6px', borderTop: '1px solid #FDE68A' }}>
+                          {analisisTitik.wawasan.catatan}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {siteAnalysisData.accessibilityRecommendation.belumTeramati > 0 && (
                   <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: '6px' }}>
                     {siteAnalysisData.accessibilityRecommendation.belumTeramati} dari{' '}
