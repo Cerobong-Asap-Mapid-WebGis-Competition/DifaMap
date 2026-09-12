@@ -325,3 +325,43 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .difa-denyut { animation: difa-denyut 1.4s ease-in-out infinite; }
 .difa-geser  { animation: difa-geser 1.25s ease-in-out infinite; }
 .difa-titik  { animation: difa-titik 1.2s ease-in-out infinite; }
+
+/* ==========================================================================
+   Tombol Difa AI
+
+   Fitur paling membedakan aplikasi ini justru paling mudah terlewat: sebuah
+   lingkaran putih di antara tombol-tombol putih lainnya. Cincin yang memuai
+   menariknya keluar dari deretan itu - dan berhenti setelah dicoba sekali,
+   sebab yang sudah tahu tidak perlu terus dipanggil.
+   ========================================================================== */
+
+@keyframes difa-cincin {
+  0%   { transform: scale(1);    opacity: 0.55; }
+  70%  { transform: scale(1.75); opacity: 0; }
+  100% { transform: scale(1.75); opacity: 0; }
+}
+
+.difa-cincin {
+  animation: difa-cincin 2.1s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+}
+
+@keyframes difa-muncul {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.difa-muncul {
+  animation: difa-muncul 0.32s ease-out both;
+}
+
+/* Menghormati pengguna yang meminta gerak dikurangi - termasuk sebagian
+   penyandang disabilitas vestibular, yang justru sasaran aplikasi ini. */
+@media (prefers-reduced-motion: reduce) {
+  .difa-cincin,
+  .difa-muncul,
+  .difa-denyut,
+  .difa-geser,
+  .difa-titik {
+    animation: none !important;
+  }
+}

@@ -109,6 +109,38 @@ export default function TopSearchBar({
   onResetToDefault,
 }: TopSearchBarProps) {
   const isMobile = useIsMobile(768);
+  /**
+   * Apakah Difa AI pernah dibuka di peramban ini.
+   *
+   * Cincin pemanggil berhenti begitu dicoba sekali: yang sudah tahu tidak perlu
+   * terus dipanggil, dan animasi yang tidak pernah berhenti berubah dari
+   * penunjuk jalan menjadi gangguan.
+   *
+   * Dibaca setelah komponen terpasang, bukan saat state pertama dibentuk -
+   * localStorage tidak ada saat halaman dirakit di server, dan membacanya di
+   * sana membuat tampilan server dan peramban berbeda.
+   */
+  const [sudahCobaAI, setSudahCobaAI] = useState(true);
+
+  useEffect(() => {
+    try {
+      setSudahCobaAI(window.localStorage.getItem('difamap:ai-dicoba') === '1');
+    } catch {
+      // Mode penyamaran memblokir localStorage. Anggap sudah dicoba supaya
+      // cincinnya tidak berdenyut selamanya tanpa pernah bisa dihentikan.
+      setSudahCobaAI(true);
+    }
+  }, []);
+
+  const tandaiCobaAI = () => {
+    setSudahCobaAI(true);
+    try {
+      window.localStorage.setItem('difamap:ai-dicoba', '1');
+    } catch {
+      // Tidak bisa diingat antar kunjungan - tidak apa, sesi ini tetap tenang.
+    }
+  };
+
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
 
   /**
@@ -1069,40 +1101,121 @@ export default function TopSearchBar({
           </>
         )}
 
-        {/* 3. AI Assistant Trigger Button */}
-        <button
-          onClick={onOpenAiAssistant}
-          className={isMobile ? 'btn-white-pill' : 'btn-circle-action'}
-          title={
-            sidebarMode === 'URBAN_PLANNER'
-              ? 'Buka Site Selection & Site Analysis'
-              : 'Tanya Difa AI'
-          }
-          style={{
-            position: 'relative',
-            height: isMobile ? '42px' : '48px',
-            padding: isMobile ? '0 14px' : undefined,
-            backgroundColor: '#FFFFFF',
-            flexShrink: 0,
-            fontSize: isMobile ? '14px' : undefined,
-            fontWeight: '700',
-            border: isMobile ? '1px solid rgba(0,0,0,0.08)' : undefined,
-          }}
-        >
-          <Sparkles size={isMobile ? 18 : 22} color="#D97706" />
-          {isMobile && <span>{sidebarMode === 'URBAN_PLANNER' ? 'Analisis' : 'Tanya AI'}</span>}
-          <span
-            style={{
-              position: 'absolute',
-              top: '4px',
-              right: '4px',
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              backgroundColor: '#FDC323',
+        {/* 3. Tombol Difa AI.
+            Sebelumnya lingkaran putih tanpa tulisan, berdiri di antara tombol
+            putih lainnya - dan fitur yang paling membedakan aplikasi ini justru
+            yang paling mudah terlewat. Sekarang bertulisan, berwarna sendiri,
+            dan dikelilingi cincin yang memuai sampai sekali dicoba. */}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          {!sudahCobaAI && (
+            <span
+              aria-hidden
+              className="difa-cincin"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                borderRadius: '999px',
+                border: '2px solid #539BA9',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
+
+          <button
+            onClick={() => {
+              tandaiCobaAI();
+              onOpenAiAssistant();
             }}
-          />
-        </button>
+            title={
+              sidebarMode === 'URBAN_PLANNER'
+                ? 'Buka Site Selection & Site Analysis'
+                : 'Tanya Difa AI tentang rute dan aksesibilitas'
+            }
+            style={{
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '7px',
+              height: isMobile ? '42px' : '48px',
+              padding: isMobile ? '0 14px' : '0 18px',
+              borderRadius: '999px',
+              // Hijau-teal merek, bukan putih: kuning sudah menjadi milik
+              // "Bagikan Laporan", dan dua tombol utama berwarna sama saling
+              // melemahkan alih-alih saling menguatkan.
+              background: 'linear-gradient(135deg, #539BA9 0%, #3E7C88 100%)',
+              color: '#FFFFFF',
+              border: 'none',
+              boxShadow: '0 4px 14px rgba(83,155,169,0.38)',
+              fontSize: isMobile ? '14px' : '15px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <Sparkles size={isMobile ? 18 : 20} color="#FDC323" fill="#FDC323" />
+            <span>
+              {sidebarMode === 'URBAN_PLANNER' ? 'Analisis' : isMobile ? 'Difa AI' : 'Tanya Difa AI'}
+            </span>
+          </button>
+
+          {/* Ajakan sekali pakai.
+              Tombol yang menonjol memberi tahu ada sesuatu di sini; kalimat ini
+              memberi tahu APA - dan tanpa itu, banyak yang menduganya sekadar
+              pencarian biasa. */}
+          {!sudahCobaAI && !isMobile && sidebarMode !== 'URBAN_PLANNER' && (
+            <div
+              className="difa-muncul"
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 10px)',
+                right: 0,
+                width: '246px',
+                backgroundColor: '#0F172A',
+                color: '#FFFFFF',
+                borderRadius: '12px',
+                padding: '11px 13px',
+                boxShadow: '0 10px 28px rgba(0,0,0,0.28)',
+                zIndex: 5,
+              }}
+            >
+              <div
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  top: '-5px',
+                  right: '26px',
+                  width: '10px',
+                  height: '10px',
+                  backgroundColor: '#0F172A',
+                  transform: 'rotate(45deg)',
+                }}
+              />
+              <div style={{ fontSize: '12.5px', fontWeight: 800, marginBottom: '3px' }}>
+                Baru: tanya langsung ke Difa AI
+              </div>
+              <div style={{ fontSize: '11.5px', lineHeight: '16px', color: '#CBD5E1' }}>
+                &quot;Rute kursi roda dari Pantai Losari ke Karebosi&quot; &mdash; dijawab dari
+                titik survei sungguhan, bukan tebakan.
+              </div>
+              <button
+                onClick={tandaiCobaAI}
+                style={{
+                  marginTop: '8px',
+                  border: 'none',
+                  background: 'rgba(255,255,255,0.12)',
+                  color: '#FFFFFF',
+                  borderRadius: '7px',
+                  padding: '4px 10px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Mengerti
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* 4. Bagikan Laporan / Ulasan Button */}
         <button
