@@ -102,9 +102,19 @@ export default function CreateActivityModal({
         specificLocation: specificLocation.trim() || undefined,
         latitude: lat,
         longitude: lng,
-        mediaUrls: imageUrl.trim()
-          ? [imageUrl.trim()]
-          : ['/photos/losari.jpg'],
+        /**
+         * Tanpa foto berarti tanpa foto - bukan foto Losari.
+         *
+         * Sebelumnya kolom kosong diisi '/photos/losari.jpg', dan itu membuat
+         * SELURUH laporan tanpa foto ditolak server: skemanya menuntut URL
+         * lengkap, dan jalur itulah yang paling sering ditempuh karena
+         * kolomnya sendiri menulis "atau kosongkan untuk foto default".
+         *
+         * Memakai URL Losari yang absolut juga bukan jawabannya: AI membaca
+         * foto yang dilampirkan untuk menilai, dan melampirkan foto tempat
+         * lain membuatnya menilai lokasi yang salah dengan penuh keyakinan.
+         */
+        mediaUrls: imageUrl.trim() ? [imageUrl.trim()] : [],
         userObservedHints: {
           rampStatus,
           guidingBlockStatus,
@@ -348,9 +358,10 @@ export default function CreateActivityModal({
             </label>
             <input
               type="url"
-              placeholder="https://images.unsplash.com/... (atau kosongkan untuk foto default)"
+              placeholder="https://... (boleh dikosongkan)"
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
+              aria-describedby="catatan-foto"
               style={{
                 width: '100%',
                 padding: '10px 14px',
@@ -360,6 +371,15 @@ export default function CreateActivityModal({
                 outline: 'none',
               }}
             />
+            {/* Konsekuensinya disebutkan, bukan sekadar "boleh dikosongkan".
+                Difa AI menilai dengan MELIHAT fotonya; tanpa foto ia hanya
+                punya deskripsi dan isian parameter, dan penilaiannya wajar
+                saja lebih ragu. Pelapor berhak tahu itu sebelum memutuskan. */}
+            <div id="catatan-foto" style={{ fontSize: '11px', color: '#64748B', marginTop: '5px', lineHeight: '16px' }}>
+              Boleh dikosongkan. Bila diisi, Difa AI ikut melihat fotonya untuk menilai
+              kondisi lapangan - tanpa foto, penilaian hanya bersandar pada deskripsi
+              dan isian parameter di bawah.
+            </div>
           </div>
 
           {/* Quick Facility Indicators Toggle */}

@@ -143,7 +143,23 @@ export const difaMapApi = {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.message || err.error || 'Failed to post activity');
+
+      /**
+       * Rincian validasi ikut disebutkan.
+       *
+       * Server menjawab { error: 'Validation error', details: [...] }, dan
+       * sebelumnya hanya kata "Validation error" yang sampai ke pengguna -
+       * benar, tetapi tidak memberi tahu kolom mana yang bermasalah. Laporan
+       * yang gagal karena satu isian lalu terbaca seperti kegagalan jaringan.
+       */
+      const rincian = Array.isArray(err.details) && err.details.length > 0
+        ? err.details
+            .slice(0, 2)
+            .map((d: any) => `${(d.path ?? []).join('.') || 'isian'}: ${d.message}`)
+            .join('; ')
+        : null;
+
+      throw new Error(rincian || err.message || err.error || 'Gagal mengirim laporan.');
     }
     return res.json();
   },
