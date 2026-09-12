@@ -1107,7 +1107,13 @@ export default function TopSearchBar({
             yang paling mudah terlewat. Sekarang bertulisan, berwarna sendiri,
             dan dikelilingi cincin yang memuai sampai sekali dicoba. */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
-          {!sudahCobaAI && (
+          {/* Cincin hanya di layar lebar.
+              Baris tombol di layar sempit menggulir mendatar, dan wadah yang
+              menggulir ikut memotong apa pun yang meluber keluar - cincin yang
+              memuai sampai 1,75 kali akan tampak terpangkas di atas dan bawah.
+              Di sana tombolnya sendiri sudah cukup menonjol: berwarna teal
+              bertuliskan "Difa AI" di antara tombol putih lainnya. */}
+          {!sudahCobaAI && !isMobile && (
             <span
               aria-hidden
               className="difa-cincin"

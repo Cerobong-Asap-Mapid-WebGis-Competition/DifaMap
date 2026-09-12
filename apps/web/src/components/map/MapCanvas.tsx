@@ -1890,7 +1890,9 @@ export default function MapCanvas({
         <div
           style={{
             position: 'absolute',
-            top: '96px',
+            // Bilah atas lebih tinggi di layar sempit - tanpa pergeseran ini
+            // pita rutenya bersembunyi di baliknya.
+            top: isMobile ? '118px' : '96px',
             left: '50%',
             transform: 'translateX(-50%)',
             display: 'flex',

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { bacaSurveiEkonomi } from '../../data/surveiEkonomi';
 import { difaMapApi } from '../../lib/api';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import MemuatAI from '../common/MemuatAI';
 
 /**
@@ -79,6 +80,7 @@ interface Props {
 }
 
 export default function PanelSurvei({ titik, onClose }: Props) {
+  const isMobile = useIsMobile(768);
   const survei = bacaSurveiEkonomi(titik);
   const [analisis, setAnalisis] = useState<WawasanTempat | null>(null);
   const [sedangMemuat, setSedangMemuat] = useState(false);
@@ -119,19 +121,25 @@ export default function PanelSurvei({ titik, onClose }: Props) {
   return (
     <aside
       style={{
+        // Di layar sempit menjadi lembar bawah selebar layar, sama seperti panel
+        // Tempat. Tata letak meja - digeser 96 piksel dari kiri dan selebar 420
+        // - menyisakan panel 255 piksel yang terdorong ke tepi pada ponsel 375
+        // piksel, terlalu sempit untuk foto menu yang menjadi isi utamanya.
         position: 'fixed',
-        top: '96px',
-        left: '96px',
-        width: '420px',
-        maxWidth: 'calc(100vw - 120px)',
-        maxHeight: 'calc(100vh - 130px)',
+        top: isMobile ? 'auto' : '96px',
+        bottom: isMobile ? 0 : 'auto',
+        left: isMobile ? 0 : '96px',
+        right: isMobile ? 0 : 'auto',
+        width: isMobile ? '100%' : '420px',
+        maxWidth: isMobile ? '100vw' : 'calc(100vw - 120px)',
+        maxHeight: isMobile ? '76vh' : 'calc(100vh - 130px)',
         overflowY: 'auto',
         backgroundColor: '#FFFFFF',
-        borderRadius: '16px',
+        borderRadius: isMobile ? '16px 16px 0 0' : '16px',
         border: '1px solid rgba(0,0,0,0.08)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+        boxShadow: isMobile ? '0 -8px 32px rgba(0,0,0,0.22)' : '0 8px 32px rgba(0,0,0,0.18)',
         zIndex: 45,
-        padding: '16px 18px 18px 18px',
+        padding: isMobile ? '14px 16px 20px 16px' : '16px 18px 18px 18px',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
