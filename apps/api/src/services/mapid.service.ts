@@ -137,7 +137,24 @@ class MapIdService {
    */
   async getMapStyle(styleId: string) {
     const activeKey = env.MAPID_API_KEY || '6a8a7eedffc137c94307a71c';
-    const targetStyle = styleId === 'basic' ? 'light' : styleId;
+
+    /**
+     * Gaya diteruskan apa adanya.
+     *
+     * Sebelumnya 'basic' diam-diam dialihkan ke 'light', sehingga pilihan
+     * "Street 3D" menampilkan peta yang sama persis dengan "Street Light" -
+     * dan tidak ada satu pun keterangan bahwa penggantian itu terjadi.
+     *
+     * Keduanya benar-benar berbeda. Diperiksa langsung ke basemap.mapid.io:
+     *
+     *   basic -> "Street Mapid", 104 lapisan, SATU di antaranya
+     *            fill-extrusion bernama building-3d
+     *   light -> "Light Mapid",   54 lapisan, TANPA fill-extrusion
+     *
+     * Jadi bangunan tiga dimensinya memang ada sejak awal, hanya tidak pernah
+     * sampai ke peta.
+     */
+    const targetStyle = styleId;
     const cacheKey = `style_${targetStyle}_${activeKey}`;
     const cached = this.getCached(cacheKey);
     if (cached) return cached;

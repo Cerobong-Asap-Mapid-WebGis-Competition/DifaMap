@@ -140,7 +140,15 @@ export default function MapCanvas({
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   /** Fitur grid terakhir yang diambil, supaya sel bisa dicari saat disorot. */
   const gridFiturRef = useRef<any[]>([]);
-  const [styleId, setStyleId] = useState<string>(process.env.NEXT_PUBLIC_MAPID_STYLE_ID || 'satellite');
+  /**
+   * Street 3D sebagai gaya bawaan.
+   *
+   * Inilah satu-satunya gaya MAPID yang memuat lapisan fill-extrusion
+   * building-3d; light, dark, dan satelit tidak punya sama sekali. Bangunannya
+   * baru menyembul mulai zoom 17 - di bawah itu petanya tampak datar biasa,
+   * dan itu bawaan gayanya sendiri, bukan sesuatu yang bisa kita paksakan.
+   */
+  const [styleId, setStyleId] = useState<string>(process.env.NEXT_PUBLIC_MAPID_STYLE_ID || 'basic');
   // Dipantau khusus untuk petunjuk POI: lapisan poi_* pada tile MAPID baru ada
   // mulai zoom 14, jadi di bawah itu tidak ada tempat yang bisa diklik sama
   // sekali - dan tanpa penjelasan, keadaan itu terbaca sebagai fitur rusak.
@@ -723,9 +731,10 @@ export default function MapCanvas({
   useEffect(() => {
     if (!resetMapTrigger || !mapRef.current || !isMapLoaded) return;
     try {
-      if (styleId !== 'satellite') {
-        setStyleId('satellite');
-        mapRef.current.setStyle(difaMapApi.getMapStyleUrl('satellite'));
+      // Kembali ke gaya bawaan yang sama dengan saat peta pertama dibuka.
+      if (styleId !== 'basic') {
+        setStyleId('basic');
+        mapRef.current.setStyle(difaMapApi.getMapStyleUrl('basic'));
       }
       mapRef.current.flyTo({
         center: [119.4500, -5.1700],
@@ -1993,8 +2002,8 @@ export default function MapCanvas({
             cursor: 'pointer',
           }}
         >
-          <option value="satellite">Satelit (Default)</option>
-          <option value="basic">Street 3D / Basic (MAPID)</option>
+          <option value="basic">Street 3D (MAPID) &mdash; Default</option>
+          <option value="satellite">Satelit</option>
           <option value="light">Street Light (MAPID)</option>
           <option value="dark">Dark Mode (MAPID)</option>
           <option value="osm">OpenStreetMap (Cepat)</option>
