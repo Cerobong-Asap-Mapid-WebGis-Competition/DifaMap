@@ -205,6 +205,18 @@ export const difaMapApi = {
    * Analisis satu titik: jangkauan nyata per pita waktu, apa yang terjangkau,
    * titik terdekat per kebutuhan, dan wawasan Difa AI.
    */
+  /**
+   * Wawasan Difa AI untuk satu titik Properti Go / Menu Go, beserta status
+   * parameter disabilitas di sekitarnya.
+   */
+  async getTempatInsight(id: string, radius = 500) {
+    const res = await fetch(
+      `${API_BASE_URL}/api/mapid/analysis/tempat-insight?id=${encodeURIComponent(id)}&radius=${radius}`
+    );
+    if (!res.ok) throw new Error('Failed to fetch place insight');
+    return res.json();
+  },
+
   async getSiteInsight(
     lat: number,
     lng: number,

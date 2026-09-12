@@ -4,6 +4,7 @@ import { mapIdService } from '../services/mapid.service.js';
 import { hitungIsokron } from '../services/rute.service.js';
 import { susunWawasanGrid } from '../services/gridInsight.service.js';
 import { analisisTitik, bandingkanTitik } from '../services/siteInsight.service.js';
+import { wawasanTempatEkonomi } from '../services/tempatInsight.service.js';
 import type { ModaPenilaian } from '../services/mapid.service.js';
 
 export async function getMapStyleController(req: Request, res: Response): Promise<void> {
@@ -212,6 +213,31 @@ export async function getSiteInsightController(req: Request, res: Response): Pro
     res.json({ success: true, data: hasil });
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to analyse site', message: error.message });
+  }
+}
+
+/**
+ * Wawasan Difa AI untuk satu titik Properti Go / Menu Go.
+ */
+export async function getTempatInsightController(req: Request, res: Response): Promise<void> {
+  try {
+    const id = String(req.query.id ?? '').trim();
+    if (!id) {
+      res.status(400).json({ error: 'Parameter id wajib diisi.' });
+      return;
+    }
+
+    const radius = Math.min(2000, Math.max(100, parseInt(req.query.radius as string, 10) || 500));
+    const hasil = await wawasanTempatEkonomi(id, radius);
+
+    if (!hasil) {
+      res.status(404).json({ error: 'Titik ekonomi tidak ditemukan.' });
+      return;
+    }
+
+    res.json({ success: true, data: hasil });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to compose place insight', message: error.message });
   }
 }
 

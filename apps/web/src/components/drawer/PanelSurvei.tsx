@@ -1,8 +1,51 @@
 'use client';
 
-import React from 'react';
-import { X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import {
+  X,
+  Sparkles,
+  Accessibility,
+  Footprints,
+  Route,
+  Waves,
+  Armchair,
+  Droplet,
+  Lightbulb,
+} from 'lucide-react';
 import { bacaSurveiEkonomi } from '../../data/surveiEkonomi';
+import { difaMapApi } from '../../lib/api';
+
+/**
+ * Lambang tiap parameter disabilitas.
+ *
+ * Ditampilkan sebagai deretan lambang, bukan tabel: di panel ini yang menjadi
+ * pokok adalah hasil survei tempatnya, dan aksesibilitas sekitar hanyalah
+ * keterangan pendamping. Tabel penuh akan menuntut perhatian yang tidak
+ * seharusnya ia dapatkan di sini - untuk itu sudah ada panel Tempat.
+ */
+const LAMBANG: Record<string, any> = {
+  ramp: Accessibility,
+  ubin: Footprints,
+  trotoar: Route,
+  permukaan: Waves,
+  duduk: Armchair,
+  toilet: Droplet,
+  terang: Lightbulb,
+};
+
+const WARNA: Record<string, { garis: string; isi: string; teks: string; kata: string }> = {
+  ada: { garis: '#BBF7D0', isi: '#F0FDF4', teks: '#15803D', kata: 'terpantau layak' },
+  tiada: { garis: '#FECACA', isi: '#FEF2F2', teks: '#B91C1C', kata: 'terpantau bermasalah' },
+  belum: { garis: '#E2E8F0', isi: '#F8FAFC', teks: '#94A3B8', kata: 'belum teramati di foto survei' },
+};
+
+interface WawasanTempat {
+  radiusMeter: number;
+  jumlahTitik: number;
+  skorRata: number | null;
+  parameter: Array<{ kunci: string; label: string; status: 'ada' | 'tiada' | 'belum'; jumlah: number }>;
+  wawasan: { ringkasan: string; temuan: string[]; catatan: string } | null;
+}
 
 /**
  * Panel hasil survei Properti Go dan Menu Go.
@@ -21,10 +64,11 @@ import { bacaSurveiEkonomi } from '../../data/surveiEkonomi';
  * ditimpa siapa pun. Klik pada label basemap boleh mengubah panel POI sesuka
  * hatinya; panel ini tetap menampilkan titik yang dipilih pengguna.
  *
- * Yang ditampilkan hanya hasil survei lapangan - foto, menu, harga, kondisi.
- * Analisis aksesibilitas per radius tidak ikut, sesuai permintaan: satu hal
- * yang benar-benar bekerja lebih berguna daripada dua hal yang saling
- * menjatuhkan.
+ * Pokoknya tetap hasil survei lapangan - foto, menu, harga, kondisi. Parameter
+ * disabilitas menyusul di bawahnya sebagai deretan lambang saja, bukan tabel:
+ * ia keterangan pendamping, bukan sorotan utama, dan tabel penuh akan menuntut
+ * perhatian yang tidak seharusnya ia dapatkan di sini. Untuk pembacaan lengkap
+ * per parameter sudah ada panel Tempat.
  */
 
 interface Props {
@@ -35,6 +79,32 @@ interface Props {
 
 export default function PanelSurvei({ titik, onClose }: Props) {
   const survei = bacaSurveiEkonomi(titik);
+  const [analisis, setAnalisis] = useState<WawasanTempat | null>(null);
+  const [sedangMemuat, setSedangMemuat] = useState(false);
+
+  useEffect(() => {
+    if (!titik?.id) return;
+
+    let batal = false;
+    setAnalisis(null);
+    setSedangMemuat(true);
+
+    difaMapApi
+      .getTempatInsight(titik.id, 500)
+      .then((r) => {
+        if (!batal) setAnalisis(r?.data ?? null);
+      })
+      .catch(() => {
+        if (!batal) setAnalisis(null);
+      })
+      .finally(() => {
+        if (!batal) setSedangMemuat(false);
+      });
+
+    return () => {
+      batal = true;
+    };
+  }, [titik?.id]);
   const isMenuGo = titik?.type === 'MENU_GO';
 
   const judul =
@@ -182,10 +252,106 @@ export default function PanelSurvei({ titik, onClose }: Props) {
         </div>
       )}
 
+      {/* Parameter disabilitas di sekitarnya - lambang saja. */}
+      {analisis && analisis.jumlahTitik > 0 && (
+        <div style={{ marginTop: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#475569' }}>
+              Aksesibilitas di sekitar
+            </span>
+            <span style={{ fontSize: '10.5px', color: '#94A3B8' }}>
+              {analisis.skorRata != null ? `skor ${analisis.skorRata} \u00b7 ` : ''}
+              {analisis.jumlahTitik} titik dalam {analisis.radiusMeter} m
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '7px' }}>
+            {analisis.parameter.map((p) => {
+              const Ikon = LAMBANG[p.kunci] ?? Accessibility;
+              const w = WARNA[p.status];
+              return (
+                <div
+                  key={p.kunci}
+                  title={`${p.label}: ${w.kata}${p.jumlah > 0 ? ` (${p.jumlah} titik teramati)` : ''}`}
+                  style={{
+                    width: '34px',
+                    height: '34px',
+                    borderRadius: '9px',
+                    border: `1px solid ${w.garis}`,
+                    backgroundColor: w.isi,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: w.teks,
+                  }}
+                >
+                  <Ikon size={17} strokeWidth={2.2} />
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '6px', lineHeight: '14px' }}>
+            Hijau layak, merah bermasalah, abu-abu belum teramati. Arahkan kursor ke
+            lambang untuk namanya.
+          </div>
+        </div>
+      )}
+
+      {/* Tidak ada satu pun titik survei dalam jangkauan.
+          Dikatakan terus terang: deretan lambang yang hilang tanpa keterangan
+          akan terbaca sebagai gagal memuat, padahal ketiadaannya justru
+          temuan - kawasan ini memang belum pernah didatangi surveyor. */}
+      {analisis && analisis.jumlahTitik === 0 && (
+        <div
+          style={{
+            marginTop: '14px',
+            padding: '11px',
+            border: '1px dashed #CBD5E1',
+            borderRadius: '9px',
+            fontSize: '11.5px',
+            color: '#64748B',
+            lineHeight: '17px',
+          }}
+        >
+          Belum ada satu pun titik survei DifaMap dalam radius {analisis.radiusMeter} m
+          dari sini, jadi kondisi aksesibilitas sekitarnya belum bisa dinilai.
+        </div>
+      )}
+
+      {/* Wawasan Difa AI */}
+      {sedangMemuat && (
+        <div style={{ marginTop: '12px', padding: '10px', border: '1px dashed #CBD5E1', borderRadius: '9px', fontSize: '11.5px', color: '#64748B' }}>
+          Difa AI sedang membaca sekitar tempat ini...
+        </div>
+      )}
+
+      {analisis?.wawasan && (
+        <div style={{ marginTop: '12px', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '10px', padding: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '5px' }}>
+            <Sparkles size={14} color="#D97706" />
+            <span style={{ fontSize: '12px', fontWeight: 800, color: '#000000' }}>Wawasan Difa AI</span>
+          </div>
+          <div style={{ fontSize: '11.5px', color: '#475569', lineHeight: '17px' }}>
+            {analisis.wawasan.ringkasan}
+          </div>
+          {analisis.wawasan.temuan.length > 0 && (
+            <ul style={{ margin: '7px 0 0 0', paddingLeft: '16px', fontSize: '11.5px', color: '#475569', lineHeight: '17px' }}>
+              {analisis.wawasan.temuan.map((t, i) => (
+                <li key={i} style={{ marginTop: '2px' }}>{t}</li>
+              ))}
+            </ul>
+          )}
+          <div style={{ fontSize: '10.5px', color: '#92400E', marginTop: '7px', paddingTop: '6px', borderTop: '1px solid #FDE68A' }}>
+            {analisis.wawasan.catatan}
+          </div>
+        </div>
+      )}
+
       <div style={{ fontSize: '10.5px', color: '#94A3B8', marginTop: '12px', lineHeight: '15px' }}>
-        Seluruh isi panel ini berasal dari survei lapangan tim lewat aplikasi MAPID.
-        Titik ekonomi tidak mencatat parameter aksesibilitas, jadi tidak ada skor
-        disabilitas yang bisa ditampilkan untuk tempat ini sendiri.
+        Rincian dan foto di atas berasal dari survei lapangan tim lewat aplikasi MAPID.
+        Titik ekonomi tidak mencatat parameter aksesibilitas, jadi lambang di atas
+        menggambarkan SEKITAR tempat ini - bukan tempatnya sendiri.
       </div>
     </aside>
   );
