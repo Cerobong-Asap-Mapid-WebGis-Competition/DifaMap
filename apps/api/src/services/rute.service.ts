@@ -149,6 +149,24 @@ export async function hitungRute(
  * Poligon jangkauan waktu tempuh - isokron yang sesungguhnya, mengikuti jalan.
  * Mengembalikan null bila layanan tidak tersedia.
  */
+/**
+ * Simpanan isokron, supaya satu tindakan pengguna tidak membayar berkali-kali.
+ *
+ * Satu kali Site Analysis meminta isokron TIGA kali untuk titik dan pita yang
+ * sama persis: sekali untuk menggambar cincinnya di peta, sekali untuk kartu
+ * ringkasan, dan sekali lagi untuk analisis titiknya. Membandingkan dua lokasi
+ * menambah dua lagi. Jatah gratisnya 500 isokron per hari, dan pada pengujian
+ * hari ini jatah itu benar-benar habis - panelnya lalu jatuh ke lingkaran
+ * radius, yang meski jujur tetap jauh lebih buruk daripada poligon sungguhan.
+ *
+ * Koordinat dibulatkan lima desimal, sekitar satu meter: dua permintaan untuk
+ * titik yang sama tidak pernah berbeda lebih dari itu, sementara titik yang
+ * memang berbeda tidak akan pernah tertukar.
+ */
+const simpananIsokron = new Map<string, { waktu: number; data: any }>();
+const UMUR_SIMPANAN = 30 * 60 * 1000;
+const BATAS_SIMPANAN = 200;
+
 export async function hitungIsokron(
   pusat: { latitude: number; longitude: number },
   menit: number[],
@@ -160,6 +178,15 @@ export async function hitungIsokron(
     range_type: 'time',
   };
 
+  const kunci = `${profilDari(moda)}|${pusat.latitude.toFixed(5)},${pusat.longitude.toFixed(
+    5
+  )}|${menit.join(',')}`;
+
+  const tersimpan = simpananIsokron.get(kunci);
+  if (tersimpan && Date.now() - tersimpan.waktu < UMUR_SIMPANAN) {
+    return tersimpan.data;
+  }
+
   // Luas tiap pita ikut diminta. Tanpa ini, "8 titik terjangkau" tidak bisa
   // dibandingkan antar titik analisis: delapan titik di dalam 0,4 km persegi
   // jauh lebih rapat daripada delapan titik di dalam 1,8 km persegi.
@@ -168,7 +195,10 @@ export async function hitungIsokron(
     attributes: ['area'],
   });
 
-  if (hasil?.features?.length) return hasil;
+  if (hasil?.features?.length) {
+    ingatIsokron(kunci, hasil);
+    return hasil;
+  }
 
   /**
    * Coba sekali lagi tanpa atribut tambahan.
@@ -182,5 +212,22 @@ export async function hitungIsokron(
   const tanpaAtribut = await panggil(`/v2/isochrones/${profilDari(moda)}`, badan);
 
   if (!tanpaAtribut?.features?.length) return null;
+
+  ingatIsokron(kunci, tanpaAtribut);
   return tanpaAtribut;
+}
+
+/**
+ * Menyimpan satu isokron, dan membuang yang paling tua bila sudah terlalu
+ * banyak. Kegagalan tidak pernah disimpan: jatah yang habis pada pukul sebelas
+ * bisa pulih pada pukul dua belas, dan menyimpan kegagalannya akan mengunci
+ * titik itu ke lingkaran radius jauh setelah layanannya sendiri kembali.
+ */
+function ingatIsokron(kunci: string, data: any): void {
+  if (simpananIsokron.size >= BATAS_SIMPANAN) {
+    const tertua = simpananIsokron.keys().next().value;
+    if (tertua) simpananIsokron.delete(tertua);
+  }
+
+  simpananIsokron.set(kunci, { waktu: Date.now(), data });
 }
