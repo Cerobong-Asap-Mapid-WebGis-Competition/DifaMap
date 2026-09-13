@@ -622,7 +622,19 @@ export default function AiChatbotDrawer({
         bottom: isMobile ? 0 : '24px',
         width: isMobile ? '100%' : '460px',
         maxWidth: isMobile ? '100vw' : 'calc(100vw - 48px)',
-        maxHeight: isMobile ? '86vh' : 'calc(100vh - 48px)',
+        /**
+         * Tinggi mengikuti isi panelnya, bukan satu angka untuk keduanya.
+         *
+         * Di mode percakapan, ruang baca lebih berharga daripada melihat peta:
+         * jawabannya panjang, dan rute yang digambarnya sudah punya pita
+         * ringkasan sendiri di atas peta.
+         *
+         * Di mode perencana justru sebaliknya. Seluruh guna Site Selection
+         * adalah MELIHAT grid prioritasnya, dan Site Analysis menggambar cincin
+         * jangkauan - panel setinggi 86% layar menutupi keduanya, sehingga yang
+         * tersisa hanya angka tanpa peta yang dijelaskannya.
+         */
+        maxHeight: isMobile ? (tampilan === 'PERENCANA' ? '62vh' : '86vh') : 'calc(100vh - 48px)',
         backgroundColor: '#FFFFFF',
         borderRadius: isMobile ? '24px 24px 0 0' : '16px',
         boxShadow: isMobile ? '0 -8px 36px rgba(0, 0, 0, 0.25)' : '0 8px 32px rgba(0, 0, 0, 0.18)',
