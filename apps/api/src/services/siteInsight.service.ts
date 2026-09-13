@@ -101,13 +101,38 @@ export interface AnalisisTitik {
    * skor 4,5 dari dua belas titik. Tanpa angka ini, keduanya tampil identik di
    * panel - dan yang pertama terbaca jauh lebih meyakinkan daripada seharusnya.
    */
+  /**
+   * Titik yang, bila diperbaiki, paling mengubah keadaan dari sini.
+   *
+   * Yang disimulasikan adalah PARAMETER TERCATAT - ramp, ubin pemandu, trotoar,
+   * permukaan, penerangan - bukan jaringan jalannya. Kita tidak bisa menyuruh
+   * layanan rute menganggap sebuah trotoar sudah diperbaiki, jadi jangkauan
+   * isokronnya tidak ikut berubah. Yang berubah adalah hambatan yang hilang,
+   * dan apakah sebuah kebutuhan menjadi terpenuhi di dalam jangkauan.
+   */
+  skenario: Array<{
+    nama: string;
+    jenis: string;
+    menit: number | null;
+    jarakMeter: number;
+    skor: number | null;
+    hambatan: string[];
+    dampak: string[];
+    nilaiDampak: number;
+  }>;
   cakupanIsokron: {
     persen: number;
     petakBerdata: number;
     petakTotal: number;
     radiusUjiMeter: number;
   } | null;
-  wawasan: { ringkasan: string; temuan: string[]; catatan: string } | null;
+  wawasan: {
+    ringkasan: string;
+    temuan: string[];
+    /** Satu perbaikan yang paling mengubah keadaan, dijelaskan apa adanya. */
+    perbaikan: string;
+    catatan: string;
+  } | null;
 }
 
 /**
@@ -161,13 +186,18 @@ const SKEMA = {
         description: 'Dua sampai empat temuan pendek, masing-masing satu kalimat.',
         items: { type: 'string' },
       },
+      perbaikan: {
+        type: 'string',
+        description:
+          'Dua sampai tiga kalimat tentang SATU perbaikan yang paling mengubah keadaan dari titik ini. Sebut nama titiknya, hambatan yang hilang, dan apa yang berubah bagi pengguna. Katakan juga bahwa jangkauan isokron TIDAK ikut dihitung ulang - yang disimulasikan hanya parameter tercatat. Bila tidak ada calon perbaikan, katakan itu.',
+      },
       catatan: {
         type: 'string',
         description:
           'Satu kalimat tentang batas kesimpulan ini: berapa titik yang mendasarinya, dan apa yang belum terdata.',
       },
     },
-    required: ['ringkasan', 'temuan', 'catatan'],
+    required: ['ringkasan', 'temuan', 'perbaikan', 'catatan'],
     additionalProperties: false,
   },
 } as const;
@@ -192,6 +222,13 @@ ATURAN YANG TIDAK BOLEH DILANGGAR
 
 5. Bahasa Indonesia, lugas. Jangan menganjurkan perbaikan atas sesuatu yang
    tidak terdata.
+
+6. Bagian "perbaikan" adalah SIMULASI parameter tercatat, bukan ramalan. Titik
+   yang diperbaiki akan kehilangan hambatan yang tercatat di situ, dan sebuah
+   kebutuhan bisa menjadi terpenuhi di dalam jangkauan. Yang TIDAK berubah
+   adalah bentuk isokronnya: layanan rute tidak tahu trotoar itu sudah
+   diperbaiki, jadi jangan mengatakan jangkauannya bertambah luas atau waktu
+   tempuhnya berkurang.
 `.trim();
 
 export async function analisisTitik(
@@ -357,6 +394,96 @@ export async function analisisTitik(
 
   const cakupanIsokron = hitungCakupan();
 
+  /**
+   * Titik mana yang, bila diperbaiki, paling mengubah keadaan dari sini.
+   *
+   * Hambatan dihitung dari parameter yang BENAR-BENAR tercatat bermasalah.
+   * "Belum teramati" tidak dihitung sebagai hambatan - memperbaiki sesuatu yang
+   * tidak pernah terlihat bukan perbaikan, melainkan tebakan.
+   *
+   * Bobot jarak membuat titik dekat lebih berarti daripada titik jauh: yang
+   * berada dalam lima menit dilewati hampir semua orang yang berangkat dari
+   * sini, sementara yang di pita lima belas menit hanya sebagian.
+   */
+  const MASALAH: Array<{ kolom: string; buruk: string[]; sebutan: string }> = [
+    { kolom: 'rampStatus', buruk: ['NONE', 'DAMAGED'], sebutan: 'ramp tidak layak' },
+    { kolom: 'guidingBlockStatus', buruk: ['NONE', 'DAMAGED'], sebutan: 'ubin pemandu rusak atau tidak ada' },
+    { kolom: 'sidewalkCondition', buruk: ['DAMAGED', 'BLOCKED', 'NARROW'], sebutan: 'trotoar rusak, sempit, atau terhalang' },
+    { kolom: 'surfaceCondition', buruk: ['SLIPPERY', 'POTHOLE', 'UNEVEN'], sebutan: 'permukaan tidak rata' },
+    { kolom: 'lightingLevel', buruk: ['DIM', 'DARK'], sebutan: 'penerangan kurang' },
+  ];
+
+  const bobotPita = (menit: number | null): number => {
+    if (menit === null) return 0;
+    if (menit <= 5) return 3;
+    if (menit <= 10) return 2;
+    return 1;
+  };
+
+  // Kebutuhan yang saat ini BELUM terpenuhi di dalam jangkauan - hanya untuk
+  // itulah sebuah perbaikan bisa membuka sesuatu yang baru.
+  const belumTerpenuhi = terdekat.filter((t) => !t.didalamJangkauan).map((t) => t.kebutuhan);
+
+  const skenario = didalam
+    .map((x) => {
+      const l: any = x.l;
+
+      const hambatan = MASALAH.filter((m) => m.buruk.includes(String(l[m.kolom]))).map((m) => m.sebutan);
+      if (hambatan.length === 0) return null;
+
+      const dampak: string[] = [
+        `${hambatan.length} hambatan tercatat hilang di titik ini`,
+      ];
+
+      /**
+       * Trotoar yang diperbaiki bisa menjadikan "trotoar layak" tersedia di
+       * dalam jangkauan - dan itu perubahan yang benar-benar dirasakan, bukan
+       * sekadar angka yang naik.
+       */
+      const jadiTrotoarLayak =
+        l.entityType === 'SIDEWALK' &&
+        belumTerpenuhi.some((k) => k.startsWith('Trotoar yang layak'));
+
+      if (jadiTrotoarLayak) {
+        const sekarang = terdekat.find((t) => t.kebutuhan.startsWith('Trotoar yang layak'));
+        dampak.push(
+          `trotoar layak menjadi tersedia dalam ${x.menit} menit (kini terdekat ${
+            sekarang?.jarakMeter ?? '-'
+          } m, di luar jangkauan)`
+        );
+      }
+
+      // Titik terburuk di pitanya menekan skor rata-rata paling dalam.
+      const sepita = didalam.filter((y) => y.menit === x.menit);
+      const terburukSepita =
+        sepita.length > 1 &&
+        typeof l.overallScore === 'number' &&
+        sepita.every(
+          (y: any) => typeof y.l.overallScore !== 'number' || y.l.overallScore >= l.overallScore
+        );
+
+      if (terburukSepita) {
+        dampak.push(`titik berskor terendah di pita ${x.menit} menit`);
+      }
+
+      const nilaiDampak =
+        hambatan.length * bobotPita(x.menit) + (jadiTrotoarLayak ? 4 : 0) + (terburukSepita ? 2 : 0);
+
+      return {
+        nama: l.name as string,
+        jenis: l.entityType as string,
+        menit: x.menit,
+        jarakMeter: x.jarak,
+        skor: (l.overallScore ?? null) as number | null,
+        hambatan,
+        dampak,
+        nilaiDampak,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+    .sort((a, b) => b.nilaiDampak - a.nilaiDampak)
+    .slice(0, 5);
+
   const namaWilayah = await namaiKoordinat(latitude, longitude);
 
   const hasil: AnalisisTitik = {
@@ -372,6 +499,7 @@ export async function analisisTitik(
       diluar: berjarak.filter((x) => x.menit === null && x.jarak <= radiusTerbesar).length,
     },
     cakupanIsokron,
+    skenario,
     wawasan: null,
   };
 
@@ -423,6 +551,18 @@ async function susunWawasan(a: AnalisisTitik) {
     a.cakupanIsokron
       ? `\nCakupan survei di dalam jangkauan: ${a.cakupanIsokron.persen}% wilayahnya punya titik survei dalam ${a.cakupanIsokron.radiusUjiMeter} meter. Bila angka ini rendah, katakan bahwa sebagian besar jangkauan ini belum pernah didatangi surveyor.`
       : '',
+    a.skenario.length > 0
+      ? [
+          '',
+          'CALON PERBAIKAN, diurutkan dari yang paling besar pengaruhnya. Angka pengaruh sudah dihitung dari jumlah hambatan, kedekatan, dan apakah perbaikan itu membuka kebutuhan yang kini belum terpenuhi:',
+          ...a.skenario.map(
+            (k, i) =>
+              `  ${i + 1}. ${k.nama} (skor ${k.skor ?? '-'}, ${k.jarakMeter} m, pita ${k.menit} menit)\n` +
+              `     hambatan sekarang: ${k.hambatan.join('; ')}\n` +
+              `     bila diperbaiki: ${k.dampak.join('; ')}`
+          ),
+        ].join('\n')
+      : '\nTidak ada titik dengan hambatan tercatat di dalam jangkauan, jadi tidak ada calon perbaikan yang bisa disimulasikan.',
   ].join('\n');
 
   try {

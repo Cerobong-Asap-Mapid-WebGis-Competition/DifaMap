@@ -80,7 +80,17 @@ interface AnalisisTitik {
   terjangkau: Array<{ nama: string; skor: number | null; jenis: string; jarakMeter: number; menit: number | null }>;
   terdekat: Array<{ kebutuhan: string; nama: string | null; skor: number | null; jarakMeter: number | null; didalamJangkauan: boolean }>;
   cakupan: { didalam: number; diluar: number };
-  wawasan: { ringkasan: string; temuan: string[]; catatan: string } | null;
+  skenario: Array<{
+    nama: string;
+    jenis: string;
+    menit: number | null;
+    jarakMeter: number;
+    skor: number | null;
+    hambatan: string[];
+    dampak: string[];
+    nilaiDampak: number;
+  }>;
+  wawasan: { ringkasan: string; temuan: string[]; perbaikan: string; catatan: string } | null;
 }
 
 interface WawasanGrid {
@@ -1693,6 +1703,72 @@ export default function AiChatbotDrawer({
                         </div>
                       )}
                     </div>
+
+                    {/* Skenario perbaikan.
+                        Panel lain memotret KEADAAN; bagian ini menjawab
+                        pertanyaan yang sebenarnya dihadapi perencana - kalau
+                        anggarannya hanya cukup untuk satu titik, titik mana
+                        yang paling mengubah keadaan dari sini. */}
+                    {analisisTitik.skenario.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: '11.5px', fontWeight: 800, color: '#000000', marginBottom: '2px' }}>
+                          Bila Satu Titik Diperbaiki
+                        </div>
+                        <div style={{ fontSize: '10px', color: '#94A3B8', lineHeight: '14px', marginBottom: '6px' }}>
+                          Diurutkan menurut pengaruhnya: jumlah hambatan, kedekatan, dan apakah
+                          perbaikan itu membuka kebutuhan yang kini belum terpenuhi.
+                        </div>
+
+                        {analisisTitik.skenario.slice(0, 3).map((k, i) => (
+                          <div
+                            key={k.nama + i}
+                            style={{
+                              backgroundColor: '#FFFFFF',
+                              border: '1px solid #E2E8F0',
+                              borderRadius: '8px',
+                              padding: '9px 10px',
+                              marginTop: '5px',
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                              <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#0F172A', flex: 1 }}>
+                                {i + 1}. {k.nama}
+                              </span>
+                              <span style={{ fontSize: '10.5px', color: '#94A3B8', flexShrink: 0 }}>
+                                {k.menit} mnt &middot; {k.jarakMeter} m
+                              </span>
+                            </div>
+
+                            <div style={{ fontSize: '10.5px', color: '#B91C1C', marginTop: '3px', lineHeight: '15px' }}>
+                              Sekarang: {k.hambatan.join('; ')}
+                            </div>
+                            <div style={{ fontSize: '10.5px', color: '#15803D', marginTop: '2px', lineHeight: '15px' }}>
+                              Bila diperbaiki: {k.dampak.join('; ')}
+                            </div>
+                          </div>
+                        ))}
+
+                        {analisisTitik.wawasan?.perbaikan && (
+                          <div style={{ backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '8px', padding: '10px', marginTop: '7px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                              <Sparkles size={13} color="#15803D" />
+                              <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#14532D' }}>
+                                Saran Difa AI
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '11.5px', color: '#166534', lineHeight: '17px' }}>
+                              {analisisTitik.wawasan.perbaikan}
+                            </div>
+                          </div>
+                        )}
+
+                        <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '6px', lineHeight: '14px' }}>
+                          Yang disimulasikan adalah parameter tercatat - ramp, ubin pemandu,
+                          trotoar, permukaan, penerangan. Bentuk jangkauan isokron TIDAK ikut
+                          dihitung ulang: layanan rute tidak tahu trotoar itu sudah diperbaiki.
+                        </div>
+                      </div>
+                    )}
 
                     {/* Wawasan Difa AI */}
                     {analisisTitik.wawasan && (
