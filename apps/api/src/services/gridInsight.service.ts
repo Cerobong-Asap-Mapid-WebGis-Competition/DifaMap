@@ -61,7 +61,7 @@ const SKEMA = {
             alasan: {
               type: 'string',
               description:
-                'Dua sampai tiga kalimat: kenapa sel ini berperingkat segitu, berdasarkan titik dan hambatan yang disebutkan. Sebutkan nama titik bila ada.',
+                'Dua sampai tiga kalimat: kenapa sel ini berperingkat segitu. WAJIB menyebut nama minimal satu titik survei di sel itu beserta skornya, persis seperti tertulis di data - itu yang membuat kesimpulannya bisa ditelusuri pembaca. Jangan hanya menyebut jumlah.',
             },
             tindakan: {
               type: 'string',
@@ -120,6 +120,11 @@ ATURAN YANG TIDAK BOLEH DILANGGAR
 7. Titik yang disebutkan di data adalah titik BERSKOR TERBURUK di sel itu,
    diurutkan dari yang paling buruk. Pakai itu sebagai bukti - jangan menyebut
    sebuah titik sebagai contoh masalah bila skornya justru tinggi.
+
+8. Tiap penjelasan sel WAJIB menyebut nama minimal satu titik beserta skornya,
+   disalin persis dari data. "Tiga titik tanpa ramp layak" memberi tahu jumlah;
+   "Bus Stop Mega Rezky 1 berskor 1,5" memberi tahu ke mana harus pergi - dan
+   hanya yang kedua yang bisa ditelusuri pembaca di peta.
 `.trim();
 
 export async function susunWawasanGrid(
