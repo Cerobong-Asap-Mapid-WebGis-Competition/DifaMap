@@ -84,6 +84,18 @@ export interface SiniGridCell {
   };
 }
 
+/** Jarak dua koordinat dalam meter. */
+function jarakMeter(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const R = 6371000;
+  const rad = Math.PI / 180;
+  const dLat = (bLat - aLat) * rad;
+  const dLng = (bLng - aLng) * rad;
+  const x =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(aLat * rad) * Math.cos(bLat * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+
 class MapIdService {
   private apiClient: AxiosInstance;
   private basemapClient: AxiosInstance;
@@ -571,13 +583,52 @@ class MapIdService {
           return 'umum';
         };
 
-        const transportCount = cellLocations.filter((l) => golongan(l) === 'transit').length;
-        const healthCount = cellLocations.filter((l) => golongan(l) === 'kesehatan').length;
-        const commercialCount = cellLocations.filter(
-          (l) =>
-            golongan(l) === 'umum' &&
-            (l.category === 'MALL' || l.category === 'RESTAURANT' || l.entityType === 'PLACE')
-        ).length;
+        /**
+         * Titik yang berdempetan dihitung sebagai SATU tujuan.
+         *
+         * "Kepadatan kegiatan" seharusnya mengukur berapa banyak tujuan berbeda
+         * yang ada di sebuah sel, bukan berapa banyak baris survei. Keduanya
+         * berbeda jauh: kampus Teknik Unhas menyumbang empat belas titik -
+         * gedung Elektro, Arsitektur, Sipil, CSA, koridor, area tunggu - yang
+         * seluruhnya berdiri di satu halaman yang sama.
+         *
+         * Dihitung apa adanya, satu kampus itu setara empat belas tempat umum
+         * yang tersebar, dan nilai selnya memuncak sampai batas atas. Dari 31
+         * titik yang terhitung "tempat umum" di seluruh data, 14 di antaranya
+         * bergolongan EDUCATION dan sebagian besar berasal dari kampus itu
+         * saja.
+         *
+         * Seratus lima puluh meter: cukup rapat untuk memisahkan dua bangunan
+         * di seberang jalan, cukup longgar untuk menyatukan gedung-gedung dalam
+         * satu kompleks.
+         */
+        const JARAK_SEGUGUS = 150;
+
+        const hitungGugus = (titik: typeof cellLocations): number => {
+          const pusat: Array<{ lat: number; lng: number }> = [];
+
+          for (const l of titik) {
+            if (typeof l.latitude !== 'number') continue;
+
+            const sudahAda = pusat.some(
+              (q) => jarakMeter(q.lat, q.lng, l.latitude, l.longitude) <= JARAK_SEGUGUS
+            );
+
+            if (!sudahAda) pusat.push({ lat: l.latitude, lng: l.longitude });
+          }
+
+          return pusat.length;
+        };
+
+        const transportCount = hitungGugus(cellLocations.filter((l) => golongan(l) === 'transit'));
+        const healthCount = hitungGugus(cellLocations.filter((l) => golongan(l) === 'kesehatan'));
+        const commercialCount = hitungGugus(
+          cellLocations.filter(
+            (l) =>
+              golongan(l) === 'umum' &&
+              (l.category === 'MALL' || l.category === 'RESTAURANT' || l.entityType === 'PLACE')
+          )
+        );
 
         const hunianCount = cellEkonomi.filter((e) => e.type === 'PROPERTI_GO').length;
         const kuliner = cellEkonomi.filter((e) => e.type === 'MENU_GO');
