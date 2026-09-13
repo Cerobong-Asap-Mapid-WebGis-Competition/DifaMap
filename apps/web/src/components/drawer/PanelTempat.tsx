@@ -390,7 +390,7 @@ export default function PanelTempat({ poi, onClose, onRadiusChange }: Props) {
         left: isMobile ? 0 : '96px',
         right: isMobile ? 0 : 'auto',
         width: isMobile ? '100%' : '420px',
-        maxHeight: isMobile ? '72vh' : 'calc(100% - 112px)',
+        maxHeight: isMobile ? '62vh' : 'calc(100% - 112px)',
         overflowY: 'auto',
         backgroundColor: '#F8FAFC',
         borderRadius: isMobile ? '16px 16px 0 0' : '16px',

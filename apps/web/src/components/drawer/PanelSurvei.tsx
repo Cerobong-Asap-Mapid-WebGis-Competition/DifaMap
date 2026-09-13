@@ -132,7 +132,7 @@ export default function PanelSurvei({ titik, onClose }: Props) {
         right: isMobile ? 0 : 'auto',
         width: isMobile ? '100%' : '420px',
         maxWidth: isMobile ? '100vw' : 'calc(100vw - 120px)',
-        maxHeight: isMobile ? '76vh' : 'calc(100vh - 130px)',
+        maxHeight: isMobile ? '62vh' : 'calc(100vh - 130px)',
         overflowY: 'auto',
         backgroundColor: '#FFFFFF',
         borderRadius: isMobile ? '16px 16px 0 0' : '16px',

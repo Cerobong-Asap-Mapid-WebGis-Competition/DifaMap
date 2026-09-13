@@ -692,7 +692,11 @@ export default function MapCanvas({
     // bisa dilihatnya. Pusat karena itu dipindah ke kanan separuh lebar panel.
     //
     // Di layar sempit panel menempati bagian bawah, jadi yang digeser tingginya.
-    const gesekan: [number, number] = isMobile ? [0, -110] : [258, 0];
+    // Di layar sempit, lembar panel menutupi 62% bagian bawah layar. Titik
+    // yang dituju karena itu digeser jauh ke atas supaya mendarat di pita peta
+    // yang masih terlihat, bukan di balik lembarnya. Pergeseran 110 piksel yang
+    // lama dihitung untuk panel yang jauh lebih pendek.
+    const gesekan: [number, number] = isMobile ? [0, -180] : [258, 0];
 
     /**
      * Mendekat sampai bangunan tiga dimensinya benar-benar menyembul.
@@ -754,8 +758,11 @@ export default function MapCanvas({
         // separuh lingkarannya mendarat di baliknya. Ruang atas dilebihkan
         // karena pada pandangan miring, tepi lingkaran yang jauh terdorong naik
         // dan paling mudah terpotong.
+        // Ruang bawah di layar sempit harus setinggi lembar panelnya - 62% layar -
+        // bukan 320 piksel yang dihitung untuk lembar lama yang lebih pendek.
+        // Tanpa itu separuh bawah lingkarannya mendarat di balik panel.
         padding: isMobile
-          ? { top: 150, bottom: 320, left: 30, right: 30 }
+          ? { top: 120, bottom: Math.round(window.innerHeight * 0.64), left: 24, right: 24 }
           : { top: 170, bottom: 60, left: 540, right: 80 },
         /**
          * Miring, tetapi tidak securam titik survei.

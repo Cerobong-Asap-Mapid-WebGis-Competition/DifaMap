@@ -358,7 +358,19 @@ export default function DetailDrawer({
         bottom: isMobile ? 0 : '20px',
         width: isMobile ? '100%' : '440px',
         maxWidth: isMobile ? '100vw' : 'calc(100vw - 116px)',
-        maxHeight: isMobile ? '86vh' : 'calc(100vh - 116px)',
+        /**
+         * Menyisakan peta yang benar-benar terlihat.
+         *
+         * Sebelumnya lembar ini setinggi 86vh, dan empat belas persen yang
+         * tersisa habis persis oleh bilah pencarian di atasnya - petanya tidak
+         * tersisa sedikit pun. Padahal seluruh gunanya membuka sebuah titik
+         * adalah melihat titik itu DI PETA; panel yang menutupi petanya
+         * membatalkan alasan ia dibuka.
+         *
+         * Enam puluh dua persen menyisakan sekitar seperempat layar di atasnya -
+         * cukup untuk melihat pin yang sedang dibuka beserta sekitarnya.
+         */
+        maxHeight: isMobile ? '62vh' : 'calc(100vh - 116px)',
         backgroundColor: '#FFFFFF',
         borderRadius: isMobile ? '24px 24px 0 0' : '20px',
         boxShadow: isMobile ? '0px -8px 36px rgba(0, 0, 0, 0.3)' : '0px 14px 44px rgba(0, 0, 0, 0.16)',
