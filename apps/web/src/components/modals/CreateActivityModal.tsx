@@ -219,7 +219,17 @@ export default function CreateActivityModal({
         inset: 0,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         backdropFilter: 'blur(4px)',
-        zIndex: 60,
+        /**
+         * Di atas bilah atas, bukan di bawahnya.
+         *
+         * Bilah pencarian berlapis 70 sementara modal ini 60, sehingga tombol
+         * Tempat, Halte, Difa AI, dan Lapor menembus ke depan dan menindih
+         * judul modalnya - paling parah di layar sempit, tempat keduanya
+         * berebut ruang yang sama. Modal adalah tugas yang menuntut perhatian
+         * penuh: selama ia terbuka, tidak ada yang boleh tampil di atasnya,
+         * termasuk daftar saran pencarian yang berlapis 100.
+         */
+        zIndex: 110,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
