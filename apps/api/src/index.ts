@@ -15,6 +15,14 @@ const app = express();
  */
 app.set('trust proxy', env.TRUST_PROXY_HOPS);
 
+// Normalisasi URL (misal '//api/...' menjadi '/api/...') agar tidak 404 bila klien menyertakan trailing slash
+app.use((req, _res, next) => {
+  if (req.url.startsWith('//')) {
+    req.url = req.url.replace(/^\/+/, '/');
+  }
+  next();
+});
+
 // Middleware
 app.use(compression()); // Gzip/Brotli compression untuk data cepat & ringan
 

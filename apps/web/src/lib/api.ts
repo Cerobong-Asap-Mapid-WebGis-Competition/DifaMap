@@ -14,7 +14,7 @@
  * Kegagalan itu tidak memunculkan pesan apa pun, hanya peta kosong, jadi
  * peringatannya dimunculkan sendiri di konsol peramban.
  */
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/\/+$/, '');
 
 if (
   typeof window !== 'undefined' &&
