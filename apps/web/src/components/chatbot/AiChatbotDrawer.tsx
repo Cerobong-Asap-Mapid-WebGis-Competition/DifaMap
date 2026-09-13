@@ -634,6 +634,16 @@ export default function AiChatbotDrawer({
          * jangkauan - panel setinggi 86% layar menutupi keduanya, sehingga yang
          * tersisa hanya angka tanpa peta yang dijelaskannya.
          */
+        /**
+         * Di layar sempit tingginya DIPATOK, bukan sekadar dibatasi.
+         *
+         * Dengan maxHeight saja, lembar ini mengikuti tinggi isi tiap tab:
+         * Site Selection panjang sehingga penuh, Site Analysis pendek sebelum
+         * dijalankan sehingga menyusut - dan berpindah tab membuat lembarnya
+         * melompat naik-turun. Dipatok, batas atasnya diam di tempat sementara
+         * isinya yang menggulung.
+         */
+        height: isMobile ? (tampilan === 'PERENCANA' ? '62vh' : '86vh') : undefined,
         maxHeight: isMobile ? (tampilan === 'PERENCANA' ? '62vh' : '86vh') : 'calc(100vh - 48px)',
         backgroundColor: '#FFFFFF',
         borderRadius: isMobile ? '24px 24px 0 0' : '16px',
