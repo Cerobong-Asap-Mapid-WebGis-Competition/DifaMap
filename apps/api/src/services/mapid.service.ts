@@ -500,9 +500,19 @@ class MapIdService {
       },
     });
 
-    const titikEkonomi = await prisma.economicPoint.findMany({
-      select: { type: true, latitude: true, longitude: true, metadata: true },
-    });
+    /**
+     * Titik ekonomi tanpa metadata tidak ikut menghitung.
+     *
+     * Empat belas dari dua puluh lima baris hanyalah nama tanpa isi, dan
+     * merekalah yang paling mudah menyesatkan di sini: moda Hunian dan
+     * Komersial menimbang KEBERADAAN titik, jadi satu nama karangan menaikkan
+     * nilai sebuah sel persis seperti hasil survei sungguhan.
+     */
+    const titikEkonomi = (
+      await prisma.economicPoint.findMany({
+        select: { type: true, latitude: true, longitude: true, metadata: true },
+      })
+    ).filter((p) => p.metadata && Object.keys(p.metadata as object).length > 0);
 
     const features: SiniGridCell[] = [];
     let gridIndex = 1;
