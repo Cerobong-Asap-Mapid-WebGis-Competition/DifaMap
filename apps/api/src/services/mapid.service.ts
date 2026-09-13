@@ -148,7 +148,10 @@ class MapIdService {
    * Endpoint: https://basemap.mapid.io/styles/{styleId}/style.json?key={API_KEY}
    */
   async getMapStyle(styleId: string) {
-    const activeKey = env.MAPID_API_KEY || '6a8a7eedffc137c94307a71c';
+    // Kunci tidak lagi punya cadangan tertulis di kode: MAPID_API_KEY sudah
+    // wajib diisi di config/env.ts, dan kunci yang tertanam di sumber ikut
+    // terbaca siapa pun begitu repositori ini dibuka.
+    const activeKey = env.MAPID_API_KEY;
 
     /**
      * Gaya diteruskan apa adanya.

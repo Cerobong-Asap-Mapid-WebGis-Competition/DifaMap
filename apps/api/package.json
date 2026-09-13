@@ -14,7 +14,8 @@
     "db:studio": "prisma studio",
     "score:ai": "tsx scripts/score-locations-openai.ts",
     "score:ai:test": "tsx scripts/score-locations-openai.ts --test",
-    "score:ai:all": "tsx scripts/score-locations-openai.ts --all"
+    "score:ai:all": "tsx scripts/score-locations-openai.ts --all",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

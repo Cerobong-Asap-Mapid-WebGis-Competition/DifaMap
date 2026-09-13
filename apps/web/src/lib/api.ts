@@ -3,7 +3,31 @@
  * Menghubungkan frontend Next.js ke backend Express (termasuk MAPID Proxy yang aman)
  */
 
+/**
+ * Alamat API, DIBAKAR SAAT BUILD - bukan dibaca saat dijalankan.
+ *
+ * Next.js mengganti setiap NEXT_PUBLIC_* dengan nilainya pada waktu build, jadi
+ * mengisi variabel ini setelah web terbangun tidak berpengaruh apa-apa. Bila
+ * lupa diisi, bundelnya membawa "http://localhost:4000" - dan setiap pengunjung
+ * akan memanggil komputernya sendiri, lalu melihat peta tanpa satu pun titik.
+ *
+ * Kegagalan itu tidak memunculkan pesan apa pun, hanya peta kosong, jadi
+ * peringatannya dimunculkan sendiri di konsol peramban.
+ */
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+if (
+  typeof window !== 'undefined' &&
+  !process.env.NEXT_PUBLIC_API_URL &&
+  window.location.hostname !== 'localhost' &&
+  window.location.hostname !== '127.0.0.1'
+) {
+  console.error(
+    '[DifaMap] NEXT_PUBLIC_API_URL tidak diisi saat build, sehingga web ini memanggil ' +
+      'http://localhost:4000 - alamat komputer pengunjung sendiri. Isi variabel itu lalu ' +
+      'BANGUN ULANG web-nya; mengisinya tanpa membangun ulang tidak mengubah apa pun.'
+  );
+}
 
 export interface LocationFilterParams {
   entityType?: 'PLACE' | 'SIDEWALK' | 'TRANSIT_HUB';

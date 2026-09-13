@@ -24,6 +24,29 @@ const envSchema = z.object({
   // lurus, keduanya dengan keterangan yang jujur.
   ORS_API_KEY: z.string().optional(),
   ORS_BASE_URL: z.string().url().default('https://api.openrouteservice.org'),
+
+  /**
+   * Domain yang boleh memanggil API ini, dipisah koma.
+   *
+   * Dibiarkan kosong berarti terbuka untuk siapa saja - benar untuk pengembangan
+   * lokal, berbahaya di produksi: situs mana pun bisa memanggil API ini dan
+   * menghabiskan jatah OpenAI serta OpenRouteService atas nama kita.
+   */
+  CORS_ORIGINS: z.string().optional(),
+
+  /**
+   * Berapa lapis proxy yang berdiri di depan server ini.
+   *
+   * Menentukan IP mana yang dianggap milik pengunjung. Tanpa ini, di belakang
+   * reverse proxy seluruh pengunjung terbaca ber-IP sama - IP proxy-nya - dan
+   * pembatas laju 120 permintaan per 15 menit menjadi jatah BERSAMA mereka
+   * semua, bukan jatah masing-masing.
+   *
+   * Satu untuk hosting biasa seperti Railway atau Render; dua bila ada
+   * Cloudflare di depannya. Jangan diisi angka berlebih: tiap lapis yang
+   * dipercaya adalah satu lapis yang header IP-nya bisa dipalsukan.
+   */
+  TRUST_PROXY_HOPS: z.string().default('1').transform((v) => parseInt(v, 10) || 1),
 });
 
 const parsed = envSchema.safeParse(process.env);
