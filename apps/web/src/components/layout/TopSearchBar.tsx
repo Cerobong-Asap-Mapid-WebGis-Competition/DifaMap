@@ -23,7 +23,7 @@ import { SidebarMode } from './AppSidebar';
 import { difaMapApi } from '../../lib/api';
 import { susunTempat } from '../../data/tempatPilihan';
 import { FILTER_PARAMETER, hitungFilter } from '../../data/filterParameter';
-import { useIsMobile } from '../../hooks/useIsMobile';
+import { useIsMobile, useIsTablet } from '../../hooks/useIsMobile';
 
 /**
  * Mode penyaring peta publik.
@@ -109,6 +109,8 @@ export default function TopSearchBar({
   onResetToDefault,
 }: TopSearchBarProps) {
   const isMobile = useIsMobile(768);
+  const isTablet = useIsTablet(769, 1024);
+  const isCompact = isMobile || isTablet;
   /**
    * Apakah Difa AI pernah dibuka di peramban ini.
    *
@@ -396,7 +398,7 @@ export default function TopSearchBar({
         flexDirection: isMobile ? 'column' : 'row',
         alignItems: isMobile ? 'stretch' : 'center',
         justifyContent: 'space-between',
-        gap: isMobile ? '8px' : '16px',
+        gap: isMobile ? '8px' : isTablet ? '10px' : '16px',
         // Di atas kedua panel detail (50 dan 20). Daftar saran pencarian tumbuh
         // ke bawah dan melintasi panel yang terbuka - dengan lapisan lebih
         // rendah, saran itu terpotong di balik panel meski kotak pencariannya
@@ -410,15 +412,16 @@ export default function TopSearchBar({
         ref={searchWrapperRef}
         style={{
           position: 'relative',
-          width: isMobile ? '100%' : '464px',
+          width: isMobile ? '100%' : isTablet ? '320px' : '464px',
           maxWidth: '100%',
+          flexShrink: isTablet ? 1 : 0,
           pointerEvents: 'auto',
         }}
       >
         <div
           style={{
             width: '100%',
-            height: isMobile ? '52px' : '60px',
+            height: isMobile ? '52px' : isTablet ? '48px' : '60px',
             backgroundColor: '#FFFFFF',
             borderRadius: '16px',
             boxShadow: isInputFocused ? '0px 8px 24px rgba(0, 0, 0, 0.12)' : '0px 4px 14px rgba(0, 0, 0, 0.08)',
@@ -1013,14 +1016,15 @@ export default function TopSearchBar({
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: isMobile ? '8px' : '12px',
+          gap: isCompact ? '8px' : '12px',
           pointerEvents: 'auto',
-          overflowX: isMobile ? 'auto' : 'visible',
-          flexWrap: isMobile ? 'nowrap' : 'wrap',
+          overflowX: 'auto',
+          flexWrap: 'nowrap',
           paddingBottom: isMobile ? '4px' : '0px',
           WebkitOverflowScrolling: 'touch',
           scrollbarWidth: 'none',
           maxWidth: '100%',
+          flexShrink: 0,
         }}
       >
         {/* PUBLIC MODE (Aktivitas & Tempat Quick Toggles) */}
@@ -1032,9 +1036,9 @@ export default function TopSearchBar({
               className={publicSubMode === 'TEMPAT' ? 'btn-yellow-pill' : 'btn-white-pill'}
               style={{
                 backgroundColor: publicSubMode === 'TEMPAT' ? '#FDC323' : '#FFFFFF',
-                height: isMobile ? '42px' : '48px',
-                padding: isMobile ? '0 14px' : '0 24px',
-                fontSize: isMobile ? '14px' : '15px',
+                height: isCompact ? '42px' : '48px',
+                padding: isCompact ? '0 14px' : '0 24px',
+                fontSize: isCompact ? '14px' : '15px',
                 fontWeight: '700',
                 flexShrink: 0,
               }}
@@ -1050,9 +1054,9 @@ export default function TopSearchBar({
               className={publicSubMode === 'HALTE' ? 'btn-yellow-pill' : 'btn-white-pill'}
               style={{
                 backgroundColor: publicSubMode === 'HALTE' ? '#FDC323' : '#FFFFFF',
-                height: isMobile ? '42px' : '48px',
-                padding: isMobile ? '0 14px' : '0 24px',
-                fontSize: isMobile ? '14px' : '15px',
+                height: isCompact ? '42px' : '48px',
+                padding: isCompact ? '0 14px' : '0 24px',
+                fontSize: isCompact ? '14px' : '15px',
                 fontWeight: '700',
                 flexShrink: 0,
               }}
@@ -1071,9 +1075,9 @@ export default function TopSearchBar({
               className={urbanFilter === 'PROPERTI_GO' ? 'btn-yellow-pill' : 'btn-white-pill'}
               style={{
                 backgroundColor: urbanFilter === 'PROPERTI_GO' ? '#FDC323' : '#FFFFFF',
-                height: isMobile ? '42px' : '48px',
-                padding: isMobile ? '0 14px' : '0 24px',
-                fontSize: isMobile ? '14px' : '15px',
+                height: isCompact ? '42px' : '48px',
+                padding: isCompact ? '0 14px' : '0 24px',
+                fontSize: isCompact ? '14px' : '15px',
                 fontWeight: '700',
                 flexShrink: 0,
               }}
@@ -1088,31 +1092,21 @@ export default function TopSearchBar({
               className={urbanFilter === 'MENU_GO' ? 'btn-yellow-pill' : 'btn-white-pill'}
               style={{
                 backgroundColor: urbanFilter === 'MENU_GO' ? '#FDC323' : '#FFFFFF',
-                height: isMobile ? '42px' : '48px',
-                padding: isMobile ? '0 14px' : '0 24px',
-                fontSize: isMobile ? '14px' : '15px',
+                height: isCompact ? '42px' : '48px',
+                padding: isCompact ? '0 14px' : '0 24px',
+                fontSize: isCompact ? '14px' : '15px',
                 fontWeight: '700',
                 flexShrink: 0,
               }}
             >
               <UtensilsCrossed size={18} strokeWidth={2.4} />
-              <span>{isMobile ? 'Kuliner' : 'Restoran & Kafe'}</span>
+              <span>{isCompact ? 'Kuliner' : 'Restoran & Kafe'}</span>
             </button>
           </>
         )}
 
-        {/* 3. Tombol Difa AI.
-            Sebelumnya lingkaran putih tanpa tulisan, berdiri di antara tombol
-            putih lainnya - dan fitur yang paling membedakan aplikasi ini justru
-            yang paling mudah terlewat. Sekarang bertulisan, berwarna sendiri,
-            dan dikelilingi cincin yang memuai sampai sekali dicoba. */}
+        {/* 3. Tombol Difa AI */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
-          {/* Cincin hanya di layar lebar.
-              Baris tombol di layar sempit menggulir mendatar, dan wadah yang
-              menggulir ikut memotong apa pun yang meluber keluar - cincin yang
-              memuai sampai 1,75 kali akan tampak terpangkas di atas dan bawah.
-              Di sana tombolnya sendiri sudah cukup menonjol: berwarna teal
-              bertuliskan "Difa AI" di antara tombol putih lainnya. */}
           {!sudahCobaAI && !isMobile && (
             <span
               aria-hidden
@@ -1142,49 +1136,42 @@ export default function TopSearchBar({
               display: 'flex',
               alignItems: 'center',
               gap: '7px',
-              height: isMobile ? '42px' : '48px',
-              padding: isMobile ? '0 14px' : '0 18px',
+              height: isCompact ? '42px' : '48px',
+              padding: isCompact ? '0 14px' : '0 18px',
               borderRadius: '999px',
-              // Hijau-teal merek, bukan putih: kuning sudah menjadi milik
-              // "Bagikan Laporan", dan dua tombol utama berwarna sama saling
-              // melemahkan alih-alih saling menguatkan.
               background: 'linear-gradient(135deg, #539BA9 0%, #3E7C88 100%)',
               color: '#FFFFFF',
               border: 'none',
               boxShadow: '0 4px 14px rgba(83,155,169,0.38)',
-              fontSize: isMobile ? '14px' : '15px',
+              fontSize: isCompact ? '14px' : '15px',
               fontWeight: 800,
               cursor: 'pointer',
               whiteSpace: 'nowrap',
             }}
           >
-            <Sparkles size={isMobile ? 18 : 20} color="#FDC323" fill="#FDC323" />
+            <Sparkles size={isCompact ? 18 : 20} color="#FDC323" fill="#FDC323" />
             <span>
-              {sidebarMode === 'URBAN_PLANNER' ? 'Analisis' : isMobile ? 'Difa AI' : 'Tanya Difa AI'}
+              {sidebarMode === 'URBAN_PLANNER' ? 'Analisis' : isCompact ? 'Difa AI' : 'Tanya Difa AI'}
             </span>
           </button>
         </div>
 
-        {/* 4. Bagikan Laporan.
-            Disembunyikan di mode Urban Planner: yang melapor adalah pengguna
-            jalan yang sedang berada di lokasi, sementara mode ini untuk
-            membaca data yang sudah terkumpul. Menaruh keduanya berdampingan
-            hanya memadati bilah tanpa ada yang memakainya. */}
+        {/* 4. Bagikan Laporan */}
         {sidebarMode !== 'URBAN_PLANNER' && (
         <button
           onClick={onOpenCreateModal}
           className="btn-yellow-pill"
           title="Laporkan Aksesibilitas Baru"
           style={{
-            height: isMobile ? '42px' : '48px',
-            padding: isMobile ? '0 14px' : '0 20px',
-            fontSize: isMobile ? '14px' : '15px',
+            height: isCompact ? '42px' : '48px',
+            padding: isCompact ? '0 14px' : '0 20px',
+            fontSize: isCompact ? '14px' : '15px',
             fontWeight: '700',
             flexShrink: 0,
           }}
         >
           <Plus size={18} strokeWidth={3} />
-          <span>{isMobile ? 'Lapor' : 'Bagikan Laporan'}</span>
+          <span>{isCompact ? 'Lapor' : 'Bagikan Laporan'}</span>
         </button>
         )}
       </div>

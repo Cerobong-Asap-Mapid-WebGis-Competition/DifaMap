@@ -78,6 +78,7 @@ export default function HomePage() {
   const [rute, setRute] = useState<RuteDigambar | null>(null);
   const [pickedCoordinate, setPickedCoordinate] = useState<{ latitude: number; longitude: number } | null>(null);
   const [analysisTarget, setAnalysisTarget] = useState<{ lat: number; lng: number; name?: string } | null>(null);
+  const [cameraFlyTo, setCameraFlyTo] = useState<{ lng: number; lat: number; zoom?: number } | null>(null);
   const [compareTarget, setCompareTarget] = useState<{ lat: number; lng: number } | null>(null);
   /** Titik Properti Go / Menu Go yang sedang dibuka panel surveinya. */
   const [titikEkonomi, setTitikEkonomi] = useState<any>(null);
@@ -460,6 +461,9 @@ export default function HomePage() {
           } else {
             handleSelectActivity(item.data);
           }
+          if (typeof item.data?.longitude === 'number' && typeof item.data?.latitude === 'number') {
+            setCameraFlyTo({ lng: item.data.longitude, lat: item.data.latitude, zoom: 16 });
+          }
         }}
         onOpenAiAssistant={() => {
           setSelectedItem(null);
@@ -667,6 +671,7 @@ export default function HomePage() {
         onMapClick={handleMapClick}
         isPickingLocation={isPickingLocation || isPickingAnalysisTarget || isPickingCompareTarget || isPickingTempatManual}
         resetMapTrigger={resetMapTrigger}
+        cameraFlyTo={cameraFlyTo}
       />
 
       {/* 4. Left Detail Drawer (Automatically slides in when a pin / polaroid is clicked) */}

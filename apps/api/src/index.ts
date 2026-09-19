@@ -4,6 +4,7 @@ import compression from 'compression';
 import { env } from './config/env.js';
 import apiRouter from './routes/index.js';
 
+
 const app = express();
 
 /**

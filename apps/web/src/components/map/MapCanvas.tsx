@@ -101,6 +101,7 @@ interface MapCanvasProps {
   onMapClick?: () => void;
   isPickingLocation?: boolean;
   resetMapTrigger?: number;
+  cameraFlyTo?: { lng: number; lat: number; zoom?: number } | null;
 }
 
 export default function MapCanvas({
@@ -132,12 +133,29 @@ export default function MapCanvas({
   onMapClick,
   isPickingLocation = false,
   resetMapTrigger = 0,
+  cameraFlyTo = null,
 }: MapCanvasProps) {
   const isMobile = useIsMobile(768);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
+
+  // Navigasi kamera eksplisit (misal: saat memilih hasil dari bilah pencarian)
+  useEffect(() => {
+    if (!cameraFlyTo || !mapRef.current) return;
+    const isLayarMobile = typeof window !== 'undefined' ? window.innerWidth <= 768 : isMobile;
+    const targetZoom = isLayarMobile
+      ? Math.min(cameraFlyTo.zoom ?? 14.2, 14.5)
+      : (cameraFlyTo.zoom ?? 16.5);
+    mapRef.current.flyTo({
+      center: [cameraFlyTo.lng, cameraFlyTo.lat],
+      zoom: targetZoom,
+      duration: 1000,
+      essential: true,
+      offset: isLayarMobile ? [0, -130] : [258, 0],
+    });
+  }, [cameraFlyTo, isMobile]);
   /** Fitur grid terakhir yang diambil, supaya sel bisa dicari saat disorot. */
   const gridFiturRef = useRef<any[]>([]);
   /**
@@ -506,13 +524,20 @@ export default function MapCanvas({
 
     const styleUrl = styleId === 'osm' ? fallbackStyle : difaMapApi.getMapStyleUrl(styleId);
 
+    // Tampilan awal peta:
+    // Desktop: terzoom kembali seperti semula (zoom 13.5) agar jalan dan titik survei jelas terlihat.
+    // Mobile: jangan terlalu zoom (zoom 11.8) agar tampilan peta tidak terlalu besar dan mencakup kawasan kota secara pas.
+    const isLayarMobile = typeof window !== 'undefined' ? window.innerWidth <= 768 : isMobile;
+    const initialZoom = isLayarMobile ? 11.8 : 13.5;
+    const initialCenter: [number, number] = isLayarMobile ? [119.4450, -5.1550] : [119.4500, -5.1600];
+
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: styleUrl,
-      center: [119.4500, -5.1700], // Wilayah Makassar & Gowa
-      zoom: 13,
-      pitch: 30,
-      bearing: -5,
+      center: initialCenter,
+      zoom: initialZoom,
+      pitch: isLayarMobile ? 15 : 30,
+      bearing: isLayarMobile ? 0 : -5,
     });
 
     let hasFallenBack = false;
@@ -684,66 +709,33 @@ export default function MapCanvas({
   // Auto-fly map to selected location or activity (termasuk saat dipilih dari autocomplete search)
   useEffect(() => {
     if (!mapRef.current || !isMapLoaded) return;
-    // Tempat didahulukan: ia yang paling sering dibuka lewat pencarian, dan
-    // koordinatnya sudah di tangan tanpa perlu dicari di daftar mana pun.
-    // Panel detail menutupi sisi kiri layar - 96 piksel sidebar ditambah 420
-    // piksel panel. Tanpa pergeseran, titik yang didekati mendarat tepat di
-    // baliknya, dan pengguna melihat peta bergerak ke tempat yang justru tidak
-    // bisa dilihatnya. Pusat karena itu dipindah ke kanan separuh lebar panel.
-    //
-    // Di layar sempit panel menempati bagian bawah, jadi yang digeser tingginya.
-    // Di layar sempit, lembar panel menutupi 62% bagian bawah layar. Titik
-    // yang dituju karena itu digeser jauh ke atas supaya mendarat di pita peta
-    // yang masih terlihat, bukan di balik lembarnya. Pergeseran 110 piksel yang
-    // lama dihitung untuk panel yang jauh lebih pendek.
-    const gesekan: [number, number] = isMobile ? [0, -180] : [258, 0];
 
-    /**
-     * Mendekat sampai bangunan tiga dimensinya benar-benar menyembul.
-     *
-     * Lapisan building-3d milik gaya Street MAPID ber-minzoom 17, sementara
-     * pendekatan sebelumnya berhenti di 16 dan 16,5 - tepat di bawah ambangnya,
-     * sehingga bangunannya tidak pernah sempat muncul. Kemiringan ikut dinaikkan
-     * karena bangunan setinggi apa pun tampak datar bila dilihat tegak lurus
-     * dari atas.
-     *
-     * Keberadaan lapisannya diperiksa langsung, bukan ditebak dari nama gaya:
-     * satelit, light, dan dark sama sekali tidak punya bangunan tiga dimensi,
-     * dan memiringkan peta di sana hanya membuat labelnya miring tanpa ada yang
-     * menyembul. Bila suatu saat MAPID menambahkan lapisan itu ke gaya lain,
-     * pemeriksaan ini ikut benar dengan sendirinya.
-     */
+    const isLayarMobile = typeof window !== 'undefined' ? window.innerWidth <= 768 : isMobile;
+    // Di desktop: panel detail menutupi sisi kiri layar (96px sidebar + 420px panel).
+    // Pusat digeser ke kanan (+258px) agar titik mendarat tepat di area peta yang terbuka.
+    // Di mobile: lembar bottom sheet menutupi bagian bawah layar.
+    // Geser ke atas (-130px) agar titik berada di area peta yang terlihat.
+    const gesekan: [number, number] = isLayarMobile ? [0, -130] : [258, 0];
+
     const bangunan3D = Boolean(mapRef.current.getLayer('building-3d'));
-    const ZOOM_3D = 17.6;
-    const PITCH_3D = 55;
+
+    // Desktop: terzoom kembali seperti semula (16.5 / 17.2 untuk 3D) agar jalan & bangunan terlihat jelas
+    // Mobile: jangan terlalu zoom (14.2) agar tampilan peta tidak terlalu besar / terpotong
+    const ZOOM_DESKTOP = bangunan3D ? 17.2 : 16.2;
+    const ZOOM_MOBILE = 14.2;
 
     const mendekat = (
       lng: number,
       lat: number,
-      zoomBiasa: number
+      zoomDesktop = ZOOM_DESKTOP
     ): maplibregl.FlyToOptions => ({
       center: [lng, lat],
-      zoom: bangunan3D ? ZOOM_3D : zoomBiasa,
-      duration: bangunan3D ? 1400 : 900,
+      zoom: isLayarMobile ? ZOOM_MOBILE : zoomDesktop,
+      duration: 1000,
       offset: gesekan,
-      ...(bangunan3D ? { pitch: PITCH_3D } : {}),
+      pitch: isLayarMobile ? 15 : (bangunan3D ? 50 : 35),
     });
 
-    /**
-     * Pin tempat TIDAK ikut mendekat sampai bangunan tiga dimensi.
-     *
-     * Yang harus terlihat di sini bukan bangunannya, melainkan lingkaran
-     * radiusnya - ia yang menjelaskan dari mana skor dan daftar pengamatan di
-     * panel berasal. Mendekat sampai zoom 17,6 membuat lingkaran 500 meter
-     * terpotong di luar layar, dan kemiringan 55 derajat membuat lingkaran itu
-     * terbaca sebagai elips - dua-duanya justru mengaburkan yang ingin
-     * dijelaskan.
-     *
-     * Bingkainya dihitung dari radius yang sedang dipilih, bukan dipatok pada
-     * satu tingkat zoom: radius 800 meter perlu pandangan yang lebih lebar
-     * daripada 150 meter, dan memakai angka yang sama untuk keduanya berarti
-     * salah satunya pasti tidak muat.
-     */
     if (titikFokus) {
       const dLat = radiusTempat / 111320;
       const dLng = radiusTempat / (111320 * Math.cos((titikFokus.latitude * Math.PI) / 180));
@@ -754,42 +746,26 @@ export default function MapCanvas({
       );
 
       mapRef.current.fitBounds(batas, {
-        // Sisi kiri disisakan untuk panel tempat yang sedang terbuka; tanpa itu
-        // separuh lingkarannya mendarat di baliknya. Ruang atas dilebihkan
-        // karena pada pandangan miring, tepi lingkaran yang jauh terdorong naik
-        // dan paling mudah terpotong.
-        // Ruang bawah di layar sempit harus setinggi lembar panelnya - 62% layar -
-        // bukan 320 piksel yang dihitung untuk lembar lama yang lebih pendek.
-        // Tanpa itu separuh bawah lingkarannya mendarat di balik panel.
-        padding: isMobile
-          ? { top: 120, bottom: Math.round(window.innerHeight * 0.64), left: 24, right: 24 }
+        padding: isLayarMobile
+          ? { top: 120, bottom: Math.round(window.innerHeight * 0.44), left: 24, right: 24 }
           : { top: 170, bottom: 60, left: 540, right: 80 },
-        /**
-         * Miring, tetapi tidak securam titik survei.
-         *
-         * Empat puluh derajat, bukan lima puluh lima: di kemiringan penuh
-         * lingkaran radius menjadi elips yang terlalu pipih untuk dibaca sebagai
-         * jangkauan, padahal lingkaran itulah yang menjelaskan dari mana skor di
-         * panel berasal. Segini masih terbaca bulat sekaligus memberi kedalaman.
-         */
-        pitch: 40,
+        pitch: isLayarMobile ? 15 : 40,
         duration: 1100,
-        // Radius kecil boleh mendekat sampai bangunan tiga dimensinya ikut
-        // menyembul; radius besar tetap ditahan lebar oleh bingkainya sendiri.
-        maxZoom: 17.5,
+        // Batas zoom: di mobile dibatasi agar tidak terlalu terzoom / terlalu besar
+        maxZoom: isLayarMobile ? 14.2 : 17.5,
       });
       return;
     }
 
     if (selectedLocationId) {
-      const loc = locations.find((l) => l.id === selectedLocationId);
+      const loc = locations?.find((l) => l.id === selectedLocationId);
       if (loc && typeof loc.longitude === 'number' && typeof loc.latitude === 'number') {
         mapRef.current.flyTo(mendekat(loc.longitude, loc.latitude, 16.5));
       }
     } else if (selectedActivityId) {
-      const act = activities.find((a) => a.id === selectedActivityId);
+      const act = activities?.find((a) => a.id === selectedActivityId);
       if (act && typeof act.longitude === 'number' && typeof act.latitude === 'number') {
-        mapRef.current.flyTo(mendekat(act.longitude, act.latitude, 16));
+        mapRef.current.flyTo(mendekat(act.longitude, act.latitude, 16.0));
       }
     }
   }, [titikFokus?.latitude, titikFokus?.longitude, radiusTempat, selectedLocationId, selectedActivityId, isMapLoaded, isMobile, locations, activities]);
@@ -803,18 +779,19 @@ export default function MapCanvas({
         setStyleId('basic');
         mapRef.current.setStyle(difaMapApi.getMapStyleUrl('basic'));
       }
+      const isLayarMobile = typeof window !== 'undefined' ? window.innerWidth <= 768 : isMobile;
       mapRef.current.flyTo({
-        center: [119.4500, -5.1700],
-        zoom: 13,
-        pitch: 30,
-        bearing: -5,
+        center: isLayarMobile ? [119.4450, -5.1550] : [119.4500, -5.1600],
+        zoom: isLayarMobile ? 11.8 : 13.5,
+        pitch: isLayarMobile ? 15 : 30,
+        bearing: isLayarMobile ? 0 : -5,
         duration: 900,
         essential: true,
       });
     } catch (err) {
       console.warn('[MapCanvas] flyTo reset failed:', err);
     }
-  }, [resetMapTrigger, isMapLoaded, styleId]);
+  }, [resetMapTrigger, isMapLoaded, styleId, isMobile]);
 
   /**
    * Menggambar dan menganimasikan lingkaran jangkauan tempat yang sedang dibuka.
@@ -1156,11 +1133,6 @@ export default function MapCanvas({
         el.addEventListener('click', (e) => {
           e.stopPropagation();
           if (onSelectActivity) onSelectActivity(act);
-          mapRef.current?.flyTo({
-            center: [act.longitude, act.latitude],
-            zoom: 15.5,
-            duration: 900,
-          });
         });
 
         const marker = new maplibregl.Marker({ element: el })
@@ -1256,11 +1228,11 @@ export default function MapCanvas({
       el.innerHTML =
         currentMode === 'TEMPAT'
           ? `
-        <div style="cursor:pointer;display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.35));" title="${judul}">
-          <div style="display:flex;align-items:center;gap:6px;background:${BIRU};color:#FFFFFF;border:2px solid #FFFFFF;border-radius:20px;padding:5px 10px;font-size:12px;font-weight:800;white-space:nowrap;">
-            ${ikonSvg(t.kategori, 15, '#FFFFFF')}
-            <span>${t.nama}</span>
-            <span style="background:${warnaSkor};border-radius:10px;padding:1px 7px;min-width:8px;text-align:center;">${t.anggota.length}</span>
+        <div style="cursor:pointer;display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.35));max-width:min(260px, 75vw);" title="${judul}">
+          <div style="display:flex;align-items:center;gap:6px;background:${BIRU};color:#FFFFFF;border:2px solid #FFFFFF;border-radius:18px;padding:5px 10px;font-size:11.5px;font-weight:800;max-width:100%;box-sizing:border-box;">
+            <span style="flex-shrink:0;display:flex;align-items:center;">${ikonSvg(t.kategori, 14, '#FFFFFF')}</span>
+            <span style="white-space:normal;word-break:break-word;line-height:1.25;text-align:left;">${t.nama}</span>
+            <span style="background:${warnaSkor};border-radius:10px;padding:1px 6px;min-width:8px;text-align:center;font-size:10px;flex-shrink:0;">${t.anggota.length}</span>
           </div>
           <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid ${BIRU};margin-top:-1px;"></div>
         </div>
@@ -1321,28 +1293,41 @@ export default function MapCanvas({
             flex-direction: column;
             align-items: center;
             cursor: pointer;
-            transform: scale(1.15);
-            transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-            filter: drop-shadow(0 6px 14px rgba(0,0,0,0.4));
+            filter: drop-shadow(0 6px 14px rgba(0,0,0,0.35));
+            max-width: min(280px, 78vw);
+            z-index: 25;
           ">
             <div style="
               background: #FDC323;
               color: #000000;
               border: 2px solid #FFFFFF;
               padding: 6px 12px;
-              border-radius: 20px;
+              border-radius: 16px;
               display: flex;
               align-items: center;
               gap: 6px;
-              font-size: 12px;
+              font-size: 11.5px;
               font-weight: 800;
-              white-space: nowrap;
+              max-width: 100%;
+              box-sizing: border-box;
             ">
-              ${ikonSvg(kunciLambang, 15, '#000000')}
-              <span>${loc.name}</span>
-              <span style="color: #000000">${
-                // Lokasi tanpa penilaian AI dulu ditampilkan "4.0★" - angka yang
-                // tidak pernah ada dasarnya. Sekarang ketiadaannya disebutkan.
+              <span style="flex-shrink: 0; display: flex; align-items: center;">${ikonSvg(kunciLambang, 14, '#000000')}</span>
+              <span style="
+                white-space: normal;
+                word-break: break-word;
+                line-height: 1.25;
+                text-align: left;
+                flex: 1;
+              ">${loc.name}</span>
+              <span style="
+                color: #000000;
+                background: rgba(0,0,0,0.08);
+                border-radius: 10px;
+                padding: 1px 6px;
+                font-size: 10.5px;
+                flex-shrink: 0;
+                white-space: nowrap;
+              ">${
                 belumDinilai || typeof loc.overallScore !== 'number'
                   ? 'belum dinilai'
                   : `${loc.overallScore.toFixed(1)}★`
@@ -1355,7 +1340,7 @@ export default function MapCanvas({
               border-left: 6px solid transparent;
               border-right: 6px solid transparent;
               border-top: 8px solid #FDC323;
-              margin-top: -2px;
+              margin-top: -1px;
             "></div>
           </div>
         ` : `
@@ -1400,11 +1385,6 @@ export default function MapCanvas({
         el.addEventListener('click', (e) => {
           e.stopPropagation();
           if (onSelectLocation) onSelectLocation(loc);
-          mapRef.current?.flyTo({
-            center: [loc.longitude, loc.latitude],
-            zoom: 16,
-            duration: 900,
-          });
         });
 
         const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
@@ -1592,10 +1572,10 @@ export default function MapCanvas({
         : 'OTHER';
 
       el.innerHTML = `
-        <div style="display:flex;flex-direction:column;align-items:center;pointer-events:none;filter:drop-shadow(0 4px 10px rgba(0,0,0,0.4));">
-          <div style="display:flex;align-items:center;gap:6px;background:#FDC323;color:#000000;border:2px solid #FFFFFF;border-radius:20px;padding:5px 11px;font-size:12px;font-weight:800;white-space:nowrap;">
-            ${ikonSvg(kunci, 15, '#000000')}
-            <span>${nama}</span>
+        <div style="display:flex;flex-direction:column;align-items:center;pointer-events:none;filter:drop-shadow(0 4px 10px rgba(0,0,0,0.4));max-width:min(280px, 78vw);">
+          <div style="display:flex;align-items:center;gap:6px;background:#FDC323;color:#000000;border:2px solid #FFFFFF;border-radius:16px;padding:5px 11px;font-size:11.5px;font-weight:800;max-width:100%;box-sizing:border-box;">
+            <span style="flex-shrink:0;display:flex;align-items:center;">${ikonSvg(kunci, 14, '#000000')}</span>
+            <span style="white-space:normal;word-break:break-word;line-height:1.25;text-align:left;">${nama}</span>
           </div>
           <div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid #FDC323;margin-top:-1px;"></div>
           <div style="width:10px;height:10px;border-radius:50%;background:#FDC323;border:2px solid #FFFFFF;margin-top:-3px;"></div>
@@ -1709,12 +1689,6 @@ export default function MapCanvas({
           // Dikirim ke panel surveinya sendiri, bukan ke state POI yang
           // diperebutkan label basemap dan penanda tempat.
           onSelectTitikEkonomiRef.current?.(pt);
-
-          mapRef.current?.flyTo({
-            center: [pt.longitude, pt.latitude],
-            zoom: 16,
-            duration: 900,
-          });
         });
 
         const ptMarker = new maplibregl.Marker({ element: ptEl })

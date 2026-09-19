@@ -213,6 +213,7 @@ export default function AppSidebar({
     >
       {/* 1. Top Logo DifaMap (Brand Logo) */}
       <div
+        suppressHydrationWarning
         title="Kembali ke Tampilan Normal (DifaMap)"
         role="button"
         tabIndex={0}

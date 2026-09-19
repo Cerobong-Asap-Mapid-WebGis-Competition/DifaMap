@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Star,
@@ -73,10 +73,37 @@ export default function DetailDrawer({
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
 
-  // Reset photo index when selected item changes
+  // Mobile Draggable Bottom Sheet State
+  const [sheetMode, setSheetMode] = useState<'peek' | 'expanded'>('peek');
+  const [dragDeltaY, setDragDeltaY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [windowHeight, setWindowHeight] = useState(800);
+  const touchStartYRef = useRef(0);
+  const touchCurrentYRef = useRef(0);
+  const bodyScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setWindowHeight(window.innerHeight);
+      const handleResize = () => setWindowHeight(window.innerHeight);
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }
+  }, []);
+
+  const peekHeight = Math.min(365, Math.round(windowHeight * 0.44));
+  const expandedHeight = Math.round(windowHeight * 0.85);
+
+  // Reset photo index and bottom sheet mode when selected item changes
   useEffect(() => {
     setSelectedPhotoIndex(0);
     setIsLightboxOpen(false);
+    setSheetMode('peek');
+    setDragDeltaY(0);
+    setIsDragging(false);
+    if (bodyScrollRef.current) {
+      bodyScrollRef.current.scrollTop = 0;
+    }
   }, [selectedItem?.data?.id]);
 
   // Handle ESC key: close comment box first, or close drawer
@@ -332,6 +359,91 @@ export default function DetailDrawer({
     }
   };
 
+  const handleDragStart = (e: React.TouchEvent) => {
+    if (!isMobile) return;
+    touchStartYRef.current = e.touches[0].clientY;
+    touchCurrentYRef.current = e.touches[0].clientY;
+    setIsDragging(true);
+  };
+
+  const handleDragMove = (e: React.TouchEvent) => {
+    if (!isMobile || !isDragging) return;
+    const currentY = e.touches[0].clientY;
+    touchCurrentYRef.current = currentY;
+    const delta = currentY - touchStartYRef.current;
+    setDragDeltaY(delta);
+  };
+
+  const handleDragEnd = () => {
+    if (!isMobile || !isDragging) return;
+    setIsDragging(false);
+    const delta = touchCurrentYRef.current - touchStartYRef.current;
+    setDragDeltaY(0);
+
+    if (sheetMode === 'peek') {
+      if (delta < -45) {
+        setSheetMode('expanded');
+      } else if (delta > 75) {
+        onClose();
+      }
+    } else {
+      if (delta > 50) {
+        setSheetMode('peek');
+      }
+    }
+  };
+
+  const handleBodyTouchStart = (e: React.TouchEvent) => {
+    if (!isMobile) return;
+    touchStartYRef.current = e.touches[0].clientY;
+    touchCurrentYRef.current = e.touches[0].clientY;
+    if (sheetMode === 'peek' || (bodyScrollRef.current && bodyScrollRef.current.scrollTop <= 0)) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleBodyTouchMove = (e: React.TouchEvent) => {
+    if (!isMobile || !isDragging) return;
+    const currentY = e.touches[0].clientY;
+    touchCurrentYRef.current = currentY;
+    const delta = currentY - touchStartYRef.current;
+
+    if (sheetMode === 'peek') {
+      setDragDeltaY(delta);
+    } else {
+      if (bodyScrollRef.current && bodyScrollRef.current.scrollTop <= 0 && delta > 0) {
+        setDragDeltaY(delta);
+      } else {
+        setIsDragging(false);
+        setDragDeltaY(0);
+      }
+    }
+  };
+
+  const handleBodyTouchEnd = () => {
+    if (!isMobile || !isDragging) return;
+    handleDragEnd();
+  };
+
+  const currentHeight = (() => {
+    if (!isMobile) return undefined;
+    if (!isDragging) {
+      return sheetMode === 'peek' ? `${peekHeight}px` : `${expandedHeight}px`;
+    }
+    const base = sheetMode === 'peek' ? peekHeight : expandedHeight;
+    const target = base - dragDeltaY;
+    const clamped = Math.max(peekHeight - 60, Math.min(expandedHeight + 30, target));
+    return `${clamped}px`;
+  })();
+
+  const currentTransform = (() => {
+    if (!isMobile) return undefined;
+    if (isDragging && sheetMode === 'peek' && dragDeltaY > 0) {
+      return `translateY(${Math.min(dragDeltaY, 140)}px)`;
+    }
+    return 'translateY(0)';
+  })();
+
   return (
     <aside
       className={isMobile ? 'animate-slide-up' : 'animate-slide-in'}
@@ -348,29 +460,22 @@ export default function DetailDrawer({
         position: 'fixed',
         left: isMobile ? 0 : '96px',
         right: isMobile ? 0 : 'auto',
-        // Mulai DI BAWAH bilah pencarian, bukan dari puncak layar.
-        //
-        // Sebelumnya panel mulai di 20px sementara bilah pencarian di 24px, dan
-        // karena panel berlapis 50 sedangkan bilah 30, panel menutupi kotak
-        // pencarian sepenuhnya. Pengguna yang membuka sebuah titik kehilangan
-        // cara mencari titik berikutnya tanpa menutup panelnya lebih dulu.
         top: isMobile ? 'auto' : '96px',
         bottom: isMobile ? 0 : '20px',
         width: isMobile ? '100%' : '440px',
         maxWidth: isMobile ? '100vw' : 'calc(100vw - 116px)',
-        /**
-         * Menyisakan peta yang benar-benar terlihat.
-         *
-         * Sebelumnya lembar ini setinggi 86vh, dan empat belas persen yang
-         * tersisa habis persis oleh bilah pencarian di atasnya - petanya tidak
-         * tersisa sedikit pun. Padahal seluruh gunanya membuka sebuah titik
-         * adalah melihat titik itu DI PETA; panel yang menutupi petanya
-         * membatalkan alasan ia dibuka.
-         *
-         * Enam puluh dua persen menyisakan sekitar seperempat layar di atasnya -
-         * cukup untuk melihat pin yang sedang dibuka beserta sekitarnya.
-         */
-        maxHeight: isMobile ? '62vh' : 'calc(100vh - 116px)',
+        height: isMobile ? currentHeight : undefined,
+        maxHeight: isMobile
+          ? isDragging
+            ? currentHeight
+            : sheetMode === 'peek'
+            ? `${peekHeight}px`
+            : `${expandedHeight}px`
+          : 'calc(100vh - 116px)',
+        transform: currentTransform,
+        transition: isDragging
+          ? 'none'
+          : 'height 0.32s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
         backgroundColor: '#FFFFFF',
         borderRadius: isMobile ? '24px 24px 0 0' : '20px',
         boxShadow: isMobile ? '0px -8px 36px rgba(0, 0, 0, 0.3)' : '0px 14px 44px rgba(0, 0, 0, 0.16)',
@@ -383,16 +488,53 @@ export default function DetailDrawer({
         userSelect: 'text',
       }}
     >
+      {/* 0. Drag Handle Bar for Mobile Bottom Sheet */}
+      {isMobile && (
+        <div
+          onTouchStart={handleDragStart}
+          onTouchMove={handleDragMove}
+          onTouchEnd={handleDragEnd}
+          onClick={() => setSheetMode((prev) => (prev === 'peek' ? 'expanded' : 'peek'))}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingTop: '10px',
+            paddingBottom: '2px',
+            cursor: 'grab',
+            touchAction: 'none',
+            backgroundColor: '#FFFFFF',
+            flexShrink: 0,
+          }}
+          title={sheetMode === 'peek' ? 'Tarik ke atas untuk melihat detail lengkap' : 'Tarik ke bawah untuk mengecilkan'}
+        >
+          <div
+            style={{
+              width: '40px',
+              height: '4.5px',
+              borderRadius: '999px',
+              backgroundColor: '#CBD5E1',
+            }}
+          />
+        </div>
+      )}
+
       {/* 1. Header Toolbar with Close Button */}
       <div
+        onTouchStart={handleDragStart}
+        onTouchMove={handleDragMove}
+        onTouchEnd={handleDragEnd}
         style={{
-          padding: isMobile ? '14px 18px' : '16px 20px',
+          padding: isMobile ? '10px 18px' : '16px 20px',
           borderBottom: '1px solid #F1F5F9',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           backgroundColor: '#FFFFFF',
           flexShrink: 0,
+          touchAction: isMobile ? 'none' : 'auto',
+          cursor: isMobile ? 'grab' : 'default',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -442,18 +584,23 @@ export default function DetailDrawer({
         </button>
       </div>
 
-      {/* 2. Scrollable Body Content (Terkunci secara horizontal agar tidak bisa tergeser ke samping) */}
+      {/* 2. Scrollable Body Content */}
       <div
+        ref={bodyScrollRef}
+        onTouchStart={handleBodyTouchStart}
+        onTouchMove={handleBodyTouchMove}
+        onTouchEnd={handleBodyTouchEnd}
         style={{
           flex: 1,
-          overflowY: 'auto',
+          overflowY: isMobile && sheetMode === 'peek' && !isDragging ? 'hidden' : 'auto',
           overflowX: 'hidden',
           width: '100%',
           boxSizing: 'border-box',
-          padding: isMobile ? '16px 18px' : '18px 22px',
+          padding: isMobile ? '12px 18px 24px' : '18px 22px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '16px',
+          gap: isMobile ? '12px' : '16px',
+          WebkitOverflowScrolling: 'touch',
         }}
       >
         {/* Title & Address */}
@@ -528,7 +675,7 @@ export default function DetailDrawer({
                   position: 'relative',
                   borderRadius: '14px',
                   overflow: 'hidden',
-                  height: '210px',
+                  height: isMobile ? '170px' : '210px',
                   width: '100%',
                   backgroundColor: '#0F172A',
                   boxShadow: '0 4px 14px rgba(0,0,0,0.1)',
