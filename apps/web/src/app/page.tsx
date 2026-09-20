@@ -16,6 +16,7 @@ import { bacaSurveiEkonomi, cariTitikEkonomi } from '../data/surveiEkonomi';
 import type { RuteDigambar } from '../data/rute';
 import { difaMapApi } from '../lib/api';
 import { useIsMobile } from '../hooks/useIsMobile';
+import SplashScreen from '../components/layout/SplashScreen';
 
 export default function HomePage() {
   const isMobile = useIsMobile(768);
@@ -418,6 +419,9 @@ export default function HomePage() {
         backgroundColor: '#FFFFFF',
       }}
     >
+      {/* 0. Animasi Pembuka Splash Screen ala Google Maps (1.8 Detik) */}
+      <SplashScreen duration={1800} />
+
       {/* 1. Left Sidebar Navigation (Unified Public mode + Urban Planner mode) */}
       <AppSidebar
         currentMode={sidebarMode}
