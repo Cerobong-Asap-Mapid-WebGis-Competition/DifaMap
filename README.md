@@ -19,7 +19,7 @@
 <br/>
 
 **Oleh: Tim Cerobong Asap**  
-*Wilayah Studi: Koridor Transportasi & Pusat Kegiatan Kota Makassar & Kabupaten Gowa*
+*Wilayah Studi: Koridor Transportasi & Pusat Kegiatan Kota Makassar & Kabupaten Gowa.*
 
 ---
 
