@@ -1,7 +1,7 @@
 <div align="center">
 
 # 🗺️ DifaMap WebGIS
-### *Peta Aksesibilitas Fasilitas Publik & Pedestrian Inklusif Ramah Difabel dan Lansia*
+### *Peta Aksesibilitas Fasilitas Publik & Pedestrian Ramah Difabel dan Lansia*
 **Karya Inovasi WebGIS untuk MAPID Competition 2026**
 
 [![MAPID Competition 2026](https://img.shields.io/badge/MAPID%20Competition-2026-008080?style=for-the-badge&logo=compass&logoColor=white)](https://mapid.io)
@@ -14,78 +14,80 @@
 
 <br/>
 
-> **"Aksesibilitas bukanlah fasilitas pelengkap, melainkan hak asasi bagi setiap warga kota untuk bergerak secara mandiri, aman, dan bermartabat."**
+> **"Aksesibilitas bukan sekadar fasilitas tambahan, melainkan hak mendasar agar setiap warga kota bisa bepergian dengan mandiri, aman, dan nyaman."**
 
 <br/>
 
 **Oleh: Tim Cerobong Asap**  
-*Wilayah Studi: Koridor Transportasi & Pusat Kegiatan Kota Makassar & Kabupaten Gowa.*
+*Fokus Wilayah: Koridor Transportasi & Pusat Aktivitas Kota Makassar dan Kabupaten Gowa.*
 
 ---
 
 </div>
 
 ## 📑 Daftar Isi
-1. [Latar Belakang & Urgensi Masalah](#-latar-belakang--urgensi-masalah)
-2. [Prinsip Integritas & Kejujuran Data](#-prinsip-integritas--kejujuran-data)
-3. [Integrasi Ekosistem MAPID Platform](#-integrasi-ekosistem-mapid-platform)
+1. [Kenapa DifaMap Dibuat?](#-kenapa-difamap-dibuat)
+2. [Prinsip Kejujuran & Transparansi Data](#-prinsip-kejujuran--transparansi-data)
+3. [Integrasi dengan Platform MAPID](#-integrasi-dengan-platform-mapid)
 4. [Arsitektur Sistem & Alur Data](#-arsitektur-sistem--alur-data)
-5. [Fitur-Fitur Utama DifaMap](#-fitur-fitur-utama-difamap)
-   - [Mode Publik (Ramah Difabel & Lansia)](#1-mode-publik-ramah-difabel-lansia--warga)
+5. [Fitur Unggulan DifaMap](#-fitur-unggulan-difamap)
+   - [Mode Publik (Untuk Teman Difabel, Lansia, & Warga)](#1-mode-publik-untuk-teman-difabel-lansia--warga)
    - [Mode Perencana Kota (Spatial Decision Support System)](#2-mode-perencana-kota-spatial-decision-support-system)
-   - [Difa AI Conversational Assistant (Spatial RAG)](#3-difa-ai-conversational-assistant-spatial-rag)
-   - [AI Multimodal Spatial & Accessibility Inspector](#4-ai-multimodal-spatial--accessibility-inspector)
+   - [Difa AI Assistant (Spatial RAG)](#3-difa-ai-assistant-spatial-rag)
+   - [Inspeksi Otomatis AI (Multimodal Vision)](#4-inspeksi-otomatis-ai-multimodal-vision)
 6. [Teknologi yang Digunakan (Tech Stack)](#-teknologi-yang-digunakan-tech-stack)
-7. [Struktur Direktori Monorepo](#-struktur-direktori-monorepo)
-8. [Panduan Instalasi & Menjalankan Lokal](#-panduan-instalasi--menjalankan-lokal)
-9. [Variabel Lingkungan (Environment Variables)](#-variabel-lingkungan-environment-variables)
-10. [Dokumentasi Terkait](#-dokumentasi-terkait)
+7. [Struktur Folder Proyek](#-struktur-folder-proyek)
+8. [Cara Menjalankan di Komputer Lokal](#-cara-menjalankan-di-komputer-lokal)
+9. [Variabel Lingkungan (.env)](#-variabel-lingkungan-env)
+10. [Dokumentasi Lengkap](#-dokumentasi-lengkap)
 11. [Tim Pengembang](#-tim-pengembang-cerobong-asap)
 
 ---
 
-## 🌍 Latar Belakang & Urgensi Masalah
+## 🌍 Kenapa DifaMap Dibuat?
 
-Mobilitas mandiri di kawasan perkotaan Indonesia masih menjadi tantangan berat bagi jutaan **penyandang disabilitas (pengguna kursi roda, tunanetra, disabilitas sensorik)**, **lansia**, dan **kelompok rentan** lainnya. Di kota metropolitan seperti **Kota Makassar dan kawasan aglomerasi Mamminasata (termasuk Kabupaten Gowa)**, perkembangan ekonomi dan simpul transit publik yang pesat sering kali belum diimbangi oleh infrastruktur pejalan kaki (*pedestrian infrastructure*) yang ramah disabilitas:
+Bagi sebagian besar orang, berjalan kaki menuju halte bus atau menyeberang ke minimarket adalah hal yang lumrah. Namun bagi **pengguna kursi roda, tunanetra, dan lansia**, perjalanan singkat bisa berubah menjadi rute yang penuh risiko. 
 
-1. **Titik Buta (*Blind Spot*) Peta Konvensional**: Aplikasi navigasi komersial populer (seperti Google Maps) dirancang terutama untuk kendaraan bermotor atau pejalan kaki tanpa hambatan fisik. Peta-peta tersebut tidak mencatat rincian mikro-spasial: apakah sebuah trotoar memiliki ramp yang landai ($\le 8\%$), apakah ubin pemandu (*guiding block*) terputus ke selokan terbuka, atau apakah trotoar terblokir oleh tiang listrik dan PKL.
-2. **Ketiadaan Rantai Perjalanan yang Tersambung (*First-Mile / Last-Mile Transit Gap*)**: Pengguna kursi roda sering kali bisa menaiki bus transit, tetapi terjebak begitu turun di halte karena tidak adanya ramp penyeberangan atau tingginya trap trotoar untuk menuju gedung tujuan (mall, rumah sakit, kantor layanan publik).
-3. **Ketimpangan Perencanaan Kota (*Urban Planning Gap*)**: Pemerintah daerah, dinas teknis, maupun pengembang swasta kerap mengalokasikan anggaran perbaikan trotoar secara sporadis tanpa basis data spasial multi-kriteria yang menunjukkan titik mana yang paling berdampak besar bagi mobilitas warga rentan.
+Di kawasan perkotaan seperti **Kota Makassar dan sekitarnya (termasuk Kabupaten Gowa)**, perkembangan kota belum selalu diimbangi oleh fasilitas trotoar yang ramah:
 
-### Solusi: DifaMap WebGIS
-**DifaMap** hadir sebagai platform **Sistem Informasi Geografis Berbasis Web (WebGIS)** yang memadukan **survei lapangan spasial partisipatif**, integrasi data ekosistem **MAPID**, algoritma analisis jaringan jalan sesungguhnya (*network isochrone*), serta kecerdasan buatan (**Multimodal AI & Spatial RAG**) untuk menjembatani kebutuhan navigasi warga difabel sekaligus menyediakan *Spatial Decision Support System (SDSS)* bagi para perencana kota.
+1. **Aplikasi Peta Biasa Punya Titik Buta (*Blind Spot*)**: Google Maps atau aplikasi navigasi umum hanya menghitung rute tercepat untuk kendaraan atau pejalan kaki tanpa hambatan. Peta-peta tersebut tidak tahu apakah trotoar punya ramp landai, apakah ubin pemandu (*guiding block*) terputus ke selokan, atau apakah jalur pejalan kaki terhalang tiang listrik dan gerobak PKL.
+2. **Konektivitas Halte yang Terputus (*First-Mile / Last-Mile Gap*)**: Sering kali seseorang bisa menaiki bus transit, tetapi kesulitan begitu turun di halte karena tidak ada jalan landai untuk menyeberang menuju gedung tujuan (rumah sakit, sekolah, kantor pelayanan, atau pusat perbelanjaan).
+3. **Perbaikan Kota yang Belum Tepat Sasaran**: Anggaran perbaikan trotoar sering dialokasikan tanpa data spasial yang jelas mengenai titik mana yang paling mendesak dan memberi dampak nyata bagi mobilitas warga difabel.
 
----
-
-## 🔍 Prinsip Integritas & Kejujuran Data
-
-DifaMap dibangun dengan **etika data spasial dan kecerdasan buatan yang transparan (*Data Honesty Principle*)**:
-
-* **"Belum Teramati" $\neq$ "Tidak Ada"**: Jika foto survei lapangan tidak menangkap lampu penerangan malam atau toilet disabilitas di dalam gedung, AI dan sistem menandainya sebagai `NOT_VISIBLE` (belum teramati), bukan berasumsi buruk atau mengada-ada.
-* **Tidak Ada Halusinasi Wilayah Kosong**: Petak wilayah yang belum pernah disurvei dibiarkan **kosong tanpa warna** pada peta intervensi, bukan diberi skor rata-rata tebakan (3.0). Kekosongan data dilaporkan secara jujur apa adanya.
-* **Skor Keyakinan Transparan (*AI Confidence Score*)**: Setiap penilaian AI disertai indikator keyakinan (0.0 – 1.0) yang bergantung pada kelengkapan bukti visual foto survei.
-* **Isokron Jaringan Jalan Nyata vs Lingkaran Radius**: Perhitungan jangkauan waktu tempuh kursi roda menggunakan jaringan jalan riil dari **OpenRouteService (Wheelchair Profile)** dengan uji *point-in-polygon*, bukan sekadar lingkaran Euclidean teoretis yang menembus tembok atau menyeberangi sungai tanpa jembatan.
+### Solusi DifaMap
+**DifaMap** adalah WebGIS inklusif yang menggabungkan **survei lapangan langsung**, data geospasial resmi dari **MAPID**, analisis rute jaringan jalan nyata (*wheelchair network routing*), dan kecerdasan buatan (**Multimodal AI & Spatial RAG**). DifaMap hadir untuk membantu mobilitas harian warga sekaligus menjadi alat bantu pengambilan keputusan bagi perencana kota.
 
 ---
 
-## 🛰️ Integrasi Ekosistem MAPID Platform
+## 🔍 Prinsip Kejujuran & Transparansi Data
 
-Sebagai proyek yang dirancang khusus untuk ajang **MAPID Competition 2026**, DifaMap memaksimalkan kapabilitas platform geospasial **MAPID** pada seluruh lapisan arsitekturnya:
+DifaMap memegang teguh prinsip **kejujuran dan transparansi data spasial**:
+
+* **"Belum Teramati" $\neq$ "Aman"**: Jika foto survei tidak memperlihatkan ramp atau lampu penerangan jalan, sistem menilainya sebagai `NOT_VISIBLE` (belum teramati), bukan langsung menganggapnya ada atau mengarang bebas.
+* **Wilayah Tanpa Data Dibiarkan Kosong**: Petak wilayah yang belum memiliki titik survei dibiarkan **kosong tanpa warna** pada peta analisis, bukan diisi skor tebakan. Kekosongan data disajikan secara jujur apa adanya.
+* **Tingkat Keyakinan AI (*Confidence Score*)**: Setiap ulasan AI dilengkapi skor keyakinan (0.0 – 1.0) yang diukur dari kejelasan dan kelengkapan bukti visual foto survei.
+* **Jaringan Jalan Nyata vs Lingkaran Radius Teoretis**: Perhitungan jangkauan kursi roda dihitung berdasarkan jaringan jalan sesungguhnya lewat **OpenRouteService (Wheelchair Profile)** dengan uji poligon spasial (*point-in-polygon*), bukan sekadar lingkaran jarak lurus yang menembus bangunan atau menyeberang sungai tanpa jembatan.
+
+---
+
+## 🛰️ Integrasi dengan Platform MAPID
+
+DifaMap terhubung erat dengan ekosistem **MAPID Platform** di berbagai fungsi utama:
 
 ```mermaid
 flowchart LR
-    subgraph MAPID_Ecosystem ["MAPID Geoplatform Ecosystem"]
+    subgraph MAPID_Ecosystem ["Ekosistem Platform MAPID"]
         direction TB
-        M1["MAPID Basemap Tile Engine<br/>(Vector & Raster Styles)"]
-        M2["MAPID Geoserver Open API<br/>(Thematic Layers)"]
-        M3["MAPID Competition API<br/>(server.mapid.io/web/competition)"]
+        M1["Tile Engine Basemap MAPID<br/>(Vector & Raster Styles)"]
+        M2["Geoserver Open API MAPID<br/>(Lapisan Tematik Spasial)"]
+        M3["API Kompetisi MAPID<br/>(server.mapid.io/web/competition)"]
     end
 
-    subgraph DifaMap_Engine ["DifaMap Processing & Analysis"]
+    subgraph DifaMap_Engine ["Pengolahan & Analisis DifaMap"]
         direction TB
-        S1["3D Extruded Buildings & Basemap Switching"]
-        S2["Mamminasata Transit & Public Layers"]
-        S3["Tri-Dataset Harvester:<br/>1. Community Activities (#cerobongasap)<br/>2. Menu Go (Kuliner & Mobilitas)<br/>3. Properti Go (Residensial & Komersial)"]
+        S1["Gedung 3D Interaktif & Ganti Basemap"]
+        S2["Lapisan Rute Transit & Titik Publik"]
+        S3["Penggabungan Tiga Dataset:<br/>1. Aktivitas Lapangan (#cerobongasap)<br/>2. Menu Go (Kuliner & Mobilitas)<br/>3. Properti Go (Hunian & Usaha)"]
     end
 
     M1 --> S1
@@ -94,52 +96,52 @@ flowchart LR
 ```
 
 1. **MAPID Basemap Tile & Style Engine**:
-   - Integrasi 5 opsi gaya peta: `basic` (dilengkapi lapisan *3D extruded buildings* / bangunan tiga dimensi interaktif), `light`, `dark`, `street-2d-building`, dan `satellite`.
-   - Caching gaya basemap di memori backend untuk meminimalkan beban koneksi dan menjamin ketersediaan tinggi (*seamless fallback*).
+   - Pilihan 5 gaya basemap: `basic` (dengan visualisasi gedung 3D interaktif), `light`, `dark`, `street-2d-building`, dan `satellite`.
+   - Caching gaya basemap di server backend untuk performa cepat dan navigasi yang mulus.
 2. **MAPID Geoserver Open API**:
-   - Konsumsi lapisan tematik geospasial proyek MAPID: Jaringan Transportasi Massal Mamminasata, Fasilitas Kesehatan & Disabilitas, serta Jalur Pedestrian.
+   - Mengambil data lapisan tematik publik: koridor transportasi massal Mamminasata, fasilitas kesehatan, dan jaringan pejalan kaki.
 3. **MAPID Competition API (`/web/competition`)**:
-   - **Community Maps (Activities)**: Data primer survei lapangan aksesibilitas fisik yang dikirimkan oleh surveyor tim (`#cerobongasap`) di 7 zona Kota Makassar & Kabupaten Gowa.
-   - **Menu Go**: Analisis kepadatan kuliner dan UMKM lokal lengkap dengan atribut kondisi tempat dan mobilitas fisik.
-   - **Properti Go**: Pemetaan properti komersial dan residensial untuk mengukur kepadatan aktivitas ekonomi dan potensi investasi kawasan inklusif.
+   - **Community Maps (Activities)**: Data survei primer aksesibilitas fisik yang dikumpulkan langsung oleh tim surveyor (`#cerobongasap`) di 7 wilayah Kota Makassar dan Kabupaten Gowa.
+   - **Menu Go**: Peta kuliner dan tempat makan lokal lengkap dengan informasi kondisi tempat dan mobilitas fisik.
+   - **Properti Go**: Pemetaan properti perumahan dan komersial untuk menilai potensi kawasan ramah disabilitas.
 
 ---
 
 ## 🏗️ Arsitektur Sistem & Alur Data
 
-DifaMap mengadopsi arsitektur monorepo modern dengan pemisahan tanggung jawab yang modular:
+DifaMap dibangun dengan struktur monorepo modern yang rapi dan modular:
 
 ```mermaid
 flowchart TD
     subgraph Clients ["Akses Pengguna (apps/web)"]
-        U1["Warga Difabel & Lansia<br/>(Mode Publik)"]
-        U2["Perencana Kota & Pengembang<br/>(Mode Urban Planner)"]
+        U1["Teman Difabel, Lansia, & Warga<br/>(Mode Publik)"]
+        U2["Perencana Kota & Pengembang<br/>(Mode Perencana Kota)"]
     end
 
     subgraph Frontend ["Frontend WebGIS (Next.js 15 + MapLibre GL)"]
         UI_Map["MapCanvas (MapLibre + Turf.js)"]
-        UI_Filter["TopSearchBar & Drawer"]
+        UI_Filter["TopSearchBar & Filter Cepat"]
         UI_Chat["AiChatbotDrawer (Difa AI)"]
         UI_Chart["AccessibilityRadarChart (ECharts)"]
     end
 
     subgraph Gateway ["Backend API (apps/api - Express.js)"]
-        AuthMid["Supabase JWT Auth Middleware"]
-        LocCtrl["Location & Activity Controller"]
-        MapCtrl["MAPID Geo & Analysis Controller"]
-        ChatCtrl["Chatbot & Spatial RAG Controller"]
+        AuthMid["Middleware Autentikasi Supabase"]
+        LocCtrl["Controller Lokasi & Aktivitas"]
+        MapCtrl["Controller MAPID & Analisis Spasial"]
+        ChatCtrl["Controller Difa AI & Spatial RAG"]
     end
 
-    subgraph Intelligence ["Layanan Cerdas & Eksternal"]
-        OpenAI_Vision["OpenAI GPT-4o-mini<br/>(Vision Inspection + Structured Output)"]
-        OpenAI_RAG["Spatial RAG Engine<br/>(Contextual 94+ Survey Points)"]
-        ORS["OpenRouteService API<br/>(Wheelchair Isochrone & Routing)"]
-        MAPID_API["MAPID Competition & Basemap API"]
+    subgraph Intelligence ["Layanan Eksternal & AI"]
+        OpenAI_Vision["OpenAI GPT-4o-mini<br/>(Inspeksi Visual & Format JSON)"]
+        OpenAI_RAG["Engine Spatial RAG<br/>(Dasar Fakta 94+ Titik Survei)"]
+        ORS["OpenRouteService API<br/>(Isokron & Rute Khusus Kursi Roda)"]
+        MAPID_API["API MAPID Basemap & Kompetisi"]
     end
 
-    subgraph Storage ["Basis Data Spasial"]
-        PG[("PostgreSQL + PostGIS<br/>(Supabase Instance)")]
-        Bucket[("Supabase Storage<br/>(laporan-foto)")]
+    subgraph Storage ["Penyimpanan Data Spasial"]
+        PG[("PostgreSQL + PostGIS<br/>(Supabase Database)")]
+        Bucket[("Supabase Storage<br/>(Foto Bukti Lapangan)")]
     end
 
     U1 --> UI_Map & UI_Filter & UI_Chat
@@ -162,260 +164,224 @@ flowchart TD
 
 ---
 
-## ✨ Fitur-Fitur Utama DifaMap
+## ✨ Fitur Unggulan DifaMap
 
-DifaMap menyediakan dua antarmuka pengalaman pengguna (*Dual-Persona Interface*) yang terintegrasi di dalam satu kanvas peta geospasial:
+DifaMap menyediakan dua mode tampilan yang dapat diakses langsung di satu peta:
 
-### 1. Mode Publik (Ramah Difabel, Lansia, & Warga)
-* **Peta Aksesibilitas Tematik Interaktif**:
-  Visualisasi titik fasilitas publik, trotoar, dan halte dengan pin berkode warna standar yang jelas:
-  * 🟢 **Hijau (Skor $\ge 3.5$)**: Fasilitas sangat ramah disabilitas (*ramp* landai, *guiding block* rapi, trotoar rata).
-  * 🟡 **Jingga (Skor $2.5 - 3.5$)**: Cukup aksesibel dengan catatan (misal: *ramp* agak curam, paving sedikit bergelombang).
-  * 🔴 **Merah (Skor $< 2.5$)**: Tidak ramah / berbahaya (ubin pemandu terputus, tangga tanpa *ramp*, trotoar terblokir).
-  * ⚪ **Abu-abu**: Titik baru terdata yang belum dievaluasi oleh AI.
-* **Penyaring Cerdas Fasilitas Disabilitas**:
-  Menyaring peta seketika berdasarkan kebutuhan spesifik:
-  * Khusus Pengguna Kursi Roda (*ramp* wajib ada/layak, permukaan halus tanpa lubang).
-  * Khusus Penyandang Tunanetra (*guiding block* terpasang baik dan tersambung).
-  * Kategori Tempat (Mall, Rumah Sakit, Kampus/Sekolah, Halte Transit, Restoran).
-  * Filter Keamanan & Kenyamanan (Penerangan terang malam hari, toilet disabilitas, tempat istirahat/duduk).
-* **Pencarian Cerdas & POI Geocoding**:
-  Mencari lokasi dari data survei lokal maupun tempat di luar basis data menggunakan data POI Basemap MAPID, disertai fitur **"Tunjuk Lokasi di Peta"** (*interactive coordinate picker*).
-* **Drawer Detail Aksesibilitas Mendalam**:
-  * Galeri foto resolusi tinggi dari surveyor lapangan.
-  * **Grafik Radar Multi-Dimensi (ECharts)**: Skor fisik vs skor keamanan.
-  * Jam sibuk (*peak hours*) dan rekomendasi waktu kunjungan paling aman & nyaman (*safe visit time*).
-  * Ringkasan kekuatan, rintangan, dan rekomendasi perbaikan hasil sintesis AI.
-* **Crowdsourced "Bagikan Laporan" (Community Reporting)**:
-  Masyarakat dapat berpartisipasi mengunggah laporan temuan fasilitas rusak lengkap dengan koordinat GPS dan foto bukti langsung ke Supabase Storage.
+### 1. Mode Publik (Untuk Teman Difabel, Lansia, & Warga)
+* **Peta Aksesibilitas Berkode Warna**:
+  Titik fasilitas publik, halte, dan trotoar diberi tanda warna yang mudah dikenali:
+  * 🟢 **Hijau (Skor $\ge 3.5$)**: Sangat ramah disabilitas (*ramp* landai, ubin pemandu rapi, trotoar rata).
+  * 🟡 **Jingga (Skor $2.5 - 3.5$)**: Cukup layak dengan catatan (misal: *ramp* agak curam, paving sedikit bergelombang).
+  * 🔴 **Merah (Skor $< 2.5$)**: Berbahaya / tidak ramah (tanpa *ramp*, ubin pemandu terputus, trotoar berlubang).
+  * ⚪ **Abu-abu**: Titik baru terdata yang belum dinilai AI.
+* **Penyaring Cepat Kebutuhan Aksesibilitas**:
+  Temukan titik yang cocok dengan satu ketukan:
+  * Pengguna Kursi Roda (wajib ada ramp layak, permukaan mulus).
+  * Teman Tunanetra (wajib ada ubin pemandu tersambung).
+  * Kategori Lokasi (Mall, Rumah Sakit, Kampus/Sekolah, Halte Bus, Restoran).
+  * Fasilitas Pendukung (Penerangan terang malam hari, toilet disabilitas, bangku istirahat).
+* **Pencarian Cerdas & Tunjuk Lokasi**:
+  Cari tempat lewat kolom pencarian atau pilih titik koordinat langsung dari peta dengan fitur interaktif.
+* **Panel Detail Lengkap**:
+  * Galeri foto asli dari hasil survei lapangan.
+  * Grafik Radar multi-faktor kondisi fisik vs keamanan lingkungan.
+  * Rekomendasi jam kunjungan paling aman & nyaman (*safe visit time*).
+  * Rangkuman catatan surveyor dan saran perbaikan dari AI.
+* **Layanan Laporan Warga ("Bagikan Laporan")**:
+  Warga dapat berkontribusi melaporkan fasilitas publik yang rusak atau ramah difabel dengan mengunggah foto dan lokasi GPS langsung ke sistem.
 
 ---
 
 ### 2. Mode Perencana Kota (Spatial Decision Support System)
-Dikhususkan bagi instansi pemerintah (Dinas PU, Dinas Perhubungan), pengembang properti, dan perencana tata ruang:
+Dirancang untuk dinas teknis (PU, Perhubungan), instansi pemerintah, dan pengembang tata ruang:
 
-* **Site Selection (SINI Grid Multi-Criteria Analytics)**:
-  * Membagi wilayah Kota Makassar dan Kabupaten Gowa ke dalam kisi grid spasial (1.000 meter atau 500 meter).
-  * Menghitung **Indeks Prioritas Intervensi** secara objektif melalui 3 sudut pandang (*Moda Penilaian*):
-    1. **Aksesibilitas & Keramaian**: Memprioritaskan petak dengan kerentanan aksesibilitas tinggi di koridor pejalan kaki yang padat.
-    2. **Hunian & Akses Transit**: Mengevaluasi keterisolasian kawasan perumahan/pemukiman terhadap simpul transportasi massal yang ramah disabilitas.
-    3. **Komersial & Fasilitas Difabel**: Menyoroti kawasan bisnis/kuliner ramai yang belum memiliki infrastruktur inklusif.
-  * Narasi rekomendasi kebijakan publik otomatis berbasis AI (*OpenAI Structured Outputs*) yang menyebutkan data titik riil tanpa templat buatan.
-* **Site Analysis (Isochrone Catchment Network Analysis)**:
-  * Menghitung poligon jangkauan sesungguhnya dalam pita waktu **5, 10, dan 15 menit perjalanan kursi roda** (*OpenRouteService Wheelchair Profile*).
-  * Menampilkan fasilitas apa saja yang terjangkau di dalam pita waktu dan mendeteksi kebutuhan esensial yang berada di luar jangkauan (misal: *"Halte terdekat berjarak 1,2 km (di luar jangkauan)"*).
-  * Mengukur persentase cakupan data survei di dalam area jangkauan untuk transparansi reliabilitas analisis.
-* **Simulasi Calon Perbaikan (*Intervention Simulation*)**:
-  * Algoritma penentu skenario intervensi: menghitung dampak domino jika satu trotoar atau halte tertentu diperbaiki, membantu instansi mengoptimalkan alokasi anggaran infrastruktur yang terbatas.
-* **Komparasi Dua Titik (Side-by-Side Site Selection)**:
-  * Membandingkan Calon Lokasi A dan Calon Lokasi B secara berdampingan dengan evaluasi keunggulan komparatif dari Difa AI.
+* **Site Selection (SINI Grid Multi-Kriteria)**:
+  * Membagi peta wilayah studi menjadi sel grid spasial (1.000 m atau 500 m).
+  * Menghitung **Skor Prioritas Perbaikan** berdasarkan 3 sudut pandang:
+    1. **Aksesibilitas & Keramaian**: Memprioritaskan petak yang ramai pejalan kaki namun kondisi trotoarnya buruk.
+    2. **Hunian & Akses Transit**: Menemukan pemukiman warga yang sulit menjangkau transportasi massal inklusif.
+    3. **Komersial & Fasilitas Difabel**: Menemukan pusat usaha yang ramai namun fasilitas difabelnya masih minim.
+  * Menyajikan rekomendasi perbaikan berbasis data nyata yang dapat langsung dieksekusi.
+* **Site Analysis (Analisis Jangkauan Waktu Tempuh Kursi Roda)**:
+  * Menghitung area yang benar-benar bisa dijangkau pengguna kursi roda dalam waktu **5, 10, dan 15 menit**.
+  * Mendeteksi fasilitas yang terjangkau serta fasilitas penting yang berada di luar jangkauan aman.
+  * Menampilkan persentase kelengkapan data survei di dalam area analisis.
+* **Simulasi & Komparasi Dua Lokasi**:
+  * Membandingkan dua calon lokasi halte atau fasilitas publik secara berdampingan untuk menentukan pilihan terbaik.
 * **Eksplorasi Data MAPID Menu Go & Properti Go**:
-  * Visualisasi sebaran kuliner, kafe, UMKM, dan properti residensial/komersial beserta rincian foto dan estimasi harga.
+  * Memetakan sebaran kuliner, kafe, dan kawasan properti untuk melihat potensi pengembangan kawasan ramah difabel.
+* **Desain Responsif Mobile**:
+  * Panel perencana dapat ditarik (*drag*) atas-bawah dengan mulus di layar smartphone (*peek* untuk melihat peta dan *expanded* untuk melihat data lengkap).
 
 ---
 
-### 3. Difa AI Conversational Assistant (Spatial RAG)
-Bukan sekadar chatbot teks biasa, **Difa AI** adalah asisten spasial cerdas yang terhubung langsung dengan basis data PostGIS dan data survei lapangan:
+### 3. Difa AI Assistant (Spatial RAG)
+Bukan sekadar chatbot teks biasa, **Difa AI** membaca data survei lapangan dan koordinat PostGIS secara langsung:
 
-* **Konsultasi Rute Ramah Kursi Roda**: Menghitung rute perjalanan yang memprioritaskan trotoar landai dan menghindari tanjakan curam ($>8\%$) atau ruas rusak, lalu **menggambar garis rute interaktif di atas peta**.
-* **Spatial Retrieval-Augmented Generation (Spatial RAG)**: Menggunakan ringkasan statistik 94+ titik survei lapangan dan pencarian kedekatan PostGIS (`ST_DWithin`) agar jawaban berbasis fakta lapangan tanpa halusinasi.
-* **Rekomendasi Waktu Kunjungan**: Memberikan saran waktu terbaik berkunjung ke fasilitas publik berdasarkan pola keramaian harian.
+* **Konsultasi Rute Ramah Kursi Roda**: Difa AI merekomendasikan rute yang memilih trotoar landai dan menghindari tanjakan curam ($>8\%$), lalu **menggambar jalurnya langsung di atas peta**.
+* **Spatial RAG Tanpa Halusinasi**: Jawaban AI didasarkan pada fakta dari 94+ titik survei lapangan dan kalkulasi spasial PostGIS (`ST_DWithin`), bukan tebakan acak.
+* **Panduan Perjalanan**: Memberikan informasi waktu terbaik untuk berkunjung dan titik-titik yang perlu diwaspadai di sepanjang jalan.
 
 ---
 
-### 4. AI Multimodal Spatial & Accessibility Inspector
-* Memanfaatkan model **OpenAI GPT-4o-mini Vision** dengan *Strict JSON Schema*.
-* Menginspeksi foto yang diunggah oleh surveyor secara otomatis untuk mengekstrak parameter: kelayakan *ramp*, kondisi ubin pemandu, kelebaran trotoar, lubang jalan, dan penerangan malam.
-* Menghasilkan rating bintang gabungan (1.0 – 5.0) dan skor keyakinan (*confidence*) secara objektif.
+### 4. Inspeksi Otomatis AI (Multimodal Vision)
+* Memanfaatkan **OpenAI GPT-4o-mini Vision** dengan format keluaran terstruktur (*Structured Output*).
+* Menilai foto laporan secara otomatis untuk memeriksa kelayakan ramp, kondisi ubin pemandu, kelebaran jalan, lubang, dan penerangan.
+* Memberikan nilai bintang gabungan (1.0 – 5.0) dan skor keyakinan secara konsisten dan objektif.
 
 ---
 
 ## 💻 Teknologi yang Digunakan (Tech Stack)
 
-| Lapisan / Komponen | Teknologi | Keterangan & Peran |
+| Bagian | Teknologi | Fungsi & Peran |
 | :--- | :--- | :--- |
-| **Arsitektur Repositori** | Turborepo, npm Workspaces | Manajemen monorepo untuk frontend, backend, dan konfigurasi bersama |
-| **Frontend Framework** | **Next.js 15 (App Router)**, React 19, TypeScript | Performa SSR/CSR cepat, struktur layout modern, type-safe |
-| **Peta & Visualisasi Spasial** | **MapLibre GL JS (v5)**, Turf.js | Rendering vektor & raster basemap MAPID, poligon isokron, buffer spasial, 3D buildings |
-| **Grafik & Visualisasi Data** | **Apache ECharts**, echarts-for-react | Visualisasi Radar Chart multi-kriteria aksesibilitas dan analitik |
-| **UI & Ikonografi** | Vanilla CSS, Lucide React | Tampilan responsif modern, bersih, bebas bloatware CSS |
-| **Backend API Server** | **Express.js (v4, ESM)**, Node.js, TypeScript | RESTful API, validasi Zod, rate limiting, kompresi respons |
-| **ORM & Basis Data** | **Prisma ORM (v6)**, PostgreSQL, **PostGIS** | Manajemen skema data, kueri spasial geospasial (`ST_DWithin`, `ST_Distance`) |
-| **Platform Basis Data & Auth** | **Supabase** | Cloud PostgreSQL, PostGIS extension, Supabase Storage (foto laporan) |
-| **Platform Geospasial Mitra** | **MAPID Platform** | MAPID Basemap Tile Server, Geoserver Open API, MAPID Competition API |
-| **Routing & Isokron** | **OpenRouteService API** | Analisis rute & isokron jaringan jalan khusus profil kursi roda (*wheelchair*) |
-| **Kecerdasan Buatan (AI)** | **OpenAI GPT-4o-mini** | Multimodal Vision Inspector, Structured Outputs, Spatial RAG Chatbot |
+| **Pengelolaan Monorepo** | Turborepo, npm Workspaces | Manajemen monorepo frontend, backend, dan package bersama |
+| **Frontend Framework** | **Next.js 15 (App Router)**, React 19, TypeScript | Tampilan responsif, cepat, dan modern |
+| **Peta & Visualisasi Spasial** | **MapLibre GL JS (v5)**, Turf.js | Render basemap MAPID, visualisasi gedung 3D, poligon jangkauan, dan layer spasial |
+| **Grafik & Data** | **Apache ECharts**, echarts-for-react | Visualisasi Radar Chart multi-faktor aksesibilitas |
+| **Desain & Ikon** | Vanilla CSS, Lucide React | Tampilan bersih, ringan, dan ramah pengguna |
+| **Backend API Server** | **Express.js (v4, ESM)**, Node.js, TypeScript | REST API, validasi skema Zod, dan pengolahan data spasial |
+| **ORM & Database** | **Prisma ORM (v6)**, PostgreSQL, **PostGIS** | Manajemen database relasional dan fungsi kueri spasial |
+| **Penyimpanan Cloud & Auth** | **Supabase** | Layanan PostgreSQL cloud, PostGIS, dan Supabase Storage foto laporan |
+| **Platform Geospasial Mitra** | **MAPID Platform** | Basemap Tile Service, Geoserver API, dan API Kompetisi MAPID |
+| **Rute & Jaringan Jalan** | **OpenRouteService API** | Kalkulasi rute jalan dan isokron khusus kursi roda (*wheelchair*) |
+| **Kecerdasan Buatan (AI)** | **OpenAI GPT-4o-mini** | Inspeksi foto survei otomatis dan chatbot spasial Difa AI |
 
 ---
 
-## 📁 Struktur Direktori Monorepo
+## 📁 Struktur Folder Proyek
 
 ```text
 DifaMap/
 ├── apps/
 │   ├── api/                          # Backend Express.js REST API
 │   │   ├── prisma/
-│   │   │   ├── schema.prisma         # Skema database relasional & spasial Prisma
-│   │   │   └── seed.ts               # Seed data pengujian awal
+│   │   │   ├── schema.prisma         # Skema database relasional & spasial PostGIS
+│   │   │   └── seed.ts               # Data awal untuk pengujian
 │   │   ├── src/
-│   │   │   ├── config/               # Konfigurasi & validasi Zod env
-│   │   │   ├── controllers/          # Handler endpoint (Location, Activity, Chat, MAPID)
-│   │   │   ├── middlewares/          # Autentikasi JWT Supabase & Error Handling
-│   │   │   ├── routes/               # Definisi rute REST API
-│   │   │   └── services/             # Logika bisnis:
-│   │   │       ├── aiOrchestrator.service.ts   # OpenAI Vision inspector
-│   │   │       ├── chatbotContext.ts           # Spatial RAG context builder
-│   │   │       ├── mapid.service.ts            # Proxy MAPID Basemap & SINI Grid
-│   │   │       ├── mapidCompetition.service.ts # Klien MAPID Competition API
-│   │   │       ├── rute.service.ts             # OpenRouteService wheelchair routing
-│   │   │       └── siteInsight.service.ts      # Isochrone & komparasi site analysis
+│   │   │   ├── config/               # Konfigurasi & validasi variabel lingkungan (Zod)
+│   │   │   ├── controllers/          # Logika pemroses endpoint API
+│   │   │   ├── middlewares/          # Autentikasi JWT Supabase & penanganan error
+│   │   │   ├── routes/               # Jalur rute REST API
+│   │   │   └── services/             # Layanan bisnis:
+│   │   │       ├── aiOrchestrator.service.ts   # Inspeksi foto via OpenAI Vision
+│   │   │       ├── chatbotContext.ts           # Konteks data untuk Spatial RAG
+│   │   │       ├── mapid.service.ts            # Integrasi Basemap & Grid SINI MAPID
+│   │   │       ├── mapidCompetition.service.ts # Klien API Kompetisi MAPID
+│   │   │       ├── rute.service.ts             # Kalkulasi rute kursi roda ORS
+│   │   │       └── siteInsight.service.ts      # Analisis isokron & perbandingan lokasi
 │   │   └── package.json
 │   │
-│   └── web/                          # Frontend Next.js 15 WebGIS Application
-│       ├── public/                   # Asset statis, ikon, dan logo DifaMap
+│   └── web/                          # Frontend Next.js 15 WebGIS
+│       ├── public/                   # Asset gambar, ikon, dan logo
 │       ├── src/
-│       │   ├── app/                  # Next.js App Router (layout, globals.css, page)
+│       │   ├── app/                  # Halaman Next.js App Router & layout
 │       │   ├── components/
-│       │   │   ├── chatbot/          # Drawer Difa AI & komponen teks kaya
-│       │   │   ├── charts/           # ECharts Radar Chart
-│       │   │   ├── common/           # Komponen indikator loading AI & badge
-│       │   │   ├── drawer/           # DetailDrawer, PanelTempat, PanelSurvei
-│       │   │   ├── layout/           # AppSidebar (mode switcher), TopSearchBar (filter)
-│       │   │   ├── map/              # MapCanvas (MapLibre GL, 3D buildings, layer rendering)
-│       │   │   └── modals/           # CreateActivityModal, InfoModal, ImageLightbox
-│       │   ├── context/              # React Context state management
-│       │   ├── data/                 # Data master parameter & utilitas filter
-│       │   ├── hooks/                # Custom React Hooks (useDifaMap, useIsMobile)
-│       │   └── lib/                  # Klien API fetcher & utilitas
+│       │   │   ├── chatbot/          # Panel Difa AI & komponen teks kaya
+│       │   │   ├── charts/           # Komponen Radar Chart ECharts
+│       │   │   ├── common/           # Badge, status, dan animasi loading
+│       │   │   ├── drawer/           # Panel informasi detail lokasi & survei
+│       │   │   ├── layout/           # Sidebar pilihan mode & bilah pencarian atas
+│       │   │   ├── map/              # Komponen kanvas peta MapLibre & gedung 3D
+│       │   │   └── modals/           # Modal laporan baru, info panduan, & lightbox foto
+│       │   ├── context/              # Manajemen state aplikasi
+│       │   ├── data/                 # Data referensi & filter
+│       │   ├── hooks/                # Custom React Hooks (deteksi mobile, dll.)
+│       │   └── lib/                  # Klien API fetcher & utilitas pembantu
 │       └── package.json
 │
 ├── packages/
 │   └── tsconfig/                     # Konfigurasi bersama TypeScript
-├── AGENTS.md                         # Panduan operasional developer & AI assistant
-├── API_DOCUMENTATION.md              # Spesifikasi lengkap REST API & payload JSON
-├── erd.md                            # Entity Relationship Diagram & penjelasan tabel
-├── SERAH-TERIMA-DEPLOY.md            # Catatan konfigurasi hosting & checklist produksi
-├── package.json                      # Konfigurasi root monorepo (Turborepo)
-├── turbo.json                        # Pipeline task build & dev Turborepo
+├── AGENTS.md                         # Pedoman teknis pengembangan monorepo & Prisma
+├── API_DOCUMENTATION.md              # Dokumentasi lengkap REST API & contoh JSON
+├── erd.md                            # Skema relasi database (ERD) & penjelasan tabel
+├── SERAH-TERIMA-DEPLOY.md            # Catatan serah terima & checklist hosting produksi
+├── package.json                      # Konfigurasi root monorepo
+├── turbo.json                        # Konfigurasi pipeline Turborepo
 └── README.md                         # Dokumentasi utama proyek DifaMap
 ```
 
 ---
 
-## 🚀 Panduan Instalasi & Menjalankan Lokal
+## 🚀 Cara Menjalankan di Komputer Lokal
 
-### 1. Prasyarat Sistem
-* **Node.js**: Versi `>=20.0.0` (Direkomendasikan Node 22 LTS).
+### 1. Prasyarat
+* **Node.js**: Versi `>=20.0.0` (disarankan Node 22 LTS).
 * **npm**: Versi `>=10.0.0`.
-* Akun & Proyek aktif di **Supabase** (dengan ekstensi PostGIS aktif).
-* API Key aktif dari **OpenAI**, **MAPID Platform**, dan **OpenRouteService**.
+* Proyek aktif di **Supabase** (dengan ekstensi PostGIS aktif).
+* Kunci API aktif dari **OpenAI**, **MAPID Platform**, dan **OpenRouteService**.
 
-### 2. Clone Repositori
+### 2. Unduh Repositori
 ```bash
 git clone https://github.com/Cerobong-Asap-Mapid-WebGis-Competition/DifaMap.git
 cd DifaMap
 ```
 
-### 3. Instalasi Dependensi
-Instal seluruh dependensi monorepo dari root menggunakan npm:
+### 3. Pasang Dependensi
+Pasang seluruh dependensi monorepo dari folder root:
 ```bash
 npm install
 ```
 
-### 4. Konfigurasi File Environment
-Salin template `.env.example` ke file `.env` pada root, backend, dan frontend:
+### 4. Konfigurasi File Lingkungan (.env)
+Salin contoh file `.env.example` ke `.env` pada folder backend dan frontend:
 
 ```bash
-# Salin konfigurasi backend
+# Konfigurasi backend
 cp apps/api/.env.example apps/api/.env
 
-# Salin konfigurasi frontend
+# Konfigurasi frontend
 cp apps/web/.env.example apps/web/.env
 ```
-*(Sesuaikan isi kredensial dengan kunci API Anda sebagaimana dijelaskan pada tabel Variabel Lingkungan di bawah).*
 
-### 5. Sinkronisasi Database Prisma
-Jalankan migrasi dan pembuatan Prisma Client:
+### 5. Siapkan Database Prisma
+Jalankan sinkronisasi skema ke database Supabase:
 ```bash
 cd apps/api
 npm run db:generate
 npm run db:push
 ```
 
-### 6. Menjalankan Server Pengembangan (Development Mode)
-Jalankan kedua aplikasi (Backend & Frontend) secara serentak menggunakan Turborepo dari direktori root:
+### 6. Jalankan Aplikasi
+Jalankan backend dan frontend secara bersamaan dari folder root DifaMap:
 ```bash
-# Dari root folder DifaMap
 npm run dev
 ```
 
-* **Frontend WebGIS** akan berjalan di: `http://localhost:3000`
-* **Backend Express API** akan berjalan di: `http://localhost:4000`
-* **Pemeriksaan Kesehatan API**: `http://localhost:4000/api/health`
+* **Frontend WebGIS**: buka di browser `http://localhost:3000`
+* **Backend API**: berjalan di `http://localhost:4000`
+* **Cek Status API**: `http://localhost:4000/api/health`
 
 ---
 
-## 🔑 Variabel Lingkungan (Environment Variables)
+## 📚 Dokumentasi Lengkap
 
-### Backend (`apps/api/.env`)
-| Variabel | Wajib? | Keterangan |
-| :--- | :---: | :--- |
-| `PORT` | Tidak | Port server API (Default: `4000`) |
-| `NODE_ENV` | Ya | Mode aplikasi (`development` / `production`) |
-| `DATABASE_URL` | **Ya** | URL koneksi PostgreSQL Supabase (Pooler port 6543) |
-| `DIRECT_URL` | Tidak | URL koneksi langsung PostgreSQL Supabase (Port 5432) |
-| `SUPABASE_URL` | **Ya** | URL endpoint proyek Supabase |
-| `SUPABASE_ANON_KEY` | **Ya** | Kunci publik Supabase |
-| `SUPABASE_SERVICE_ROLE_KEY` | **Ya** | Kunci service role untuk mengunggah foto ke storage |
-| `OPENAI_API_KEY` | **Ya** | Kunci API OpenAI untuk evaluasi foto & Spatial RAG |
-| `MAPID_API_KEY` | **Ya** | Kunci API MAPID Platform |
-| `MAPID_BASE_URL` | Ya | Base URL API MAPID (`https://api.mapid.io`) |
-| `MAPID_BASEMAP_URL` | Ya | URL Tile Basemap MAPID (`https://basemap.mapid.io`) |
-| `MAPID_GEOSERVER_URL` | Ya | URL Geoserver MAPID (`https://geoserver.mapid.io`) |
-| `MAPID_COMPETITION_URL`| Ya | Endpoint Competition MAPID (`https://server.mapid.io/web/competition`) |
-| `MAPID_PROJECT_ID` | Ya | ID Proyek MAPID DifaMap |
-| `ORS_API_KEY` | Ya | Kunci API OpenRouteService untuk rute & isokron kursi roda |
-| `ORS_BASE_URL` | Ya | Base URL OpenRouteService (`https://api.openrouteservice.org`) |
-| `CORS_ORIGINS` | Opsional | Domain frontend yang diizinkan (misal: `https://difamap.example.com`) |
-| `TRUST_PROXY_HOPS` | Opsional | Jumlah lapis reverse proxy (`1` untuk Railway/Render, `2` untuk Cloudflare) |
-
-### Frontend (`apps/web/.env`)
-| Variabel | Wajib? | Keterangan |
-| :--- | :---: | :--- |
-| `NEXT_PUBLIC_API_URL` | **Ya** | URL Backend API DifaMap (Wajib diisi sebelum `npm run build`) |
-| `NEXT_PUBLIC_SUPABASE_URL` | **Ya** | URL proyek Supabase |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY`| **Ya** | Kunci anon Supabase untuk otentikasi klien |
-| `NEXT_PUBLIC_MAPID_STYLE_ID` | Ya | Default style basemap MAPID (`basic` / `dark` / `light` / `satellite`) |
-
----
-
-## 📚 Dokumentasi Terkait
-
-Untuk pemahaman teknis yang lebih mendalam, silakan baca dokumen arsitektur pendukung berikut:
-* **[API_DOCUMENTATION.md](file:///e:/Ngodingkan/DifaMap/API_DOCUMENTATION.md)**: Spesifikasi lengkap seluruh endpoint REST API, parameter kueri spasial, skema body JSON, dan contoh respons.
-* **[erd.md](file:///e:/Ngodingkan/DifaMap/erd.md)**: Entity Relationship Diagram (ERD), skema tabel database Prisma, indeks spasial PostGIS, dan tipe enum parameter aksesibilitas.
-* **[AGENTS.md](file:///e:/Ngodingkan/DifaMap/AGENTS.md)**: Panduan tata kelola penulisan kode monorepo, aturan sinkronisasi tipe Prisma, dan validasi *type-checking*.
-* **[SERAH-TERIMA-DEPLOY.md](file:///e:/Ngodingkan/DifaMap/SERAH-TERIMA-DEPLOY.md)**: Panduan komprehensif serah terima produksi, konfigurasi storage bucket Supabase, dan mitigasi *rate-limiting*.
+Untuk panduan teknis lebih mendalam, silakan buka dokumen berikut:
+* **[API_DOCUMENTATION.md](./API_DOCUMENTATION.md)**: Spesifikasi endpoint REST API, parameter kueri spasial, format body request, dan contoh respons JSON.
+* **[erd.md](./erd.md)**: Skema relasi database (ERD), tabel Prisma, indeks spasial PostGIS, dan tipe enum parameter.
+* **[AGENTS.md](./AGENTS.md)**: Panduan standar pengembangan monorepo, sinkronisasi tipe Prisma, dan validasi kode.
+* **[SERAH-TERIMA-DEPLOY.md](./SERAH-TERIMA-DEPLOY.md)**: Panduan konfigurasi hosting produksi, bucket Supabase Storage, dan mitigasi pembatasan rate-limit.
 
 ---
 
 ## 👥 Tim Pengembang (Cerobong Asap)
 
-Karya ini disusun dan dikembangkan dengan dedikasi penuh untuk **MAPID Competition 2026** oleh **Tim Cerobong Asap**:
+DifaMap dikembangkan untuk **MAPID Competition 2026** oleh **Tim Cerobong Asap**:
 
 * **Surveyor Lapangan & Kontributor Data Spasial**:
   * `randymuflih` (Randy Muflih)
   * `atyas` (Atyas)
   * `amarr` (Amar)
   * `aixii16` (Aixii)
-* **Tagar Kampanye Survei Lapangan**: `#cerobongasap`
-* **Wilayah Studi Survei**: 7 Zona Koridor & Pusat Kawasan di Kota Makassar dan Kabupaten Gowa (*Tamalate, Tamalanrea, Mariso, Ujung Pandang, Rappocini, Somba Opu, Bontomarannu*).
+* **Tagar Survei Lapangan**: `#cerobongasap`
+* **Wilayah Studi Lapangan**: 7 Zona Koridor & Pusat Kawasan di Kota Makassar dan Kabupaten Gowa (*Tamalate, Tamalanrea, Mariso, Ujung Pandang, Rappocini, Somba Opu, Bontomarannu*).
 
 ---
 
 <div align="center">
 
 **DifaMap WebGIS &copy; 2026 Tim Cerobong Asap &bull; Dikembangkan untuk MAPID Competition 2026**  
-*Mewujudkan Perkotaan yang Inklusif, Aksesibel, dan Berkeadilan bagi Semua.*
+*Mewujudkan Perkotaan yang Inklusif, Aksesibel, dan Nyaman bagi Semua.*
 
 </div>

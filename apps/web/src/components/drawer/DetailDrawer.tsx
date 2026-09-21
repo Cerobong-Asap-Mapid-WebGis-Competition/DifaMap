@@ -198,25 +198,25 @@ export default function DetailDrawer({
   // Ekstraksi parameter observasi AI secara dinamis (tanpa hardcode)
   const observedParams = isLocation
     ? {
-        rampStatus: data.rampStatus,
-        guidingBlockStatus: data.guidingBlockStatus,
-        sidewalkCondition: data.sidewalkCondition,
-        surfaceCondition: data.surfaceCondition,
-        seatingAvailability: data.seatingAvailability,
-        toiletAccessibility: data.toiletAccessibility,
-        lightingLevel: data.lightingLevel,
-        crowdLevel: data.crowdLevel,
-      }
+      rampStatus: data.rampStatus,
+      guidingBlockStatus: data.guidingBlockStatus,
+      sidewalkCondition: data.sidewalkCondition,
+      surfaceCondition: data.surfaceCondition,
+      seatingAvailability: data.seatingAvailability,
+      toiletAccessibility: data.toiletAccessibility,
+      lightingLevel: data.lightingLevel,
+      crowdLevel: data.crowdLevel,
+    }
     : (data.observedParameters || data.aiAnalysis?.observedParameters || {
-        rampStatus: data.rampStatus,
-        guidingBlockStatus: data.guidingBlockStatus,
-        sidewalkCondition: data.sidewalkCondition,
-        surfaceCondition: data.surfaceCondition,
-        seatingAvailability: data.seatingAvailability,
-        toiletAccessibility: data.toiletAccessibility,
-        lightingLevel: data.lightingLevel,
-        crowdLevel: data.crowdLevel,
-      });
+      rampStatus: data.rampStatus,
+      guidingBlockStatus: data.guidingBlockStatus,
+      sidewalkCondition: data.sidewalkCondition,
+      surfaceCondition: data.surfaceCondition,
+      seatingAvailability: data.seatingAvailability,
+      toiletAccessibility: data.toiletAccessibility,
+      lightingLevel: data.lightingLevel,
+      crowdLevel: data.crowdLevel,
+    });
 
   // Skor resmi terobservasi
   const overallScore = isLocation
@@ -338,7 +338,7 @@ export default function DetailDrawer({
       };
 
       await difaMapApi.createComment(payload);
-      
+
       const newComment = {
         id: Math.random().toString(),
         content: commentText,
@@ -469,8 +469,8 @@ export default function DetailDrawer({
           ? isDragging
             ? currentHeight
             : sheetMode === 'peek'
-            ? `${peekHeight}px`
-            : `${expandedHeight}px`
+              ? `${peekHeight}px`
+              : `${expandedHeight}px`
           : 'calc(100vh - 116px)',
         transform: currentTransform,
         transition: isDragging
@@ -647,7 +647,7 @@ export default function DetailDrawer({
                 : data.coverImageUrl
                   ? [data.coverImageUrl]
                   : [];
-          
+
           if (rawMedias.length === 0) return null;
 
           // Urutkan foto agar foto kamera survei asli berada di depan
@@ -831,7 +831,7 @@ export default function DetailDrawer({
                 <span style={{ fontSize: '24px', fontWeight: '800', color: '#0F172A' }}>
                   {overallScore.toFixed(1)}
                 </span>
-                
+
                 {/* 5 Stars */}
                 <div style={{ display: 'flex', gap: '2px' }}>
                   {[1, 2, 3, 4, 5].map((star) => (
