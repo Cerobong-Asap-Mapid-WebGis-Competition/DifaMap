@@ -77,10 +77,13 @@ export default function DetailDrawer({
   const [sheetMode, setSheetMode] = useState<'peek' | 'expanded'>('peek');
   const [dragDeltaY, setDragDeltaY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const [windowHeight, setWindowHeight] = useState(800);
   const touchStartYRef = useRef(0);
   const touchCurrentYRef = useRef(0);
   const bodyScrollRef = useRef<HTMLDivElement>(null);
+  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -91,22 +94,49 @@ export default function DetailDrawer({
     }
   }, []);
 
-  const peekHeight = Math.min(365, Math.round(windowHeight * 0.44));
-  const expandedHeight = Math.round(windowHeight * 0.85);
+  // Batas aman atas: menyisakan ruang minimal 132px dari tepi atas layar agar bilah pencarian & tombol filter tidak tertimpa
+  const topSafetyOffset = 132;
+  const maxAllowedHeight = Math.max(300, windowHeight - topSafetyOffset);
+  const expandedHeight = Math.min(maxAllowedHeight, Math.round(windowHeight * 0.82));
+  const peekHeight = Math.min(360, Math.max(260, Math.round(windowHeight * 0.42)));
+  const peekOffset = Math.max(0, expandedHeight - peekHeight);
 
-  // Reset photo index and bottom sheet mode when selected item changes
+  // Animasi tutup halus (slide down ke bawah layar) tanpa langsung hilang mendadak
+  const triggerClose = () => {
+    if (isClosing) return;
+    setIsClosing(true);
+    if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    closeTimeoutRef.current = setTimeout(() => {
+      onClose();
+      setIsClosing(false);
+    }, 260);
+  };
+
   useEffect(() => {
-    setSelectedPhotoIndex(0);
-    setIsLightboxOpen(false);
-    setSheetMode('peek');
-    setDragDeltaY(0);
-    setIsDragging(false);
-    if (bodyScrollRef.current) {
-      bodyScrollRef.current.scrollTop = 0;
+    return () => {
+      if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    };
+  }, []);
+
+  // Reset photo index, bottom sheet mode, dan trigger animasi masuk saat selected item berganti
+  useEffect(() => {
+    if (selectedItem) {
+      setSelectedPhotoIndex(0);
+      setIsLightboxOpen(false);
+      setSheetMode('peek');
+      setDragDeltaY(0);
+      setIsDragging(false);
+      setIsClosing(false);
+      setIsMounted(false);
+      if (bodyScrollRef.current) {
+        bodyScrollRef.current.scrollTop = 0;
+      }
+      const t = requestAnimationFrame(() => setIsMounted(true));
+      return () => cancelAnimationFrame(t);
     }
   }, [selectedItem?.data?.id]);
 
-  // Handle ESC key: close comment box first, or close drawer
+  // Handle ESC key: close comment box first, or trigger smooth close
   useEffect(() => {
     if (!selectedItem) return;
 
@@ -122,14 +152,14 @@ export default function DetailDrawer({
         if (showCommentInput) {
           setShowCommentInput(false);
         } else {
-          onClose();
+          triggerClose();
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedItem, showCommentInput, isLightboxOpen, onClose]);
+  }, [selectedItem, showCommentInput, isLightboxOpen, isClosing]);
 
   // Fetch comments when selected item changes
   useEffect(() => {
@@ -383,12 +413,18 @@ export default function DetailDrawer({
     if (sheetMode === 'peek') {
       if (delta < -45) {
         setSheetMode('expanded');
-      } else if (delta > 75) {
-        onClose();
+      } else if (delta > 70) {
+        triggerClose();
+      } else {
+        setSheetMode('peek');
       }
     } else {
-      if (delta > 50) {
+      if (delta > 220 || delta > peekOffset + 40) {
+        triggerClose();
+      } else if (delta > 55) {
         setSheetMode('peek');
+      } else {
+        setSheetMode('expanded');
       }
     }
   };
@@ -413,7 +449,7 @@ export default function DetailDrawer({
     } else {
       if (bodyScrollRef.current && bodyScrollRef.current.scrollTop <= 0 && delta > 0) {
         setDragDeltaY(delta);
-      } else {
+      } else if (delta < 0) {
         setIsDragging(false);
         setDragDeltaY(0);
       }
@@ -425,28 +461,27 @@ export default function DetailDrawer({
     handleDragEnd();
   };
 
-  const currentHeight = (() => {
-    if (!isMobile) return undefined;
+  // Posisi vertikal GPU-accelerated: 0 = expanded (di bawah bilah atas), peekOffset = peek mode, expandedHeight + 120 = offscreen
+  const currentTranslateY = (() => {
+    if (!isMobile) return 0;
+    if (!isMounted || isClosing) {
+      return expandedHeight + 120;
+    }
+    const baseTranslateY = sheetMode === 'peek' ? peekOffset : 0;
     if (!isDragging) {
-      return sheetMode === 'peek' ? `${peekHeight}px` : `${expandedHeight}px`;
+      return baseTranslateY;
     }
-    const base = sheetMode === 'peek' ? peekHeight : expandedHeight;
-    const target = base - dragDeltaY;
-    const clamped = Math.max(peekHeight - 60, Math.min(expandedHeight + 30, target));
-    return `${clamped}px`;
-  })();
-
-  const currentTransform = (() => {
-    if (!isMobile) return undefined;
-    if (isDragging && sheetMode === 'peek' && dragDeltaY > 0) {
-      return `translateY(${Math.min(dragDeltaY, 140)}px)`;
+    const target = baseTranslateY + dragDeltaY;
+    // Damping / rubber-band saat ditarik melebihi batas atas expanded agar tidak menimpa search bar
+    if (target < 0) {
+      return Math.max(-25, target * 0.2);
     }
-    return 'translateY(0)';
+    return target;
   })();
 
   return (
     <aside
-      className={isMobile ? 'animate-slide-up' : 'animate-slide-in'}
+      className={isMobile ? undefined : 'animate-slide-in'}
       // Hentikan seluruh event mouse, drag, dan touch agar peta di bawah TIDAK ikut bergeser saat pop-up disentuh
       onClick={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
@@ -464,18 +499,12 @@ export default function DetailDrawer({
         bottom: isMobile ? 0 : '20px',
         width: isMobile ? '100%' : '440px',
         maxWidth: isMobile ? '100vw' : 'calc(100vw - 116px)',
-        height: isMobile ? currentHeight : undefined,
-        maxHeight: isMobile
-          ? isDragging
-            ? currentHeight
-            : sheetMode === 'peek'
-              ? `${peekHeight}px`
-              : `${expandedHeight}px`
-          : 'calc(100vh - 116px)',
-        transform: currentTransform,
+        height: isMobile ? `${expandedHeight}px` : undefined,
+        maxHeight: isMobile ? `${expandedHeight}px` : 'calc(100vh - 116px)',
+        transform: isMobile ? `translateY(${currentTranslateY}px)` : undefined,
         transition: isDragging
           ? 'none'
-          : 'height 0.32s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+          : 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
         backgroundColor: '#FFFFFF',
         borderRadius: isMobile ? '24px 24px 0 0' : '20px',
         boxShadow: isMobile ? '0px -8px 36px rgba(0, 0, 0, 0.3)' : '0px 14px 44px rgba(0, 0, 0, 0.16)',
@@ -486,6 +515,7 @@ export default function DetailDrawer({
         flexDirection: 'column',
         overflow: 'hidden',
         userSelect: 'text',
+        willChange: isMobile ? 'transform' : undefined,
       }}
     >
       {/* 0. Drag Handle Bar for Mobile Bottom Sheet */}
@@ -561,7 +591,7 @@ export default function DetailDrawer({
 
         {/* Close Button */}
         <button
-          onClick={onClose}
+          onClick={triggerClose}
           title="Tutup Panel"
           style={{
             background: isMobile ? '#F1F5F9' : 'transparent',

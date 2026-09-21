@@ -287,13 +287,74 @@ export default function AiChatbotDrawer({
   const [siteAnalysisData, setSiteAnalysisData] = useState<any>(null);
   const [gagalAnalisis, setGagalAnalisis] = useState<string | null>(null);
 
+  // Mobile Draggable Bottom Sheet State
+  const [sheetMode, setSheetMode] = useState<'peek' | 'expanded'>('peek');
+  const [dragDeltaY, setDragDeltaY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [windowHeight, setWindowHeight] = useState(800);
+  const touchStartYRef = useRef(0);
+  const touchCurrentYRef = useRef(0);
+  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setWindowHeight(window.innerHeight);
+      const handleResize = () => setWindowHeight(window.innerHeight);
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }
+  }, []);
+
+  // Batas aman atas: minimal 132px dari tepi atas layar agar bilah pencarian & tombol filter tidak tertimpa
+  const topSafetyOffset = 132;
+  const maxAllowedHeight = Math.max(300, windowHeight - topSafetyOffset);
+  const expandedHeight = tampilan === 'PERENCANA'
+    ? Math.min(maxAllowedHeight, Math.round(windowHeight * 0.74))
+    : Math.min(maxAllowedHeight, Math.round(windowHeight * 0.82));
+  const peekHeight = tampilan === 'PERENCANA'
+    ? Math.min(340, Math.max(240, Math.round(windowHeight * 0.40)))
+    : Math.min(360, Math.max(250, Math.round(windowHeight * 0.44)));
+  const peekOffset = Math.max(0, expandedHeight - peekHeight);
+
+  // Animasi tutup halus (slide down ke bawah layar) tanpa langsung hilang mendadak
+  const triggerClose = () => {
+    if (isClosing) return;
+    setIsClosing(true);
+    if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    closeTimeoutRef.current = setTimeout(() => {
+      onClose();
+      setIsClosing(false);
+    }, 260);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    };
+  }, []);
+
+  // Reset mode bottom sheet & trigger animasi masuk saat drawer dibuka atau berganti mode tampilan
+  useEffect(() => {
+    if (isOpen) {
+      setSheetMode('peek');
+      setDragDeltaY(0);
+      setIsDragging(false);
+      setIsClosing(false);
+      setIsMounted(false);
+      const t = requestAnimationFrame(() => setIsMounted(true));
+      return () => cancelAnimationFrame(t);
+    }
+  }, [isOpen, tampilan]);
+
   useEffect(() => {
     if (isOpen) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isOpen]);
 
-  // Handle ESC key to close AiChatbotDrawer
+  // Handle ESC key to smoothly close AiChatbotDrawer
   useEffect(() => {
     if (!isOpen) return;
 
@@ -302,13 +363,13 @@ export default function AiChatbotDrawer({
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
-        onClose();
+        triggerClose();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, isClosing]);
 
   // When analysisTarget changes (user picked point on map), trigger Site Analysis automatically
   useEffect(() => {
@@ -348,7 +409,7 @@ export default function AiChatbotDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compareTarget]);
 
-  if (!isOpen) return null;
+  if (!isOpen && !isClosing) return null;
 
   // Handler: Chatbot Message
   const handleSendMessage = async (textToSend: string) => {
@@ -605,46 +666,124 @@ export default function AiChatbotDrawer({
     }
   };
 
+  // Handler drag gesture untuk mobile bottom sheet
+  const handleDragStart = (e: React.TouchEvent) => {
+    if (!isMobile) return;
+    touchStartYRef.current = e.touches[0].clientY;
+    touchCurrentYRef.current = e.touches[0].clientY;
+    setIsDragging(true);
+  };
+
+  const handleDragMove = (e: React.TouchEvent) => {
+    if (!isMobile || !isDragging) return;
+    const currentY = e.touches[0].clientY;
+    touchCurrentYRef.current = currentY;
+    const delta = currentY - touchStartYRef.current;
+    setDragDeltaY(delta);
+  };
+
+  const handleDragEnd = () => {
+    if (!isMobile || !isDragging) return;
+    setIsDragging(false);
+    const delta = touchCurrentYRef.current - touchStartYRef.current;
+    setDragDeltaY(0);
+
+    if (sheetMode === 'peek') {
+      if (delta < -45) {
+        setSheetMode('expanded');
+      } else if (delta > 70) {
+        triggerClose();
+      } else {
+        setSheetMode('peek');
+      }
+    } else {
+      if (delta > 220 || delta > peekOffset + 40) {
+        triggerClose();
+      } else if (delta > 55) {
+        setSheetMode('peek');
+      } else {
+        setSheetMode('expanded');
+      }
+    }
+  };
+
+  const handleBodyTouchStart = (e: React.TouchEvent) => {
+    if (!isMobile) return;
+    touchStartYRef.current = e.touches[0].clientY;
+    touchCurrentYRef.current = e.touches[0].clientY;
+    const target = e.currentTarget as HTMLElement;
+    if (sheetMode === 'peek' || (target && target.scrollTop <= 0)) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleBodyTouchMove = (e: React.TouchEvent) => {
+    if (!isMobile || !isDragging) return;
+    const currentY = e.touches[0].clientY;
+    touchCurrentYRef.current = currentY;
+    const delta = currentY - touchStartYRef.current;
+
+    if (sheetMode === 'peek') {
+      setDragDeltaY(delta);
+    } else {
+      const target = e.currentTarget as HTMLElement;
+      if (target && target.scrollTop <= 0 && delta > 0) {
+        setDragDeltaY(delta);
+      } else if (delta < 0) {
+        setIsDragging(false);
+        setDragDeltaY(0);
+      }
+    }
+  };
+
+  const handleBodyTouchEnd = () => {
+    if (!isMobile || !isDragging) return;
+    handleDragEnd();
+  };
+
+  // Posisi vertikal GPU-accelerated: 0 = expanded (di bawah bilah atas), peekOffset = peek mode, expandedHeight + 120 = offscreen
+  const currentTranslateY = (() => {
+    if (!isMobile) return 0;
+    if (!isMounted || isClosing) {
+      return expandedHeight + 120;
+    }
+    const baseTranslateY = sheetMode === 'peek' ? peekOffset : 0;
+    if (!isDragging) {
+      return baseTranslateY;
+    }
+    const target = baseTranslateY + dragDeltaY;
+    // Damping / rubber-band saat ditarik melebihi batas atas expanded agar tidak menimpa search bar
+    if (target < 0) {
+      return Math.max(-25, target * 0.2);
+    }
+    return target;
+  })();
+
   return (
     <aside
-      className={isMobile ? 'animate-slide-up' : 'animate-slide-in'}
+      className={isMobile ? undefined : 'animate-slide-in'}
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onMouseUp={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
+      onTouchMove={(e) => e.stopPropagation()}
+      onWheel={(e) => e.stopPropagation()}
       style={{
         position: 'fixed',
         left: isMobile ? 0 : 'auto',
         right: isMobile ? 0 : '24px',
-        // Mulai di bawah baris tombol atas, bukan sejajar dengannya.
-        //
-        // Sebelumnya panel dan tombol Tempat, Halte, serta Bagikan Laporan
-        // sama-sama dimulai di 24px - dan karena panel berlapis 50 sementara
-        // bilah tombol 70, tombol-tombol itu menimpa kepala panel: judul "Difa
-        // AI" tertutup separuh dan tab di bawahnya ikut terpotong.
         top: isMobile ? 'auto' : '96px',
         bottom: isMobile ? 0 : '24px',
         width: isMobile ? '100%' : '460px',
         maxWidth: isMobile ? '100vw' : 'calc(100vw - 48px)',
-        /**
-         * Tinggi mengikuti isi panelnya, bukan satu angka untuk keduanya.
-         *
-         * Di mode percakapan, ruang baca lebih berharga daripada melihat peta:
-         * jawabannya panjang, dan rute yang digambarnya sudah punya pita
-         * ringkasan sendiri di atas peta.
-         *
-         * Di mode perencana justru sebaliknya. Seluruh guna Site Selection
-         * adalah MELIHAT grid prioritasnya, dan Site Analysis menggambar cincin
-         * jangkauan - panel setinggi 86% layar menutupi keduanya, sehingga yang
-         * tersisa hanya angka tanpa peta yang dijelaskannya.
-         */
-        /**
-         * Di layar sempit tingginya DIPATOK, bukan sekadar dibatasi.
-         *
-         * Dengan maxHeight saja, lembar ini mengikuti tinggi isi tiap tab:
-         * Site Selection panjang sehingga penuh, Site Analysis pendek sebelum
-         * dijalankan sehingga menyusut - dan berpindah tab membuat lembarnya
-         * melompat naik-turun. Dipatok, batas atasnya diam di tempat sementara
-         * isinya yang menggulung.
-         */
-        height: isMobile ? (tampilan === 'PERENCANA' ? '62vh' : '86vh') : undefined,
-        maxHeight: isMobile ? (tampilan === 'PERENCANA' ? '62vh' : '86vh') : 'calc(100vh - 48px)',
+        height: isMobile ? `${expandedHeight}px` : undefined,
+        maxHeight: isMobile ? `${expandedHeight}px` : 'calc(100vh - 48px)',
+        transform: isMobile ? `translateY(${currentTranslateY}px)` : undefined,
+        transition: isDragging
+          ? 'none'
+          : 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
         backgroundColor: '#FFFFFF',
         borderRadius: isMobile ? '24px 24px 0 0' : '16px',
         boxShadow: isMobile ? '0 -8px 36px rgba(0, 0, 0, 0.25)' : '0 8px 32px rgba(0, 0, 0, 0.18)',
@@ -654,20 +793,56 @@ export default function AiChatbotDrawer({
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
+        willChange: isMobile ? 'transform' : undefined,
       }}
     >
-      {/* Mobile Top Drag Handle Bar */}
-      {isMobile && <div className="bottom-sheet-drag-handle" />}
+      {/* 0. Mobile Top Drag Handle Bar */}
+      {isMobile && (
+        <div
+          onTouchStart={handleDragStart}
+          onTouchMove={handleDragMove}
+          onTouchEnd={handleDragEnd}
+          onClick={() => setSheetMode((prev) => (prev === 'peek' ? 'expanded' : 'peek'))}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingTop: '10px',
+            paddingBottom: '2px',
+            cursor: 'grab',
+            touchAction: 'none',
+            backgroundColor: '#FFFFFF',
+            flexShrink: 0,
+          }}
+          title={sheetMode === 'peek' ? 'Tarik ke atas untuk melihat detail lengkap' : 'Tarik ke bawah untuk mengecilkan'}
+        >
+          <div
+            style={{
+              width: '40px',
+              height: '4.5px',
+              borderRadius: '999px',
+              backgroundColor: '#CBD5E1',
+            }}
+          />
+        </div>
+      )}
 
       {/* 1. Header Difa AI */}
       <div
+        onTouchStart={handleDragStart}
+        onTouchMove={handleDragMove}
+        onTouchEnd={handleDragEnd}
         style={{
-          padding: isMobile ? '12px 18px' : '16px 20px',
+          padding: isMobile ? '10px 18px' : '16px 20px',
           borderBottom: '1px solid #EFEFEF',
           backgroundColor: '#FFFFFF',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          flexShrink: 0,
+          touchAction: isMobile ? 'none' : 'auto',
+          cursor: isMobile ? 'grab' : 'default',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -704,7 +879,7 @@ export default function AiChatbotDrawer({
 
         {/* Elderly-friendly large Close Button */}
         <button
-          onClick={onClose}
+          onClick={triggerClose}
           title="Tutup Panel"
           style={{
             background: isMobile ? '#F1F5F9' : 'transparent',
@@ -736,14 +911,18 @@ export default function AiChatbotDrawer({
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* Messages Body */}
           <div
+            onTouchStart={handleBodyTouchStart}
+            onTouchMove={handleBodyTouchMove}
+            onTouchEnd={handleBodyTouchEnd}
             style={{
               flex: 1,
-              overflowY: 'auto',
+              overflowY: isMobile && sheetMode === 'peek' && !isDragging ? 'hidden' : 'auto',
               padding: '16px',
               display: 'flex',
               flexDirection: 'column',
               gap: '14px',
               backgroundColor: '#F8FAFC',
+              WebkitOverflowScrolling: 'touch',
             }}
           >
             {messages.map((msg, idx) => (
@@ -990,7 +1169,20 @@ export default function AiChatbotDrawer({
       )}
 
       {tampilan === 'PERENCANA' && alatPerencana === 'SELECTION' && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div
+          onTouchStart={handleBodyTouchStart}
+          onTouchMove={handleBodyTouchMove}
+          onTouchEnd={handleBodyTouchEnd}
+          style={{
+            flex: 1,
+            overflowY: isMobile && sheetMode === 'peek' && !isDragging ? 'hidden' : 'auto',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
           {/* Info Card */}
           <div style={{ backgroundColor: '#F8FAFC', borderRadius: '10px', padding: '12px', border: '1px solid #E2E8F0', fontSize: '12.5px', color: '#475569', lineHeight: '18px' }}>
             <strong style={{ color: '#000000' }}>Difa AI Site Selection</strong> membagi peta menjadi grid sel spasial untuk menemukan zona prioritas intervensi infrastruktur disabilitas berdasarkan formula multi-kriteria.
@@ -1275,7 +1467,20 @@ export default function AiChatbotDrawer({
       )}
 
       {tampilan === 'PERENCANA' && alatPerencana === 'ANALYSIS' && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div
+          onTouchStart={handleBodyTouchStart}
+          onTouchMove={handleBodyTouchMove}
+          onTouchEnd={handleBodyTouchEnd}
+          style={{
+            flex: 1,
+            overflowY: isMobile && sheetMode === 'peek' && !isDragging ? 'hidden' : 'auto',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
           {/* Action: Pick Point on Map (Sesuai MAPID Screenshot 1) */}
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
