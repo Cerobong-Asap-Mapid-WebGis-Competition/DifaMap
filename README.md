@@ -312,7 +312,7 @@ DifaMap/
 
 ### 2. Clone Repositori
 ```bash
-git clone https://github.com/[username]/DifaMap.git
+git clone https://github.com/Cerobong-Asap-Mapid-WebGis-Competition/DifaMap.git
 cd DifaMap
 ```
 

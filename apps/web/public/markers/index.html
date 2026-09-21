@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DifaMap - Map Marker Assets untuk Video Editing</title>
+  <style>
+    :root {
+      --bg: #0F172A;
+      --card: #1E293B;
+      --border: #334155;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 32px 20px; line-height: 1.5; }
+    .container { max-width: 1100px; margin: 0 auto; }
+    header { margin-bottom: 28px; text-align: center; }
+    h1 { font-size: 26px; font-weight: 800; margin-bottom: 8px; }
+    p.lead { color: var(--text-muted); font-size: 15px; max-width: 650px; margin: 0 auto 16px; }
+    .download-zip-btn {
+      display: inline-block;
+      background: #FDC323;
+      color: #000;
+      font-weight: 800;
+      font-size: 14px;
+      padding: 10px 22px;
+      border-radius: 9999px;
+      text-decoration: none;
+      transition: transform 0.15s, background-color 0.15s;
+    }
+    .download-zip-btn:hover { background: #FBBF24; transform: translateY(-2px); }
+
+    .color-section { margin-bottom: 36px; }
+    .color-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .color-badge { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #FFF; }
+    .color-title { font-size: 18px; font-weight: 700; }
+    .color-desc { font-size: 13px; color: var(--text-muted); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      transition: border-color 0.2s;
+    }
+    .card:hover { border-color: #64748B; }
+    .preview-box {
+      width: 110px;
+      height: 140px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-image: radial-gradient(#334155 1px, transparent 1px);
+      background-size: 10px 10px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+    .preview-box img { max-width: 75px; max-height: 105px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4)); }
+    .card-label { font-size: 13px; font-weight: 700; margin-bottom: 8px; color: #FFF; }
+    .btn-row { display: flex; gap: 6px; width: 100%; }
+    .btn-row a {
+      flex: 1;
+      padding: 5px 0;
+      font-size: 11.5px;
+      font-weight: 700;
+      text-decoration: none;
+      text-align: center;
+      border-radius: 6px;
+      background: #334155;
+      color: #F8FAFC;
+      transition: background 0.15s;
+    }
+    .btn-row a:hover { background: #475569; }
+    .btn-row a.png-btn { background: #2563EB; }
+    .btn-row a.png-btn:hover { background: #1D4ED8; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>📍 DifaMap Asset Marker Peta</h1>
+      <p class="lead">Asset penanda lokasi resmi DifaMap dalam format <strong>PNG Transparan (High-Res 512px)</strong> & <strong>SVG Vektor</strong> siap pakai untuk editing video di Premiere Pro, After Effects, CapCut, DaVinci Resolve, dll.</p>
+      <a class="download-zip-btn" href="/difamap-markers-pack.zip" download>📦 Unduh Semua Sekaligus (.ZIP - 1.0 MB)</a>
+    </header>
+
+    <!-- BIRU -->
+    <div class="color-section">
+      <div class="color-header">
+        <span class="color-badge" style="background:#2563EB;"></span>
+        <div>
+          <h2 class="color-title">Penanda Biru (#2563EB)</h2>
+          <span class="color-desc">Fasilitas Publik / Halte Transit / Tempat Pilihan / Rekomendasi</span>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <div class="preview-box"><img src="pin-biru-trotoar.png" alt="Trotoar"></div>
+          <div class="card-label">Trotoar / Pejalan</div>
+          <div class="btn-row"><a href="pin-biru-trotoar.png" class="png-btn" download>PNG</a><a href="pin-biru-trotoar.svg" download>SVG</a></div>
+        </div>
+        <div class="card">
+          <div class="preview-box"><img src="pin-biru-halte.png" alt="Halte"></div>
+          <div class="card-label">Halte / Transit</div>
+          <div class="btn-row"><a href="pin-biru-halte.png" class="png-btn" download>PNG</a><a href="pin-biru-halte.svg" download>SVG</a></div>
+        </div>
+        <div class="card">
+          <div class="preview-box"><img src="pin-biru-kesehatan.png" alt="Kesehatan"></div>
+          <div class="card-label">Fasilitas Kesehatan</div>
+          <div class="btn-row"><a href="pin-biru-kesehatan.png" class="png-btn" download>PNG</a><a href="pin-biru-kesehatan.svg" download>SVG</a></div>
+        </div>
+        <div class="card">
+          <div class="preview-box"><img src="pin-biru-plain.png" alt="Polos"></div>
+          <div class="card-label">Polos (Kustom)</div>
+          <div class="btn-row"><a href="pin-biru-plain.png" class="png-btn" download>PNG</a><a href="pin-biru-plain.svg" download>SVG</a></div>
+        </div>
+        <div class="card">
+          <div class="preview-box"><img src="pin-tempat-biru-halte.png" alt="Tempat Halte"></div>
+          <div class="card-label">Tempat (Border Putih)</div>
+          <div class="btn-row"><a href="pin-tempat-biru-halte.png" class="png-btn" download>PNG</a><a href="pin-tempat-biru-halte.svg" download>SVG</a></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HIJAU -->
+    <div class="color-section">
+      <div class="color-header">
+        <span class="color-badge" style="background:#16A34A;"></span>
+        <div>
+          <h2 class="color-title">Penanda Hijau (#16A34A)</h2>
+          <span class="color-desc">Skor Aksesibilitas Tinggi (3.5 – 5.0) &bull; Ramah Disabilitas & Fasilitas Baik</span>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <div class="preview-box"><img src="pin-hijau-trotoar.png" alt="Trotoar"></div>
+          <div class="card-label">Trotoar Ramah</div>
+          <div class="btn-row"><a href="pin-hijau-trotoar.png" class="png-btn" download>PNG</a><a href="pin-hijau-trotoar.svg" download>SVG</a></div>
+        </div>
+        <div class="card">
+          <div class="preview-box"><img src="pin-hijau-halte.png" alt="Halte"></div>
+          <div class="card-label">Halte Aksesibel</div>
+          <div class="btn-row"><a href="pin-hijau-halte.png" class="png-btn" download>PNG</a><a href="pin-hijau-halte.svg" download>SVG</a></div>
+        </div>
+        <div class="card">
+          <div class="preview-box"><img src="pin-hijau-kesehatan.png" alt="Kesehatan"></div>
+          <div class="card-label">Kesehatan Aksesibel</div>
+          <div class="btn-row"><a href="pin-hijau-kesehatan.png" class="png-btn" download>PNG</a><a href="pin-hijau-kesehatan.svg" download>SVG</a></div>
+        </div>
+        <div class="card">
+          <div class="preview-box"><img src="pin-hijau-plain.png" alt="Polos"></div>
+          <div class="card-label">Polos Hijau</div>
+          <div class="btn-row"><a href="pin-hijau-plain.png" class="png-btn" download>PNG</a><a href="pin-hijau-plain.svg" download>SVG</a></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KUNING / ORANYE -->
+    <div class="color-section">
+      <div class="color-header">
+        <span class="color-badge" style="background:#F59E0B;"></span>
+        <div>
+          <h2 class="color-title">Penanda Kuning / Oranye (#F59E0B)</h2>
+          <span class="color-desc">Skor Aksesibilitas Sedang (2.5 – 3.4) &bull; Cukup Aksesibel / Perlu Perhatian</span>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <div class="preview-box"><img src="pin-kuning-trotoar.png" alt="Trotoar"></div>
+          <div class="card-label">Trotoar Cukup</div>
+          <div class="btn-row"><a href="pin-kuning-trotoar.png" class="png-btn" download>PNG</a><a href="pin-kuning-trotoar.svg" download>SVG</a></div>
+        </div>
+        <div class="card">
+          <div class="preview-box"><img src="pin-kuning-halte.png" alt="Halte"></div>
+          <div class="card-label">Halte Cukup</div>
+          <div class="btn-row"><a href="pin-kuning-halte.png" class="png-btn" download>PNG</a><a href="pin-kuning-halte.svg" download>SVG</a></div>
+        </div>
+        <div class="card">
+          <div class="preview-box"><img src="pin-kuning-plain.png" alt="Polos"></div>
+          <div class="card-label">Polos Kuning</div>
+          <div class="btn-row"><a href="pin-kuning-plain.png" class="png-btn" download>PNG</a><a href="pin-kuning-plain.svg" download>SVG</a></div>
+        </div>
+        <div class="card">
+          <div class="preview-box"><img src="pin-kuning-brand-trotoar.png" alt="Brand Yellow"></div>
+          <div class="card-label">Kuning Brand DifaMap</div>
+          <div class="btn-row"><a href="pin-kuning-brand-trotoar.png" class="png-btn" download>PNG</a><a href="pin-kuning-brand-trotoar.svg" download>SVG</a></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MERAH -->
+    <div class="color-section">
+      <div class="color-header">
+        <span class="color-badge" style="background:#EF4444;"></span>
+        <div>
+          <h2 class="color-title">Penanda Merah (#EF4444)</h2>
+          <span class="color-desc">Skor Aksesibilitas Rendah (&lt; 2.5) &bull; Belum Ramah Disabilitas / Rusak / Butuh Renovasi</span>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <div class="preview-box"><img src="pin-merah-trotoar.png" alt="Trotoar"></div>
+          <div class="card-label">Trotoar Kurang</div>
+          <div class="btn-row"><a href="pin-merah-trotoar.png" class="png-btn" download>PNG</a><a href="pin-merah-trotoar.svg" download>SVG</a></div>
+        </div>
+        <div class="card">
+          <div class="preview-box"><img src="pin-merah-halte.png" alt="Halte"></div>
+          <div class="card-label">Halte Kurang</div>
+          <div class="btn-row"><a href="pin-merah-halte.png" class="png-btn" download>PNG</a><a href="pin-merah-halte.svg" download>SVG</a></div>
+        </div>
+        <div class="card">
+          <div class="preview-box"><img src="pin-merah-plain.png" alt="Polos"></div>
+          <div class="card-label">Polos Merah</div>
+          <div class="btn-row"><a href="pin-merah-plain.png" class="png-btn" download>PNG</a><a href="pin-merah-plain.svg" download>SVG</a></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
